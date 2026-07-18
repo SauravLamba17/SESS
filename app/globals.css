@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* --font-display / --font-body / --font-mono are injected by next/font
+   on the <html> element (see app/layout.tsx). */
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-background text-text font-sans antialiased;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display tracking-tight;
+  }
+  /* Data values, codes and IDs use mono — a deliberate signature. */
+  .data,
+  .mono {
+    @apply font-mono;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* Thin instrument-panel scrollbars. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2a333a transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #2a333a;
+  border-radius: 4px;
+}

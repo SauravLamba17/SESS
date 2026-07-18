@@ -1,0 +1,279 @@
+// SESS — Simplen Employee Self-Service
+// Production / Quality / Attendance / Payroll HRMS
+// Prisma schema — Phase 0 Foundation
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  EMPLOYEE
+  MANAGER
+  HR
+  SUPER_ADMIN
+}
+
+enum AttendanceChannel {
+  WEB
+  MOBILE
+  BIOMETRIC
+}
+
+enum WarningStatus {
+  DRAFT
+  RELEASED
+}
+
+enum PayrollStatus {
+  DRAFT
+  SUBMITTED
+  FINALIZED
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id         String    @id @default(cuid())
+  clerkId    String    @unique
+  role       Role
+  employee   Employee? @relation(fields: [employeeId], references: [id])
+  employeeId String?   @unique
+  createdAt  DateTime  @default(now())
+}
+
+model Employee {
+  id          String    @id @default(cuid())
+  employeeCode String   @unique
+  name        String
+  department  String
+  designation String?
+  emergencyContact String? // Phase 1: editable on the My Profile page
+  managerId   String?
+  manager     Employee? @relation("ManagerToReports", fields: [managerId], references: [id])
+  reports     Employee[] @relation("ManagerToReports")
+  machineId   String?
+  joiningDate DateTime
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+
+  // Back-relations
+  user           User?
+  attendance     Attendance[]
+  production     Production[]
+  qualityReports QualityReport[]
+  idleLogs       IdleLog[]
+  clientMails    ClientMail[]
+  warningLetters WarningLetter[]
+  appraisalScores AppraisalScore[]
+  payrolls       Payroll[]
+  consentRecords ConsentRecord[]
+  leaveRequests  LeaveRequest[]
+  monthlyTargets MonthlyTarget[]
+}
+
+model Attendance {
+  id             String            @id @default(cuid())
+  employeeId     String
+  employee       Employee          @relation(fields: [employeeId], references: [id])
+  date           DateTime
+  checkIn        DateTime?
+  checkOut       DateTime?
+  channel        AttendanceChannel @default(WEB)
+  ipAddress      String?
+  lat            Float?
+  long           Float?
+  verifiedByFace Boolean           @default(false)
+  lateFlag       Boolean           @default(false)
+  approvedBy     String?
+  // Phase 1: a punch that fails IP/geofence validation is still written,
+  // flagged for HR review with the specific reason(s) recorded here.
+  flaggedForReview Boolean         @default(false)
+  reviewReason   String?
+
+  @@index([employeeId, date])
+}
+
+model Production {
+  id            String   @id @default(cuid())
+  employeeId    String
+  employee      Employee @relation(fields: [employeeId], references: [id])
+  date          DateTime
+  unitsProduced Int
+  targetUnits   Int
+  loggedBy      String?
+
+  // One production row per employee per date (Phase 3 self-logging upsert key).
+  @@unique([employeeId, date])
+}
+
+model QualityReport {
+  id           String   @id @default(cuid())
+  employeeId   String
+  employee     Employee @relation(fields: [employeeId], references: [id])
+  date         DateTime
+  defectCount  Int      @default(0)
+  qualityScore Float
+  reviewedBy   String?
+
+  // One quality report per employee per date (Phase 3 upsert key).
+  @@unique([employeeId, date])
+}
+
+model IdleLog {
+  id            String   @id @default(cuid())
+  employeeId    String
+  employee      Employee @relation(fields: [employeeId], references: [id])
+  date          DateTime
+  idleMinutes   Int
+  activeMinutes Int
+
+  @@index([employeeId, date])
+}
+
+model ClientMail {
+  id                String   @id @default(cuid())
+  employeeId        String
+  employee          Employee @relation(fields: [employeeId], references: [id])
+  subject           String
+  summaryViaClaude  String?
+  taggedByManagerId String?
+  date              DateTime
+}
+
+model WarningLetter {
+  id           String        @id @default(cuid())
+  employeeId   String
+  employee     Employee      @relation(fields: [employeeId], references: [id])
+  issuedBy     String
+  reason       String
+  fileUrl      String?
+  status       WarningStatus @default(DRAFT)
+  releasedBy   String?
+  releasedAt   DateTime?
+  acknowledged Boolean       @default(false)
+  createdAt    DateTime      @default(now())
+}
+
+model AppraisalCycle {
+  id          String           @id @default(cuid())
+  period      String // e.g. "2026-Q3"
+  department  String?
+  weightsJson Json // { punctuality, production, quality, feedback, warningPenalty }
+  createdBy   String
+  published   Boolean          @default(false)
+  scores      AppraisalScore[]
+  createdAt   DateTime         @default(now())
+}
+
+model AppraisalScore {
+  id                  String         @id @default(cuid())
+  employeeId          String
+  employee            Employee       @relation(fields: [employeeId], references: [id])
+  cycleId             String
+  cycle               AppraisalCycle @relation(fields: [cycleId], references: [id])
+  // Nullable: a row can exist pre-compute (manager feedback entered) or as an
+  // INCOMPLETE row (missing component data) — final score only lands once the
+  // three hard components have data. See lib/appraisal/compute.ts.
+  componentScoresJson Json?
+  finalScore          Float?
+  managerFeedback     String? // free-text comment (Phase 0 field, retained)
+  managerFeedbackScore Float? // 0-100 numeric feedback component (Phase 4)
+  componentDataJson   Json? // which components had real data vs were missing
+  excluded            Boolean        @default(false) // HR-excluded from this cycle
+
+  // One score row per employee per cycle (upsert key for feedback + compute).
+  @@unique([employeeId, cycleId])
+}
+
+model AppraisalFormula {
+  id          String   @id @default(cuid())
+  department  String? // null = global default, used when no dept-specific formula exists
+  weightsJson Json // { punctuality, production, quality, feedback, warningPenaltyPoints }
+  updatedBy   String // Super Admin's user id
+  updatedAt   DateTime @updatedAt
+
+  @@unique([department])
+}
+
+model MachineLog {
+  id                 String   @id @default(cuid())
+  machineId          String
+  date               DateTime
+  uptimeMinutes      Int
+  output             Int
+  avgPerformanceRate Float
+
+  @@index([machineId, date])
+}
+
+model Payroll {
+  id          String        @id @default(cuid())
+  employeeId  String
+  employee    Employee      @relation(fields: [employeeId], references: [id])
+  month       String // e.g. "2026-07"
+  gross       Float
+  deductions  Float
+  net         Float
+  bonus       Float         @default(0)
+  status      PayrollStatus @default(DRAFT)
+  processedBy String? // HR user id
+  finalizedBy String? // Super Admin user id — set only on FINALIZED
+  finalizedAt DateTime?
+
+  @@index([employeeId, month])
+}
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  actorUserId  String
+  action       String
+  targetEntity String
+  timestamp    DateTime @default(now())
+}
+
+model ConsentRecord {
+  id              String    @id @default(cuid())
+  employeeId      String
+  employee        Employee  @relation(fields: [employeeId], references: [id])
+  consentType     String // "FACE_VERIFICATION" | "IDLE_TRACKING"
+  givenOn         DateTime
+  retentionExpiry DateTime?
+}
+
+model LeaveRequest {
+  id         String      @id @default(cuid())
+  employeeId String
+  employee   Employee    @relation(fields: [employeeId], references: [id])
+  startDate  DateTime
+  endDate    DateTime
+  reason     String
+  status     LeaveStatus @default(PENDING)
+  approvedBy String?
+  createdAt  DateTime    @default(now())
+
+  @@index([employeeId, status])
+}
+
+// Phase 2: manager-set monthly targets. Kept separate from Production so a
+// manager's target write and an employee's daily actual write never collide
+// on the same row. The @@unique makes target-setting a clean upsert.
+model MonthlyTarget {
+  id          String   @id @default(cuid())
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id])
+  period      String // "YYYY-MM", e.g. "2026-07"
+  targetUnits Int
+  setBy       String // manager's user id
+  updatedAt   DateTime @updatedAt
+
+  @@unique([employeeId, period])
+}

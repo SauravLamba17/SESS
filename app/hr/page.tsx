@@ -1,14 +1,57 @@
 import { PageHeader } from "@/components/portal/portal-shell";
 import { Panel, PanelHeader, StatCard } from "@/components/ui/panel";
 import { StatusLabel } from "@/components/ui/status-dot";
+import { NotificationPanel } from "@/components/employee/notification-panel";
+import { getEffectiveUserId } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { getEmployeeByClerkId } from "@/lib/data/scope";
 
-export default function HRDashboard() {
+export const dynamic = "force-dynamic";
+
+/**
+ * HR's own notifications — the same Notification model, the same panel
+ * component as the Employee dashboard. HR staff are Employees too, so their
+ * notifications are addressed exactly like anyone else's.
+ */
+async function loadNotifications() {
+  const userId = await getEffectiveUserId();
+  if (!userId) return [];
+  try {
+    const me = await getEmployeeByClerkId(userId);
+    if (!me) return [];
+    const rows = await db.notification.findMany({
+      where: { employeeId: me.id },
+      orderBy: [{ read: "asc" }, { createdAt: "desc" }],
+      take: 10,
+    });
+    return rows.map((n) => ({
+      id: n.id,
+      type: n.type,
+      message: n.message,
+      read: n.read,
+      createdAt: n.createdAt.toISOString(),
+    }));
+  } catch (err) {
+    console.error("[hr/dashboard] notifications failed:", err);
+    return [];
+  }
+}
+
+export default async function HRDashboard() {
+  const notifications = await loadNotifications();
+
   return (
     <>
       <PageHeader
         title="HR Dashboard"
         description="Organisation-wide attendance, payroll, appraisal and compliance."
       />
+
+      {notifications.length > 0 && (
+        <div className="mb-4">
+          <NotificationPanel items={notifications} />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard

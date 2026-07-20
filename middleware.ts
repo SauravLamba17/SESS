@@ -10,6 +10,22 @@ const isPortalRoute = createRouteMatcher([
   "/admin(.*)",
 ]);
 
+/**
+ * Phase 8: the public career surface — the ONLY unauthenticated part of the app.
+ *
+ * These paths were already outside the gate, because the handler below returns
+ * early for anything `isPortalRoute` does not match. Listing them explicitly
+ * changes no behaviour today; it exists so the exemption is a stated decision
+ * rather than a side effect of how the portal matcher happens to be written.
+ * If someone later broadens isPortalRoute, this line documents what must stay
+ * reachable — and the assertion in the smoke test will catch a regression.
+ *
+ * Scope is exact: /careers and the single POST endpoint the form submits to.
+ * Resume FILES are NOT public — they are served by
+ * app/api/resume/[applicationId]/route.ts, which is role-checked in-route.
+ */
+const isPublicRoute = createRouteMatcher(["/careers(.*)", "/api/careers/apply"]);
+
 function coerceRole(value: unknown): Role | null {
   if (
     value === "EMPLOYEE" ||
@@ -23,6 +39,12 @@ function coerceRole(value: unknown): Role | null {
 }
 
 export default clerkMiddleware(async (auth, req) => {
+  // Public career surface: never gated, never role-checked.
+  if (isPublicRoute(req)) return;
+
+  // Everything else that is not a portal route is likewise ungated here —
+  // API routes under /api/** enforce their own auth + role in-route, which is
+  // where the 401/403 responses in this codebase come from.
   if (!isPortalRoute(req)) return;
 
   const { userId, sessionClaims, redirectToSignIn } = await auth();

@@ -41,6 +41,25 @@ enum LeaveStatus {
   REJECTED
 }
 
+enum ExpenseCategory {
+  TRAVEL
+  FOOD
+  ACCOMMODATION
+  COMMUNICATION
+  MISCELLANEOUS
+}
+
+enum ExpenseStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum LoanStatus {
+  ACTIVE
+  CLOSED
+}
+
 model User {
   id         String    @id @default(cuid())
   clerkId    String    @unique
@@ -65,6 +84,11 @@ model Employee {
   machineId   String?
   joiningDate DateTime
   active      Boolean   @default(true)
+  // Phase 7: the last working day, set when HR offboards. Pro-ration needs a
+  // DATE, not just active=false — an employee who left on the 12th is owed 12
+  // days, and `active` alone cannot express that.
+  offboardedAt DateTime?
+  pfUan       String? // Provident Fund UAN — nullable, not every employee has one yet
   createdAt   DateTime  @default(now())
 
   // Back-relations
@@ -80,6 +104,11 @@ model Employee {
   consentRecords ConsentRecord[]
   leaveRequests  LeaveRequest[]
   monthlyTargets MonthlyTarget[]
+  salaryStructure SalaryStructure?
+  expenseClaims  ExpenseClaim[]
+  salaryAdvances SalaryAdvance[]
+  notifications  Notification[]
+  onboardingTasks OnboardingTask[]
 }
 
 // Phase 6: named shifts replace the single global WORKDAY_START env var.
@@ -160,7 +189,7 @@ model ClientMail {
   employeeId        String
   employee          Employee @relation(fields: [employeeId], references: [id])
   subject           String
-  summaryViaClaude  String?
+  summary           String? // manager-typed text. Renamed from summaryViaClaude: this system never uses an LLM, and the old name implied otherwise.
   taggedByManagerId String?
   date              DateTime
 }
@@ -231,21 +260,136 @@ model MachineLog {
   @@index([machineId, date])
 }
 
+// Phase 7. Every currency field is Decimal(12,2) (Postgres numeric), NEVER
+// Float — a payslip and a Form 16 are legal/financial documents and binary
+// floating point accumulates rounding error across the deduction chain.
 model Payroll {
   id          String        @id @default(cuid())
   employeeId  String
   employee    Employee      @relation(fields: [employeeId], references: [id])
   month       String // e.g. "2026-07"
-  gross       Float
-  deductions  Float
-  net         Float
-  bonus       Float         @default(0)
+
+  // Earnings — snapshotted from the employee's SalaryStructure at run creation
+  // so a later structure change never rewrites history on a finalized payslip.
+  // Earnings, ALREADY PRO-RATED for daysWorked (see lib/payroll/proration.ts).
+  basic            Decimal @default(0) @db.Decimal(12, 2)
+  hra              Decimal @default(0) @db.Decimal(12, 2)
+  specialAllowance Decimal @default(0) @db.Decimal(12, 2)
+  bonus            Decimal @default(0) @db.Decimal(12, 2)
+
+  // Pro-ration inputs, stored so a payslip can always explain its own figures.
+  daysWorked  Int @default(0)
+  daysInMonth Int @default(0)
+
+  // Statutory deductions — all HR-entered.
+  pfEmployee      Decimal @default(0) @db.Decimal(12, 2)
+  pfEmployer      Decimal @default(0) @db.Decimal(12, 2) // employer's own contribution: recorded, NOT deducted from net
+  esi             Decimal @default(0) @db.Decimal(12, 2)
+  professionalTax Decimal @default(0) @db.Decimal(12, 2)
+  // TDS is entered by HR from the company's CA/accountant. This application
+  // performs NO tax-slab, exemption or TDS computation of any kind, by design.
+  tds             Decimal @default(0) @db.Decimal(12, 2)
+  tdsSource       String  @default("") // provenance of the TDS figure, e.g. "CA-provided, FY2026-27"
+
+  // Recovery of an outstanding SalaryAdvance. On a normal run this is one
+  // installment; on a final settlement it is the entire remaining balance.
+  loanDeduction Decimal @default(0) @db.Decimal(12, 2)
+
+  // Approved expense claims folded into this run. Kept OUT of gross: a
+  // reimbursement is not taxable salary, it is added after deductions.
+  reimbursements Decimal @default(0) @db.Decimal(12, 2)
+
+  gross      Decimal @default(0) @db.Decimal(12, 2) // basic + hra + specialAllowance (pro-rated)
+  deductions Decimal @default(0) @db.Decimal(12, 2) // pfEmployee + esi + professionalTax + tds + loanDeduction
+  net        Decimal @default(0) @db.Decimal(12, 2) // gross - deductions + bonus + reimbursements
+
   status      PayrollStatus @default(DRAFT)
   processedBy String? // HR user id
   finalizedBy String? // Super Admin user id — set only on FINALIZED
   finalizedAt DateTime?
 
+  // Full & Final settlement row, created by the Phase 5 offboarding flow.
+  isFinalSettlement Boolean @default(false)
+
+  // Post-finalization corrections are NEW rows pointing at the original —
+  // a FINALIZED row is never edited, so the trail stays auditable.
+  adjustmentForPayrollId String?
+  adjustmentFor          Payroll?  @relation("PayrollAdjustment", fields: [adjustmentForPayrollId], references: [id])
+  adjustments            Payroll[] @relation("PayrollAdjustment")
+
+  expenseClaims ExpenseClaim[]
+
+  // NOT unique on [employeeId, month]: a final-settlement row and an
+  // adjustment row both legitimately share an employee's month with the
+  // regular run. Duplicate-run protection therefore lives in
+  // app/api/hr/payroll/run/route.ts, which counts only regular rows
+  // (isFinalSettlement=false, adjustmentForPayrollId=null) before creating.
   @@index([employeeId, month])
+  @@index([status, month])
+}
+
+// Phase 7: the employee's current salary breakup. One row per employee
+// (upsert on employeeId). Historical structures for raises are deliberately
+// NOT modelled — see the note in app/hr/salary-structure/page.tsx.
+model SalaryStructure {
+  id               String   @id @default(cuid())
+  employeeId       String   @unique
+  employee         Employee @relation(fields: [employeeId], references: [id])
+  basic            Decimal  @db.Decimal(12, 2)
+  hra              Decimal  @db.Decimal(12, 2)
+  specialAllowance Decimal  @db.Decimal(12, 2)
+  effectiveFrom    DateTime
+  setBy            String // HR user id
+  updatedAt        DateTime @updatedAt
+}
+
+model ExpenseClaim {
+  id          String          @id @default(cuid())
+  employeeId  String
+  employee    Employee        @relation(fields: [employeeId], references: [id])
+  category    ExpenseCategory
+  amount      Decimal         @db.Decimal(12, 2)
+  date        DateTime
+  description String
+  receiptUrl  String?
+  status      ExpenseStatus   @default(PENDING)
+  approvedBy  String?
+  approvedAt  DateTime?
+  // Set once folded into a payroll run — the guard against double-reimbursement.
+  includedInPayrollId String?
+  includedInPayroll   Payroll? @relation(fields: [includedInPayrollId], references: [id])
+  createdAt   DateTime        @default(now())
+
+  @@index([employeeId, status])
+}
+
+// Phase 7: an advance/loan paid to an employee, recovered via monthly
+// installments on payroll. Recovery is applied at FINALIZE, never at draft
+// creation — an unfinalized run must not move a real balance.
+model SalaryAdvance {
+  id               String     @id @default(cuid())
+  employeeId       String
+  employee         Employee   @relation(fields: [employeeId], references: [id])
+  principalAmount  Decimal    @db.Decimal(12, 2)
+  monthlyDeduction Decimal    @db.Decimal(12, 2)
+  remainingBalance Decimal    @db.Decimal(12, 2)
+  status           LoanStatus @default(ACTIVE)
+  issuedBy         String
+  issuedAt         DateTime   @default(now())
+
+  @@index([employeeId, status])
+}
+
+model Notification {
+  id         String   @id @default(cuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id])
+  type       String // e.g. "PAYSLIP_READY"
+  message    String
+  read       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([employeeId, read])
 }
 
 model AuditLog {
@@ -292,4 +436,158 @@ model MonthlyTarget {
   updatedAt   DateTime @updatedAt
 
   @@unique([employeeId, period])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Phase 8 — Recruitment / ATS
+//
+// Every decision in this subsystem is a HUMAN action on plain data:
+// stage transitions, offer approval and hiring are all explicit clicks by a
+// named user, recorded in AuditLog. Resumes are stored and read by people —
+// there is no parsing, extraction, scoring or summarisation anywhere, and
+// none is to be added. This is a permanent design constraint for the whole
+// system, not a limitation of this phase.
+// ─────────────────────────────────────────────────────────────
+
+enum RequisitionStatus {
+  OPEN
+  ON_HOLD
+  CLOSED
+}
+
+model JobRequisition {
+  id           String            @id @default(cuid())
+  title        String
+  department   String
+  description  String
+  openings     Int
+  status       RequisitionStatus @default(OPEN)
+  createdBy    String
+  createdAt    DateTime          @default(now())
+  closedAt     DateTime?
+  applications Application[]
+
+  @@index([status])
+}
+
+model Candidate {
+  id           String        @id @default(cuid())
+  name         String
+  email        String
+  phone        String
+  // Storage KEY, not a public URL. Resumes live outside the web root and are
+  // served only through the role-checked /api/resume/[applicationId] route —
+  // putting them in public/ would expose every applicant's CV to the internet.
+  resumeUrl    String
+  source       String // e.g. "Career Page", "Referral"
+  createdAt    DateTime      @default(now())
+
+  // ── Data retention (DPDP-oriented) ────────────────────────────────
+  // Real opt-in: the career-page checkbox is unchecked by default and this
+  // stays false unless the applicant actively ticks it.
+  talentPoolConsent   Boolean   @default(false)
+  talentPoolConsentAt DateTime?
+  // When this candidate's personal data becomes due for review and deletion.
+  // Set on rejection: +1 year without consent, +2 years with it. Even the
+  // consented window is bounded — "indefinite" is the problem being fixed.
+  // Nothing deletes automatically; HR reviews and acts (see
+  // app/hr/candidates/retention-review).
+  scheduledDeletionAt DateTime?
+
+  applications Application[]
+
+  @@index([email])
+  @@index([scheduledDeletionAt])
+}
+
+enum PipelineStage {
+  APPLIED
+  SCREENING
+  INTERVIEW
+  OFFER
+  HIRED
+  REJECTED
+}
+
+model Application {
+  id               String         @id @default(cuid())
+  candidateId      String
+  candidate        Candidate      @relation(fields: [candidateId], references: [id])
+  jobRequisitionId String
+  jobRequisition   JobRequisition @relation(fields: [jobRequisitionId], references: [id])
+  stage            PipelineStage  @default(APPLIED)
+  rejectedReason   String?
+  // Free-text, human-authored review notes. Never machine-generated.
+  reviewNotes      String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  interviewFeedback InterviewFeedback[]
+  offer             Offer?
+
+  // One application per candidate per requisition.
+  @@unique([candidateId, jobRequisitionId])
+  @@index([stage])
+}
+
+model InterviewFeedback {
+  id                String      @id @default(cuid())
+  applicationId     String
+  application       Application @relation(fields: [applicationId], references: [id])
+  interviewerUserId String // the Manager or HR user who interviewed
+  rating            Int // 1-5
+  notes             String
+  interviewDate     DateTime
+  // Which interview round this feedback belongs to. Defaults to 1, which is
+  // also correct for every row created before multi-round tracking existed —
+  // those were all effectively a single round at the time.
+  roundNumber       Int         @default(1)
+  createdAt         DateTime    @default(now())
+
+  @@index([applicationId])
+}
+
+enum OfferStatus {
+  DRAFT
+  APPROVED
+  SENT
+  ACCEPTED
+  DECLINED
+  WITHDRAWN
+}
+
+// Mirrors the Payroll DRAFT→SUBMITTED→FINALIZED pattern: HR drafts, a Super
+// Admin approves, and once SENT the proposed figures are immutable through
+// every code path (enforced in app/api/hr/offer/*, not just hidden in the UI).
+model Offer {
+  id                       String      @id @default(cuid())
+  applicationId            String      @unique
+  application              Application @relation(fields: [applicationId], references: [id])
+  proposedBasic            Decimal     @db.Decimal(12, 2)
+  proposedHra              Decimal     @db.Decimal(12, 2)
+  proposedSpecialAllowance Decimal     @db.Decimal(12, 2)
+  proposedDesignation      String
+  proposedDepartment       String
+  proposedManagerId        String? // which existing Employee they'd report to
+  joiningDate              DateTime
+  status                   OfferStatus @default(DRAFT)
+  createdBy                String
+  approvedBy               String?
+  approvedAt               DateTime?
+  sentAt                   DateTime?
+  respondedAt              DateTime?
+
+  @@index([status])
+}
+
+model OnboardingTask {
+  id          String    @id @default(cuid())
+  employeeId  String
+  employee    Employee  @relation(fields: [employeeId], references: [id])
+  taskName    String
+  completed   Boolean   @default(false)
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([employeeId, completed])
 }

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getEffectiveUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getCurrentRole } from "@/lib/auth";
+import { assemblePayrollRow } from "@/lib/payroll/assemble";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,6 +11,30 @@ function fail(code: string, error: string, status: number) {
   return NextResponse.json({ error, code }, { status });
 }
 
+/** "YYYY-MM" period a date falls in. */
+function periodOf(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/** Exclusive upper bound of a "YYYY-MM" period. */
+function monthEnd(period: string): Date {
+  const [y, m] = period.split("-").map(Number);
+  return new Date(y, m, 1);
+}
+
+/**
+ * Offboard an employee (Phase 5) and raise their Full & Final settlement
+ * (Phase 7) in ONE transaction.
+ *
+ * The settlement is NOT a parallel flow — it is part of the same offboarding
+ * event, sharing its transaction and its audit trail, so an employee can never
+ * end up inactive without a settlement raised, or vice versa.
+ *
+ * The settlement row is created as DRAFT and follows the identical
+ * DRAFT→SUBMITTED→FINALIZED workflow as a normal run. It is deliberately NOT
+ * auto-finalized: a settlement is exactly the payroll a departing employee is
+ * most likely to dispute, so it gets the same HR review and Super Admin lock.
+ */
 export async function POST(req: NextRequest) {
   const userId = await getEffectiveUserId();
   if (!userId) return fail("UNAUTHENTICATED", "Not authenticated", 401);
@@ -17,7 +42,7 @@ export async function POST(req: NextRequest) {
   if (role !== "HR" && role !== "SUPER_ADMIN")
     return fail("FORBIDDEN", "Only HR or Super Admin may offboard employees", 403);
 
-  let body: { employeeId?: unknown };
+  let body: { employeeId?: unknown; lastWorkingDay?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -26,42 +51,180 @@ export async function POST(req: NextRequest) {
   const employeeId = typeof body.employeeId === "string" ? body.employeeId : "";
   if (!employeeId) return fail("BAD_INPUT", "employeeId is required", 400);
 
+  // Last working day drives the settlement's pro-ration. Defaults to today.
+  let lastWorkingDay: Date;
+  if (typeof body.lastWorkingDay === "string" && body.lastWorkingDay.trim()) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(body.lastWorkingDay.trim()))
+      return fail("BAD_INPUT", "lastWorkingDay must be YYYY-MM-DD", 400);
+    const [y, m, d] = body.lastWorkingDay.trim().split("-").map(Number);
+    lastWorkingDay = new Date(y, m - 1, d);
+    if (Number.isNaN(lastWorkingDay.getTime()))
+      return fail("BAD_INPUT", "lastWorkingDay is not a valid date", 400);
+  } else {
+    const n = new Date();
+    lastWorkingDay = new Date(n.getFullYear(), n.getMonth(), n.getDate());
+  }
+
   try {
-    // Soft-delete only (active=false); historical records must stay intact.
-    // Block if this person still manages active reports — don't orphan them.
-    const result = await db.$transaction(async (tx) => {
-      const emp = await tx.employee.findUnique({
-        where: { id: employeeId },
-        select: { id: true, active: true },
-      });
-      if (!emp) return { code: "NOT_FOUND" as const };
-      if (!emp.active) return { code: "ALREADY_INACTIVE" as const };
+    const result = await db.$transaction(
+      async (tx) => {
+        const emp = await tx.employee.findUnique({
+          where: { id: employeeId },
+          select: {
+            id: true,
+            active: true,
+            joiningDate: true,
+            salaryStructure: {
+              select: { basic: true, hra: true, specialAllowance: true },
+            },
+          },
+        });
+        if (!emp) return { code: "NOT_FOUND" as const };
+        if (!emp.active) return { code: "ALREADY_INACTIVE" as const };
 
-      const activeReports = await tx.employee.count({
-        where: { managerId: employeeId, active: true },
-      });
-      if (activeReports > 0) return { code: "HAS_REPORTS" as const, activeReports };
+        // Phase 5 rule, unchanged: don't orphan active direct reports.
+        const activeReports = await tx.employee.count({
+          where: { managerId: employeeId, active: true },
+        });
+        if (activeReports > 0) return { code: "HAS_REPORTS" as const, activeReports };
 
-      await tx.employee.update({ where: { id: employeeId }, data: { active: false } });
-      await tx.auditLog.create({
-        data: { actorUserId: userId, action: "EMPLOYEE_OFFBOARDED", targetEntity: employeeId },
-      });
-      return { code: "OK" as const };
-    });
+        if (lastWorkingDay < emp.joiningDate)
+          return { code: "BEFORE_JOINING" as const };
+
+        // ── Phase 5: the soft-delete itself, plus the exit date ──
+        await tx.employee.update({
+          where: { id: employeeId },
+          data: { active: false, offboardedAt: lastWorkingDay },
+        });
+        await tx.auditLog.create({
+          data: {
+            actorUserId: userId,
+            action: "EMPLOYEE_OFFBOARDED",
+            targetEntity: employeeId,
+          },
+        });
+
+        // ── Phase 7: the Full & Final settlement ──
+        // No salary structure means we cannot compute a settlement. Offboarding
+        // still completes — reported, not silently skipped.
+        if (!emp.salaryStructure) {
+          return { code: "OK_NO_STRUCTURE" as const };
+        }
+
+        const period = periodOf(lastWorkingDay);
+
+        // A settlement must not double-pay a claim already folded into a
+        // regular run, so the same includedInPayrollId guard applies.
+        const claims = await tx.expenseClaim.findMany({
+          where: {
+            employeeId,
+            status: "APPROVED",
+            includedInPayrollId: null,
+            date: { lt: monthEnd(period) },
+          },
+          select: { id: true, amount: true },
+        });
+
+        const advance = await tx.salaryAdvance.findFirst({
+          where: { employeeId, status: "ACTIVE" },
+          select: { id: true, monthlyDeduction: true, remainingBalance: true },
+          orderBy: { issuedAt: "asc" },
+        });
+
+        // Same shared assembler the monthly run uses — settlement: true is the
+        // only difference, recovering the FULL outstanding balance rather than
+        // one installment.
+        const row = assemblePayrollRow({
+          period,
+          structure: emp.salaryStructure,
+          joiningDate: emp.joiningDate,
+          offboardedAt: lastWorkingDay,
+          claims,
+          advance,
+          settlement: true,
+        });
+
+        const settlement = await tx.payroll.create({
+          data: {
+            employeeId,
+            month: period,
+            isFinalSettlement: true,
+            basic: row.basic,
+            hra: row.hra,
+            specialAllowance: row.specialAllowance,
+            daysWorked: row.daysWorked,
+            daysInMonth: row.daysInMonth,
+            reimbursements: row.reimbursements,
+            loanDeduction: row.loanDeduction,
+            gross: row.gross,
+            deductions: row.deductions,
+            net: row.net,
+            processedBy: userId,
+          },
+        });
+
+        if (row.claimIds.length > 0) {
+          await tx.expenseClaim.updateMany({
+            where: { id: { in: row.claimIds }, includedInPayrollId: null },
+            data: { includedInPayrollId: settlement.id },
+          });
+        }
+
+        // NOTE: the advance's balance is NOT reduced here. Recovery happens at
+        // FINALIZE (app/api/admin/payroll/finalize), same as every other row.
+        // Closing the loan at offboard would mark it settled against a DRAFT
+        // settlement that a Super Admin has not approved and that HR may still
+        // revise — the ledger would then disagree with the payslip.
+        await tx.auditLog.create({
+          data: {
+            actorUserId: userId,
+            action: "FULL_FINAL_SETTLEMENT_CREATED",
+            targetEntity: settlement.id,
+          },
+        });
+
+        return {
+          code: "OK" as const,
+          settlementId: settlement.id,
+          period,
+          daysWorked: row.daysWorked,
+          daysInMonth: row.daysInMonth,
+          net: row.net.toFixed(2),
+          loanDeduction: row.loanDeduction.toFixed(2),
+          reimbursements: row.reimbursements.toFixed(2),
+          claimsIncluded: row.claimIds.length,
+        };
+      },
+      { timeout: 30_000 },
+    );
 
     switch (result.code) {
       case "NOT_FOUND":
         return fail("NOT_FOUND", "Employee not found", 404);
       case "ALREADY_INACTIVE":
         return fail("ALREADY_INACTIVE", "Employee is already offboarded", 409);
+      case "BEFORE_JOINING":
+        return fail(
+          "BAD_INPUT",
+          "Last working day cannot be before the employee's joining date",
+          400,
+        );
       case "HAS_REPORTS":
         return fail(
           "HAS_ACTIVE_REPORTS",
           `Cannot offboard: this employee still manages ${result.activeReports} active direct report(s). Reassign them to another manager first.`,
           409,
         );
+      case "OK_NO_STRUCTURE":
+        return NextResponse.json({
+          ok: true,
+          employeeId,
+          settlement: null,
+          warning:
+            "Employee offboarded, but no full & final settlement was raised — they have no salary structure set.",
+        });
       default:
-        return NextResponse.json({ ok: true, employeeId });
+        return NextResponse.json({ ok: true, employeeId, settlement: result });
     }
   } catch (err) {
     console.error("[hr/employee offboard] failed:", err);

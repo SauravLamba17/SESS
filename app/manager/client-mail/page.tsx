@@ -87,8 +87,8 @@ export default async function ClientMailPage() {
                     <div className="mt-0.5 font-mono text-xs text-text-muted">
                       {m.employee.name} · {m.employee.employeeCode}
                     </div>
-                    {m.summaryViaClaude && (
-                      <p className="mt-1 text-xs text-text-muted">{m.summaryViaClaude}</p>
+                    {m.summary && (
+                      <p className="mt-1 text-xs text-text-muted">{m.summary}</p>
                     )}
                   </li>
                 ))}

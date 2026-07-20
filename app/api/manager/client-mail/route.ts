@@ -47,9 +47,9 @@ export async function POST(req: NextRequest) {
         select: { id: true },
       });
       if (!report) return null;
-      // summaryViaClaude holds manager-entered text for now (no AI this phase).
+      // Plain manager-entered text — this system never uses an LLM anywhere.
       return tx.clientMail.create({
-        data: { employeeId, subject, date, summaryViaClaude: summary || null, taggedByManagerId: userId },
+        data: { employeeId, subject, date, summary: summary || null, taggedByManagerId: userId },
       });
     });
 

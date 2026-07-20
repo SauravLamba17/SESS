@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/portal/portal-shell";
 import { Panel, PanelHeader, StatCard } from "@/components/ui/panel";
 import { StatusDot, StatusLabel, type StatusState } from "@/components/ui/status-dot";
 import { ClockInWidget } from "@/components/employee/clock-in-widget";
+import { NotificationPanel } from "@/components/employee/notification-panel";
 import { db } from "@/lib/db";
 import { getEmployeeByClerkId } from "@/lib/data/scope";
 import { currentPeriod } from "@/lib/period";
@@ -41,7 +42,7 @@ async function loadMetrics() {
     const weekStart = weekStartMonday(now);
     const weekEnd = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 7);
 
-    const [prod, target, qual, appraisal, todayAtt, weekAtt, consents, shift] = await Promise.all([
+    const [prod, target, qual, appraisal, todayAtt, weekAtt, consents, shift, notifications] = await Promise.all([
       db.production.aggregate({
         where: { employeeId: employee.id, date: inMonth },
         _sum: { unitsProduced: true },
@@ -82,6 +83,12 @@ async function loadMetrics() {
       employee.shiftId
         ? db.shift.findUnique({ where: { id: employee.shiftId } })
         : Promise.resolve(null),
+      // Phase 7: own notifications — unread first, then most recent.
+      db.notification.findMany({
+        where: { employeeId: employee.id },
+        orderBy: [{ read: "asc" }, { createdAt: "desc" }],
+        take: 8,
+      }),
     ]);
 
     const weekByDate = new Map(weekAtt.map((a) => [ymd(a.date), a]));
@@ -101,6 +108,14 @@ async function loadMetrics() {
       face: latestConsent("FACE_VERIFICATION"),
       idle: latestConsent("IDLE_TRACKING"),
       shift,
+      // Serialize Dates — they don't cross the RSC boundary as Date objects.
+      notifications: notifications.map((n) => ({
+        id: n.id,
+        type: n.type,
+        message: n.message,
+        read: n.read,
+        createdAt: n.createdAt.toISOString(),
+      })),
     };
   } catch (err) {
     console.error("[employee/dashboard] metrics failed:", err);
@@ -192,6 +207,12 @@ export default async function EmployeeDashboard() {
         title="My Dashboard"
         description="Your attendance, production, quality and appraisal at a glance."
       />
+
+      {m && m.notifications.length > 0 && (
+        <div className="mb-4">
+          <NotificationPanel items={m.notifications} />
+        </div>
+      )}
 
       <div className="mb-4">
         <ClockInWidget

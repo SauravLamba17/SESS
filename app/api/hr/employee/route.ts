@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getEffectiveUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getCurrentRole } from "@/lib/auth";
+import { onboardEmployee } from "@/lib/employees/onboard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -53,30 +54,28 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Duplicate employeeCode → clear 409 (also backed by the DB unique index).
-    const dupe = await db.employee.findUnique({ where: { employeeCode } });
-    if (dupe) return fail("DUPLICATE_CODE", `Employee code ${employeeCode} already exists`, 409);
+    // Delegates to the SHARED onboarding function (lib/employees/onboard.ts).
+    // Phase 8's hire-conversion calls the exact same function, so employeeCode
+    // uniqueness, manager validation and the audit row cannot drift apart
+    // between the manual and automatic paths.
+    const result = await db.$transaction((tx) =>
+      onboardEmployee(
+        tx,
+        { employeeCode, name, department, designation, managerId, machineId, joiningDate },
+        userId,
+      ),
+    );
 
-    if (managerId) {
-      const mgr = await db.employee.findFirst({
-        where: { id: managerId, active: true },
-        select: { id: true },
-      });
-      if (!mgr)
-        return fail("BAD_MANAGER", "Selected manager is not an active employee", 400);
+    if (!result.ok) {
+      const status = result.code === "DUPLICATE_CODE" ? 409 : 400;
+      return fail(result.code, result.message, status);
     }
 
-    const created = await db.$transaction(async (tx) => {
-      const emp = await tx.employee.create({
-        data: { employeeCode, name, department, designation, managerId, machineId, joiningDate },
-      });
-      await tx.auditLog.create({
-        data: { actorUserId: userId, action: "EMPLOYEE_ONBOARDED", targetEntity: emp.id },
-      });
-      return emp;
+    return NextResponse.json({
+      ok: true,
+      id: result.employee.id,
+      employeeCode: result.employee.employeeCode,
     });
-
-    return NextResponse.json({ ok: true, id: created.id, employeeCode });
   } catch (err) {
     // Unique-violation backstop if two onboards race the pre-check.
     if (typeof err === "object" && err && (err as { code?: string }).code === "P2002")

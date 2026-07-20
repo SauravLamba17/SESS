@@ -1,0 +1,199 @@
+import { NextResponse, type NextRequest } from "next/server";
+import { getEffectiveUserId, getCurrentRole } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { onboardEmployee, createDefaultOnboardingTasks } from "@/lib/employees/onboard";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+function fail(code: string, error: string, status: number) {
+  return NextResponse.json({ error, code }, { status });
+}
+
+/** Legal transitions. Anything not listed here is refused. */
+const NEXT: Record<string, string[]> = {
+  DRAFT: ["WITHDRAWN"],
+  APPROVED: ["SENT", "WITHDRAWN"],
+  SENT: ["ACCEPTED", "DECLINED", "WITHDRAWN"],
+  ACCEPTED: [],
+  DECLINED: [],
+  WITHDRAWN: [],
+};
+
+/**
+ * Advance an offer: APPROVED→SENT, SENT→ACCEPTED/DECLINED, or WITHDRAWN.
+ *
+ * Candidates have no accounts, so ACCEPTED/DECLINED is HR recording a
+ * real-world response, not the candidate clicking anything.
+ *
+ * ACCEPTED additionally performs HIRE CONVERSION in the SAME transaction:
+ * Employee + SalaryStructure + OnboardingTasks + application stage, all or
+ * nothing. The Employee is created by the shared onboardEmployee() from
+ * lib/employees/onboard.ts — the identical function Phase 5's manual HR
+ * onboarding route calls — so employeeCode generation and uniqueness behave
+ * the same on both paths.
+ */
+export async function POST(req: NextRequest) {
+  const userId = await getEffectiveUserId();
+  if (!userId) return fail("UNAUTHENTICATED", "Not authenticated", 401);
+  const role = await getCurrentRole();
+  if (role !== "HR" && role !== "SUPER_ADMIN")
+    return fail("FORBIDDEN", "Only HR or Super Admin may update an offer's status", 403);
+
+  let body: { id?: unknown; status?: unknown };
+  try {
+    body = await req.json();
+  } catch {
+    return fail("BAD_INPUT", "Invalid JSON body", 400);
+  }
+  const id = typeof body.id === "string" ? body.id : "";
+  const status = typeof body.status === "string" ? body.status : "";
+  if (!id || !status) return fail("BAD_INPUT", "id and status are required", 400);
+
+  try {
+    const offer = await db.offer.findUnique({
+      where: { id },
+      include: {
+        application: {
+          select: {
+            id: true,
+            stage: true,
+            candidate: { select: { id: true, name: true } },
+          },
+        },
+      },
+    });
+    if (!offer) return fail("NOT_FOUND", "Offer not found", 404);
+
+    const allowed = NEXT[offer.status] ?? [];
+    if (!allowed.includes(status))
+      return fail(
+        "BAD_TRANSITION",
+        allowed.length === 0
+          ? `This offer is ${offer.status} and is final — no further changes are possible.`
+          : `Cannot go from ${offer.status} to ${status}. Allowed next: ${allowed.join(", ")}.`,
+        409,
+      );
+
+    // ── SENT / DECLINED / WITHDRAWN: a guarded status flip ──
+    if (status !== "ACCEPTED") {
+      const now = new Date();
+      const count = await db.$transaction(async (tx) => {
+        const upd = await tx.offer.updateMany({
+          where: { id, status: offer.status },
+          data: {
+            status: status as never,
+            ...(status === "SENT" ? { sentAt: now } : {}),
+            ...(status === "DECLINED" || status === "WITHDRAWN" ? { respondedAt: now } : {}),
+          },
+        });
+        if (upd.count === 0) return 0;
+        await tx.auditLog.create({
+          data: {
+            actorUserId: userId,
+            action:
+              status === "SENT"
+                ? "OFFER_SENT"
+                : status === "DECLINED"
+                  ? "OFFER_DECLINED"
+                  : "OFFER_WITHDRAWN",
+            targetEntity: id,
+          },
+        });
+        return upd.count;
+      });
+      if (count === 0)
+        return fail("CONCURRENT_CHANGE", "This offer changed state. Reload and try again.", 409);
+      return NextResponse.json({ ok: true, id, status });
+    }
+
+    // ── ACCEPTED: hire conversion, one atomic transaction ──
+    if (offer.application.stage === "HIRED")
+      return fail("ALREADY_HIRED", "This candidate has already been converted.", 409);
+
+    const result = await db.$transaction(async (tx) => {
+      // Guard first: if this fails, nothing else in the transaction happens.
+      const upd = await tx.offer.updateMany({
+        where: { id, status: "SENT" },
+        data: { status: "ACCEPTED", respondedAt: new Date() },
+      });
+      if (upd.count === 0) return { code: "CONCURRENT" as const };
+
+      // 1. The Employee — via the SHARED Phase 5 onboarding function.
+      const onboarded = await onboardEmployee(
+        tx,
+        {
+          // No employeeCode supplied → the shared function generates the next
+          // one in the same EMP-#### series HR's manual flow uses.
+          name: offer.application.candidate.name,
+          department: offer.proposedDepartment,
+          designation: offer.proposedDesignation,
+          managerId: offer.proposedManagerId,
+          joiningDate: offer.joiningDate,
+        },
+        userId,
+      );
+      if (!onboarded.ok) return { code: "ONBOARD_FAILED" as const, detail: onboarded };
+
+      // 2. Salary structure straight from the agreed offer figures.
+      await tx.salaryStructure.create({
+        data: {
+          employeeId: onboarded.employee.id,
+          basic: offer.proposedBasic,
+          hra: offer.proposedHra,
+          specialAllowance: offer.proposedSpecialAllowance,
+          effectiveFrom: offer.joiningDate,
+          setBy: userId,
+        },
+      });
+
+      // 3. Default onboarding checklist.
+      const taskCount = await createDefaultOnboardingTasks(tx, onboarded.employee.id);
+
+      // 4. The application is HIRED — set only here, never by hand.
+      await tx.application.update({
+        where: { id: offer.applicationId },
+        data: { stage: "HIRED" },
+      });
+
+      await tx.auditLog.create({
+        data: { actorUserId: userId, action: "OFFER_ACCEPTED", targetEntity: id },
+      });
+      await tx.auditLog.create({
+        data: {
+          actorUserId: userId,
+          action: "CANDIDATE_HIRED_CONVERTED",
+          // All three ids, so the trail reads from any direction.
+          targetEntity: `candidate=${offer.application.candidate.id} application=${offer.applicationId} employee=${onboarded.employee.id}`,
+        },
+      });
+
+      return {
+        code: "OK" as const,
+        employee: onboarded.employee,
+        taskCount,
+      };
+    });
+
+    if (result.code === "CONCURRENT")
+      return fail("CONCURRENT_CHANGE", "This offer changed state. Reload and try again.", 409);
+    if (result.code === "ONBOARD_FAILED")
+      return fail(
+        result.detail.code,
+        `Could not create the employee record: ${result.detail.message}`,
+        result.detail.code === "DUPLICATE_CODE" ? 409 : 400,
+      );
+
+    return NextResponse.json({
+      ok: true,
+      id,
+      status: "ACCEPTED",
+      employeeId: result.employee.id,
+      employeeCode: result.employee.employeeCode,
+      onboardingTasksCreated: result.taskCount,
+    });
+  } catch (err) {
+    console.error("[hr/offer/status] failed:", err);
+    return fail("SERVER_ERROR", "Could not update the offer", 503);
+  }
+}

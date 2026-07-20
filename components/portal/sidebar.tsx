@@ -22,6 +22,13 @@ import {
   UserCircle,
   Mail,
   Clock,
+  ReceiptText,
+  IndianRupee,
+  Lock,
+  Briefcase,
+  UserSearch,
+  ClipboardCheck,
+  FileSignature,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -48,6 +55,13 @@ const ICONS: Record<string, LucideIcon> = {
   UserCircle,
   Mail,
   Clock,
+  ReceiptText,
+  IndianRupee,
+  Lock,
+  Briefcase,
+  UserSearch,
+  ClipboardCheck,
+  FileSignature,
 };
 
 export function Sidebar({ portal }: { portal: PortalKey }) {

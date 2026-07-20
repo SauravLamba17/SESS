@@ -1,8 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getEffectiveUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getEmployeeByClerkId } from "@/lib/data/scope";
-import { validatePunch, isLateCheckIn } from "@/lib/attendance/validation";
+import {
+  validatePunch,
+  isLateCheckIn,
+  lateMinutesForShift,
+} from "@/lib/attendance/validation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,7 +41,7 @@ function endOfDay(d: Date): Date {
 
 export async function POST(req: NextRequest) {
   // ── Auth: resolve the employee from the Clerk session ──────
-  const { userId } = await auth();
+  const userId = await getEffectiveUserId();
   if (!userId) {
     return NextResponse.json(
       { ok: false, error: "Not authenticated" },
@@ -59,6 +63,7 @@ export async function POST(req: NextRequest) {
 
   const lat = coerceCoord(body.lat);
   const long = coerceCoord(body.long);
+  const note = typeof body.note === "string" ? body.note.trim() : "";
   const ip = clientIp(req);
   const now = new Date();
 
@@ -95,9 +100,37 @@ export async function POST(req: NextRequest) {
     let record;
 
     if (!existing) {
-      // First punch of the day → CHECK-IN.
+      // First punch of the day → CHECK-IN. A comment is mandatory (enforced
+      // server-side, not just in the modal).
+      if (!note) {
+        return NextResponse.json(
+          {
+            ok: false,
+            code: "NOTE_REQUIRED",
+            error: "A comment is required to clock in.",
+          },
+          { status: 400 },
+        );
+      }
       punchType = "IN";
-      const lateFlag = isLateCheckIn(now);
+      // Shift-based lateness (Phase 6/7). Fall back to the WORKDAY_START env
+      // behaviour if the employee somehow has no assigned shift — in that case
+      // lateMinutes stays null (we have no shift start to measure against).
+      let lateFlag: boolean;
+      let lateMinutes: number | null = null;
+      const shift = employee.shiftId
+        ? await db.shift.findUnique({ where: { id: employee.shiftId } })
+        : null;
+      if (shift) {
+        lateMinutes = lateMinutesForShift(now, shift.startTime, shift.gracePeriodMinutes);
+        lateFlag = lateMinutes !== null;
+      } else {
+        console.warn(
+          `[attendance/punch] employee ${employee.id} has no shift; falling back to WORKDAY_START lateness (lateMinutes stays null).`,
+        );
+        lateFlag = isLateCheckIn(now);
+        lateMinutes = null;
+      }
       record = await db.attendance.create({
         data: {
           employeeId: employee.id,
@@ -108,6 +141,8 @@ export async function POST(req: NextRequest) {
           lat,
           long,
           lateFlag,
+          lateMinutes,
+          checkInNote: note,
           flaggedForReview,
           reviewReason,
         },
@@ -162,6 +197,7 @@ export async function POST(req: NextRequest) {
       checkIn: record.checkIn,
       checkOut: record.checkOut,
       lateFlag: record.lateFlag,
+      lateMinutes: record.lateMinutes,
       flaggedForReview: record.flaggedForReview,
     });
   } catch (err) {

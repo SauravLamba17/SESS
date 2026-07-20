@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getEffectiveUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getEmployeeByClerkId } from "@/lib/data/scope";
 
@@ -14,7 +14,7 @@ function ymd(d: Date): string {
 }
 
 export async function GET(req: NextRequest) {
-  const { userId } = await auth();
+  const userId = await getEffectiveUserId();
   if (!userId) {
     return NextResponse.json(
       { ok: false, error: "Not authenticated" },
@@ -57,6 +57,7 @@ export async function GET(req: NextRequest) {
       checkIn: r.checkIn ? r.checkIn.toISOString() : null,
       checkOut: r.checkOut ? r.checkOut.toISOString() : null,
       lateFlag: r.lateFlag,
+      lateMinutes: r.lateMinutes, // null for historical rows / not late
       flaggedForReview: r.flaggedForReview,
     }));
 

@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { Prisma } from "@prisma/client";
-import { auth } from "@clerk/nextjs/server";
+import { getEffectiveUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getCurrentRole } from "@/lib/auth";
 import { getActiveEmployees } from "@/lib/data/scope";
@@ -26,11 +26,15 @@ function parseWeights(raw: unknown): AppraisalWeights {
     quality: Number(w.quality) || 0,
     feedback: Number(w.feedback) || 0,
     warningPenaltyPoints: Number(w.warningPenaltyPoints) || 0,
+    // NaN when a (pre-Phase-8) snapshot lacks these — compute.ts defaults them.
+    punctualityFrequencyWeight: Number(w.punctualityFrequencyWeight),
+    punctualitySeverityWeight: Number(w.punctualitySeverityWeight),
+    punctualitySeverityCapMinutes: Number(w.punctualitySeverityCapMinutes),
   };
 }
 
 export async function POST(req: NextRequest) {
-  const { userId } = await auth();
+  const userId = await getEffectiveUserId();
   if (!userId) return fail("UNAUTHENTICATED", "Not authenticated", 401);
   const role = await getCurrentRole();
   if (role !== "HR" && role !== "SUPER_ADMIN")
@@ -80,6 +84,7 @@ export async function POST(req: NextRequest) {
           by: ["employeeId"],
           where: { employeeId: { in: ids }, date: inRange, lateFlag: true },
           _count: { _all: true },
+          _sum: { lateMinutes: true }, // Phase 8: for severity (late days only)
         }),
         db.production.groupBy({
           by: ["employeeId"],
@@ -112,6 +117,7 @@ export async function POST(req: NextRequest) {
 
     const totalBy = new Map(attTotal.map((g) => [g.employeeId, g._count._all]));
     const lateBy = new Map(attLate.map((g) => [g.employeeId, g._count._all]));
+    const lateMinsBy = new Map(attLate.map((g) => [g.employeeId, g._sum.lateMinutes ?? 0]));
     const prodBy = new Map(prodSum.map((g) => [g.employeeId, g._sum.unitsProduced ?? 0]));
     const qualBy = new Map(qualAvg.map((g) => [g.employeeId, g._avg.qualityScore]));
     const warnBy = new Map(warnings.map((g) => [g.employeeId, g._count._all]));
@@ -122,6 +128,19 @@ export async function POST(req: NextRequest) {
       targetBy.set(t.employeeId, (targetBy.get(t.employeeId) ?? 0) + t.targetUnits);
 
     const incomplete: { employeeId: string; name: string; missing: string[] }[] = [];
+    const scored: {
+      employeeId: string;
+      name: string;
+      finalScore: number;
+      punctuality: {
+        value: number;
+        frequencyScore: number;
+        severityScore: number;
+        lateCount: number;
+        totalPunchDays: number;
+        avgLateMinutesAmongLateDays: number;
+      };
+    }[] = [];
     let complete = 0;
 
     await Promise.all(
@@ -129,6 +148,7 @@ export async function POST(req: NextRequest) {
         const metrics: EmployeeMetrics = {
           totalPunchDays: totalBy.get(emp.id) ?? 0,
           lateCount: lateBy.get(emp.id) ?? 0,
+          lateMinutesSum: lateMinsBy.get(emp.id) ?? 0,
           unitsProduced: prodBy.get(emp.id) ?? 0,
           targetUnits: targetBy.has(emp.id) ? targetBy.get(emp.id)! : null,
           qualityAvg: qualBy.get(emp.id) ?? null,
@@ -147,8 +167,27 @@ export async function POST(req: NextRequest) {
         } as unknown as Prisma.InputJsonValue;
         const finalScore = result.status === "COMPLETE" ? result.finalScore : null;
 
-        if (result.status === "COMPLETE") complete += 1;
-        else incomplete.push({ employeeId: emp.id, name: emp.name, missing: result.missingComponents });
+        if (result.status === "COMPLETE") {
+          complete += 1;
+          const pd = result.componentData.punctuality;
+          if (pd.breakdown) {
+            scored.push({
+              employeeId: emp.id,
+              name: emp.name,
+              finalScore: result.finalScore,
+              punctuality: {
+                value: pd.value ?? 0,
+                frequencyScore: pd.breakdown.frequencyScore,
+                severityScore: pd.breakdown.severityScore,
+                lateCount: pd.breakdown.lateCount,
+                totalPunchDays: pd.breakdown.totalPunchDays,
+                avgLateMinutesAmongLateDays: pd.breakdown.avgLateMinutesAmongLateDays,
+              },
+            });
+          }
+        } else {
+          incomplete.push({ employeeId: emp.id, name: emp.name, missing: result.missingComponents });
+        }
 
         // Upsert preserves manager feedback (update touches only compute fields).
         await db.appraisalScore.upsert({
@@ -175,6 +214,7 @@ export async function POST(req: NextRequest) {
       total: employees.length,
       complete,
       incomplete,
+      scored,
     });
   } catch (err) {
     console.error("[hr/appraisal/compute] failed:", err);

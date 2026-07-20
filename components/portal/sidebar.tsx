@@ -21,6 +21,7 @@ import {
   ScrollText,
   UserCircle,
   Mail,
+  Clock,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -46,6 +47,7 @@ const ICONS: Record<string, LucideIcon> = {
   ScrollText,
   UserCircle,
   Mail,
+  Clock,
 };
 
 export function Sidebar({ portal }: { portal: PortalKey }) {

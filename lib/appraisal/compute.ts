@@ -8,12 +8,27 @@ export interface AppraisalWeights {
   quality: number;
   feedback: number;
   warningPenaltyPoints: number;
+  // Phase 8: internal split of the punctuality component into frequency vs
+  // severity, plus the minutes-late cap at which severity bottoms out.
+  // (freq + sev sum to 100; validated at save. Defaulted here for safety when
+  // an older snapshot lacks them — see resolvePunctualityConfig.)
+  punctualityFrequencyWeight?: number;
+  punctualitySeverityWeight?: number;
+  punctualitySeverityCapMinutes?: number;
 }
+
+/** Suggested defaults, referenced by the API/UI and used as the safety fallback. */
+export const PUNCTUALITY_DEFAULTS = {
+  punctualityFrequencyWeight: 70,
+  punctualitySeverityWeight: 30,
+  punctualitySeverityCapMinutes: 60,
+} as const;
 
 /** Pre-aggregated metrics for one employee over the cycle's period. */
 export interface EmployeeMetrics {
   totalPunchDays: number; // count of Attendance rows in period
   lateCount: number; // count with lateFlag = true
+  lateMinutesSum: number; // sum of lateMinutes over ONLY the late-flagged rows (nulls treated as 0 by the DB _sum)
   unitsProduced: number; // sum(Production.unitsProduced)
   targetUnits: number | null; // sum of MonthlyTarget.targetUnits over period, null if none
   qualityAvg: number | null; // avg(QualityReport.qualityScore), already 0-100, null if none
@@ -29,8 +44,24 @@ export interface ComponentDatum {
   weight: number;
 }
 
+/** The two-part frequency + severity breakdown behind the punctuality value. */
+export interface PunctualityBreakdown {
+  frequencyScore: number; // (1 - lateCount/totalPunchDays) * 100
+  severityScore: number; // 100 among the LATE days only; 100 when never late
+  lateCount: number;
+  totalPunchDays: number;
+  avgLateMinutesAmongLateDays: number; // 0 when lateCount === 0
+  frequencyWeight: number;
+  severityWeight: number;
+  severityCapMinutes: number;
+}
+
+export interface PunctualityDatum extends ComponentDatum {
+  breakdown: PunctualityBreakdown | null; // null when no data (no punch days)
+}
+
 export interface ComponentData {
-  punctuality: ComponentDatum;
+  punctuality: PunctualityDatum;
   production: ComponentDatum;
   quality: ComponentDatum;
   feedback: ComponentDatum;
@@ -56,10 +87,65 @@ function clamp(n: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, n));
 }
 
-/** Component values 0-100, or null when the component has no data. */
-function punctualityValue(m: EmployeeMetrics): number | null {
+/** Resolve the punctuality sub-config, defaulting safely if a snapshot lacks it. */
+function resolvePunctualityConfig(weights: AppraisalWeights) {
+  let freqW = Number(weights.punctualityFrequencyWeight);
+  let sevW = Number(weights.punctualitySeverityWeight);
+  if (!Number.isFinite(freqW) || !Number.isFinite(sevW) || freqW + sevW <= 0) {
+    freqW = PUNCTUALITY_DEFAULTS.punctualityFrequencyWeight;
+    sevW = PUNCTUALITY_DEFAULTS.punctualitySeverityWeight;
+  }
+  let cap = Number(weights.punctualitySeverityCapMinutes);
+  if (!Number.isFinite(cap) || cap <= 0) cap = PUNCTUALITY_DEFAULTS.punctualitySeverityCapMinutes;
+  return { freqW, sevW, cap };
+}
+
+/**
+ * Two-part punctuality (Phase 8). Returns { value 0-100, breakdown } or null
+ * when there is no punch data in the period (component missing → INCOMPLETE).
+ *
+ * frequency: how OFTEN late — (1 - lateCount/totalPunchDays)*100.
+ * severity:  how LATE on the days that WERE late only (on-time days excluded,
+ *            so a single severe incident is not diluted by frequency). 100 when
+ *            never late. Bottoms out at 0 once avg late reaches the cap.
+ */
+function punctualityValue(
+  m: EmployeeMetrics,
+  weights: AppraisalWeights,
+): { value: number; breakdown: PunctualityBreakdown } | null {
   if (m.totalPunchDays <= 0) return null;
-  return clamp((1 - m.lateCount / m.totalPunchDays) * 100, 0, 100);
+  const { freqW, sevW, cap } = resolvePunctualityConfig(weights);
+
+  const frequencyScore = clamp((1 - m.lateCount / m.totalPunchDays) * 100, 0, 100);
+
+  let avgLate = 0;
+  let severityScore: number;
+  if (m.lateCount === 0) {
+    severityScore = 100; // never late → severity trivially perfect
+  } else {
+    avgLate = m.lateMinutesSum / m.lateCount; // ONLY across late days
+    severityScore = clamp(100 - (avgLate / cap) * 100, 0, 100); // max(0, …)
+  }
+
+  const value = clamp(
+    frequencyScore * (freqW / 100) + severityScore * (sevW / 100),
+    0,
+    100,
+  );
+
+  return {
+    value,
+    breakdown: {
+      frequencyScore,
+      severityScore,
+      lateCount: m.lateCount,
+      totalPunchDays: m.totalPunchDays,
+      avgLateMinutesAmongLateDays: avgLate,
+      frequencyWeight: freqW,
+      severityWeight: sevW,
+      severityCapMinutes: cap,
+    },
+  };
 }
 
 function productionValue(m: EmployeeMetrics): number | null {
@@ -88,13 +174,19 @@ export function computeAppraisal(
   m: EmployeeMetrics,
   opts: { allowMissingFeedback: boolean },
 ): AppraisalResult {
-  const pVal = punctualityValue(m);
+  const punct = punctualityValue(m, weights);
+  const pVal = punct ? punct.value : null;
   const prodVal = productionValue(m);
   const qVal = qualityValue(m);
   const fVal = m.feedbackScore;
 
   const componentData: ComponentData = {
-    punctuality: { hasData: pVal !== null, value: pVal, weight: weights.punctuality },
+    punctuality: {
+      hasData: pVal !== null,
+      value: pVal,
+      weight: weights.punctuality,
+      breakdown: punct ? punct.breakdown : null,
+    },
     production: { hasData: prodVal !== null, value: prodVal, weight: weights.production },
     quality: { hasData: qVal !== null, value: qVal, weight: weights.quality },
     feedback: { hasData: fVal !== null, value: fVal, weight: weights.feedback },

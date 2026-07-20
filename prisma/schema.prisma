@@ -57,6 +57,8 @@ model Employee {
   department  String
   designation String?
   emergencyContact String? // Phase 1: editable on the My Profile page
+  shiftId     String? // Phase 6: assigned shift (drives lateFlag)
+  shift       Shift?  @relation(fields: [shiftId], references: [id])
   managerId   String?
   manager     Employee? @relation("ManagerToReports", fields: [managerId], references: [id])
   reports     Employee[] @relation("ManagerToReports")
@@ -80,6 +82,18 @@ model Employee {
   monthlyTargets MonthlyTarget[]
 }
 
+// Phase 6: named shifts replace the single global WORKDAY_START env var.
+model Shift {
+  id                 String     @id @default(cuid())
+  name               String     @unique
+  startTime          String // "HH:MM", e.g. "09:30"
+  endTime            String // "HH:MM", e.g. "18:00"
+  gracePeriodMinutes Int        @default(0) // minutes after startTime before lateFlag triggers
+  createdBy          String
+  active             Boolean    @default(true)
+  employees          Employee[]
+}
+
 model Attendance {
   id             String            @id @default(cuid())
   employeeId     String
@@ -93,6 +107,8 @@ model Attendance {
   long           Float?
   verifiedByFace Boolean           @default(false)
   lateFlag       Boolean           @default(false)
+  lateMinutes    Int? // Phase 7: minutes past (shift.startTime + grace) if late; null if not late / no shift data
+  checkInNote    String? // mandatory employee comment captured at web clock-in
   approvedBy     String?
   // Phase 1: a punch that fails IP/geofence validation is still written,
   // flagged for HR review with the specific reason(s) recorded here.

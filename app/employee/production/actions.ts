@@ -1,6 +1,6 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
+import { getEffectiveUserId } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { getEmployeeByClerkId } from "@/lib/data/scope";
@@ -34,7 +34,7 @@ export async function logProduction(input: {
   date: string;
   unitsProduced: number | string;
 }): Promise<ProductionFormState> {
-  const { userId } = await auth();
+  const userId = await getEffectiveUserId();
   if (!userId) return { ok: false, error: "You must be signed in." };
 
   const fieldErrors: ProductionFormState["fieldErrors"] = {};

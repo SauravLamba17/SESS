@@ -1,6 +1,6 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
+import { getEffectiveUserId } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { getEmployeeByClerkId } from "@/lib/data/scope";
@@ -16,7 +16,7 @@ export async function updateProfile(input: {
   name: string;
   emergencyContact: string;
 }): Promise<ProfileFormState> {
-  const { userId } = await auth();
+  const userId = await getEffectiveUserId();
   if (!userId) return { ok: false, error: "You must be signed in." };
 
   const name = typeof input.name === "string" ? input.name.trim() : "";

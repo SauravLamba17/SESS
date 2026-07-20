@@ -104,6 +104,7 @@ export const NAV: Record<PortalKey, NavItem[]> = {
   hr: [
     { label: "HR Dashboard", href: "/hr", icon: "LayoutDashboard" },
     { label: "Employee Master", href: "/hr/employees", icon: "Users" },
+    { label: "Shifts", href: "/hr/shifts", icon: "Clock" },
     { label: "Attendance Oversight", href: "/hr/attendance", icon: "CalendarClock" },
     { label: "Payroll & Financials", href: "/hr/payroll", icon: "Wallet" },
     { label: "Appraisal Cycles", href: "/hr/appraisal", icon: "Gauge" },

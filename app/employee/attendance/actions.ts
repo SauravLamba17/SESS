@@ -1,6 +1,6 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
+import { getEffectiveUserId } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { getEmployeeByClerkId } from "@/lib/data/scope";
@@ -35,7 +35,7 @@ export async function submitLeaveRequest(input: {
   endDate: string;
   reason: string;
 }): Promise<LeaveFormState> {
-  const { userId } = await auth();
+  const userId = await getEffectiveUserId();
   if (!userId) {
     return { ok: false, error: "You must be signed in to request leave." };
   }

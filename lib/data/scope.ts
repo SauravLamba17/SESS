@@ -17,10 +17,11 @@ export function getEmployeeByClerkId(clerkId: string) {
     .then((u) => u?.employee ?? null);
 }
 
-/** The manager's DIRECT reports only (single level). */
+/** The manager's DIRECT reports only (single level). Shift batched in. */
 export function getDirectReports(managerEmployeeId: string) {
   return db.employee.findMany({
     where: { managerId: managerEmployeeId, active: true },
+    include: { shift: { select: { id: true, name: true, startTime: true, endTime: true } } },
     orderBy: { name: "asc" },
   });
 }
@@ -80,7 +81,19 @@ export function getActiveEmployees(department?: string | null) {
  */
 export function getAllEmployees() {
   return db.employee.findMany({
-    include: { manager: { select: { name: true } } },
+    include: {
+      manager: { select: { name: true } },
+      shift: { select: { id: true, name: true, startTime: true, endTime: true } },
+    },
     orderBy: [{ active: "desc" }, { employeeCode: "asc" }],
+  });
+}
+
+/** Active shifts for assignment dropdowns. */
+export function getActiveShifts() {
+  return db.shift.findMany({
+    where: { active: true },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true, startTime: true, endTime: true },
   });
 }

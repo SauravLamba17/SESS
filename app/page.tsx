@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { auth } from "@clerk/nextjs/server";
+import { getEffectiveUserId } from "@/lib/auth";
 import { SignInButton } from "@clerk/nextjs";
 import { getCurrentRole } from "@/lib/auth";
 import { ROLE_HOME, ROLE_LABEL } from "@/lib/auth-types";
@@ -8,7 +8,7 @@ import { Logo } from "@/components/brand/logo";
 import { StatusDot } from "@/components/ui/status-dot";
 
 export default async function LandingPage() {
-  const { userId } = await auth();
+  const userId = await getEffectiveUserId();
 
   // Signed in with a role → send to the matching portal.
   if (userId) {

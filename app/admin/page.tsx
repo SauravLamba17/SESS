@@ -1,6 +1,9 @@
 import { PageHeader } from "@/components/portal/portal-shell";
 import { Panel, PanelHeader, StatCard } from "@/components/ui/panel";
 import { StatusLabel } from "@/components/ui/status-dot";
+import { ImpersonatePanel } from "@/components/admin/impersonate-panel";
+
+export const dynamic = "force-dynamic";
 
 export default function SystemDashboard() {
   return (
@@ -9,6 +12,8 @@ export default function SystemDashboard() {
         title="System Dashboard"
         description="Platform-wide configuration, machines, audit and the appraisal formula."
       />
+
+      <ImpersonatePanel />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard

@@ -1,4 +1,4 @@
-import { auth } from "@clerk/nextjs/server";
+import { getEffectiveUserId } from "@/lib/auth";
 import { PageHeader } from "@/components/portal/portal-shell";
 import { Panel } from "@/components/ui/panel";
 import { StatusDot, type StatusState } from "@/components/ui/status-dot";
@@ -20,7 +20,7 @@ function scoreState(score: number): StatusState {
 }
 
 async function load() {
-  const { userId } = await auth();
+  const userId = await getEffectiveUserId();
   if (!userId) return { employee: null, error: null };
   try {
     const employee = await getEmployeeByClerkId(userId);

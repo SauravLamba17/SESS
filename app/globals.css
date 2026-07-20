@@ -33,6 +33,17 @@
   }
 }
 
+/* Dark-theme <select> popups: browsers render the option list with the system
+   (white) background while inheriting our near-white text, making options
+   invisible/unpickable. Force explicit colours on every option. */
+select option {
+  background-color: #171d21; /* surface */
+  color: #e8ecee; /* text */
+}
+select option:disabled {
+  color: #8b98a1; /* text-muted */
+}
+
 /* Thin instrument-panel scrollbars. */
 * {
   scrollbar-width: thin;

@@ -1,4 +1,4 @@
-import { auth } from "@clerk/nextjs/server";
+import { getEffectiveUserId } from "@/lib/auth";
 import { PageHeader } from "@/components/portal/portal-shell";
 import { Panel } from "@/components/ui/panel";
 import { StatusDot, type StatusState } from "@/components/ui/status-dot";
@@ -13,8 +13,18 @@ interface Datum {
   value: number | null;
   weight: number;
 }
+interface PunctBreakdown {
+  frequencyScore: number;
+  severityScore: number;
+  lateCount: number;
+  totalPunchDays: number;
+  avgLateMinutesAmongLateDays: number;
+}
+interface PunctDatum extends Datum {
+  breakdown?: PunctBreakdown | null;
+}
 interface ComponentScores {
-  punctuality?: Datum;
+  punctuality?: PunctDatum;
   production?: Datum;
   quality?: Datum;
   feedback?: Datum;
@@ -36,7 +46,7 @@ function scoreState(score: number): StatusState {
 }
 
 async function load() {
-  const { userId } = await auth();
+  const userId = await getEffectiveUserId();
   if (!userId) return { employee: null, error: null };
   try {
     const employee = await getEmployeeByClerkId(userId);
@@ -117,22 +127,35 @@ export default async function MyAppraisalPage() {
                 <div className="space-y-2 p-4 text-sm">
                   {COMPONENT_LABELS.map(({ key, label }) => {
                     const d = cs[key] as Datum | undefined;
+                    const bd = key === "punctuality" ? cs.punctuality?.breakdown : null;
                     return (
-                      <div key={key} className="flex items-center justify-between">
-                        <span className="text-text-muted">
-                          {label}{" "}
-                          <span className="font-mono text-xs">
-                            (w{d?.weight ?? 0})
+                      <div key={key}>
+                        <div className="flex items-center justify-between">
+                          <span className="text-text-muted">
+                            {label}{" "}
+                            <span className="font-mono text-xs">
+                              (w{d?.weight ?? 0})
+                            </span>
                           </span>
-                        </span>
-                        {d?.hasData ? (
-                          <span className="font-mono text-text">
-                            {(d.value ?? 0).toFixed(1)}
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 text-xs text-text-muted">
-                            <StatusDot state="idle" /> no data
-                          </span>
+                          {d?.hasData ? (
+                            <span className="font-mono text-text">
+                              {(d.value ?? 0).toFixed(1)}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 text-xs text-text-muted">
+                              <StatusDot state="idle" /> no data
+                            </span>
+                          )}
+                        </div>
+                        {/* Frequency + severity breakdown — tells a pattern from a single incident. */}
+                        {bd && (
+                          <div className="mt-0.5 pl-1 text-[11px] text-text-muted">
+                            Frequency: {bd.frequencyScore.toFixed(0)}/100 — late {bd.lateCount} of{" "}
+                            {bd.totalPunchDays} days · Severity: {bd.severityScore.toFixed(0)}/100
+                            {bd.lateCount > 0
+                              ? ` — averaged ${bd.avgLateMinutesAmongLateDays.toFixed(0)} min late on late days`
+                              : " — never late"}
+                          </div>
                         )}
                       </div>
                     );

@@ -1,6 +1,7 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { ROUTE_ACCESS, portalForPath, type Role } from "@/lib/auth-types";
+import { IMP_COOKIE, verifyImpersonation } from "@/lib/impersonation";
 
 const isPortalRoute = createRouteMatcher([
   "/employee(.*)",
@@ -31,12 +32,21 @@ export default clerkMiddleware(async (auth, req) => {
     return redirectToSignIn({ returnBackUrl: req.url });
   }
 
-  // Role lives in the session token as `metadata.role`
-  // (mirror of the Clerk user's publicMetadata — see README).
-  const role = coerceRole(sessionClaims?.metadata?.role);
+  // Real role lives in the session token as `metadata.role`.
+  const realRole = coerceRole(sessionClaims?.metadata?.role);
+
+  // Impersonation: ONLY a real Super Admin with a valid, bound cookie takes on
+  // an effective role. Same signed-cookie check used everywhere else — the
+  // route gate below is identical for genuine and impersonated sessions.
+  let role = realRole;
+  if (realRole === "SUPER_ADMIN") {
+    const imp = await verifyImpersonation(req.cookies.get(IMP_COOKIE)?.value, userId);
+    if (imp) role = imp.role;
+  }
+
   const portal = portalForPath(req.nextUrl.pathname);
 
-  // Signed in but role not allowed for this portal → bounce to landing.
+  // Signed in but (effective) role not allowed for this portal → bounce.
   if (portal && (!role || !ROUTE_ACCESS[portal].includes(role))) {
     return NextResponse.redirect(new URL("/", req.url));
   }

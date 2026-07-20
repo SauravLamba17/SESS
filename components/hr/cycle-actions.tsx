@@ -11,6 +11,20 @@ interface Incomplete {
   missing: string[];
 }
 
+interface Scored {
+  employeeId: string;
+  name: string;
+  finalScore: number;
+  punctuality: {
+    value: number;
+    frequencyScore: number;
+    severityScore: number;
+    lateCount: number;
+    totalPunchDays: number;
+    avgLateMinutesAmongLateDays: number;
+  };
+}
+
 export function CycleActions({ cycleId }: { cycleId: string }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -19,6 +33,7 @@ export function CycleActions({ cycleId }: { cycleId: string }) {
     total: number;
     complete: number;
     incomplete: Incomplete[];
+    scored: Scored[];
   } | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -34,7 +49,12 @@ export function CycleActions({ cycleId }: { cycleId: string }) {
       setMsg({ ok: false, text: data.error ?? "Compute failed" });
       return;
     }
-    setSummary({ total: data.total, complete: data.complete, incomplete: data.incomplete });
+    setSummary({
+      total: data.total,
+      complete: data.complete,
+      incomplete: data.incomplete,
+      scored: data.scored ?? [],
+    });
   }
 
   function onCompute() {
@@ -137,6 +157,35 @@ export function CycleActions({ cycleId }: { cycleId: string }) {
                 </li>
               ))}
             </ul>
+          )}
+
+          {/* Punctuality breakdown per scored employee — pattern vs single incident */}
+          {summary.scored.length > 0 && (
+            <div className="mt-3 border-t border-border pt-2">
+              <div className="mb-1 text-[11px] uppercase tracking-wide text-text-muted">
+                Punctuality breakdown
+              </div>
+              <ul className="space-y-1">
+                {summary.scored.map((s) => (
+                  <li key={s.employeeId} className="flex flex-col gap-0.5">
+                    <span className="text-text">
+                      {s.name}{" "}
+                      <span className="font-mono text-text-muted">
+                        punctuality {s.punctuality.value.toFixed(0)}/100
+                      </span>
+                    </span>
+                    <span className="font-mono text-[11px] text-text-muted">
+                      Freq {s.punctuality.frequencyScore.toFixed(0)} (late{" "}
+                      {s.punctuality.lateCount}/{s.punctuality.totalPunchDays}) · Sev{" "}
+                      {s.punctuality.severityScore.toFixed(0)}
+                      {s.punctuality.lateCount > 0
+                        ? ` (avg ${s.punctuality.avgLateMinutesAmongLateDays.toFixed(0)}m late)`
+                        : " (never late)"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </div>
       )}

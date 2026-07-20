@@ -125,6 +125,9 @@ export function validatePunch(input: PunchInput): ValidationResult {
  * Determine whether a check-in is late relative to WORKDAY_START ("HH:MM").
  * Uses the punch timestamp's local hours/minutes. Returns false when
  * WORKDAY_START is unset or malformed (cannot determine lateness).
+ *
+ * Phase 6: this is now the FALLBACK only — used when an employee has no
+ * assigned shift. Shift-assigned employees use isLateForShift() below.
  */
 export function isLateCheckIn(at: Date): boolean {
   const raw = (process.env.WORKDAY_START ?? "").trim();
@@ -136,4 +139,43 @@ export function isLateCheckIn(at: Date): boolean {
   const cutoff = h * 60 + min;
   const actual = at.getHours() * 60 + at.getMinutes();
   return actual > cutoff;
+}
+
+/**
+ * Phase 7 shift-based lateness magnitude: minutes past
+ * (shift.startTime + gracePeriodMinutes) at check-in.
+ *
+ * Pure. Returns the positive minutes-late when late, or null when NOT late
+ * (on-time/early) or when startTime is malformed (cannot determine). Never
+ * returns a negative or zero — those collapse to null. This is the single
+ * source of truth; isLateForShift() below is derived from it.
+ */
+export function lateMinutesForShift(
+  at: Date,
+  startTime: string,
+  gracePeriodMinutes: number,
+): number | null {
+  const m = /^(\d{1,2}):(\d{2})$/.exec((startTime ?? "").trim());
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h > 23 || min > 59) return null;
+  const grace = Number.isFinite(gracePeriodMinutes) ? gracePeriodMinutes : 0;
+  const cutoff = h * 60 + min + grace;
+  const actual = at.getHours() * 60 + at.getMinutes();
+  const diff = actual - cutoff;
+  return diff > 0 ? diff : null; // floored at 0 → null when not late
+}
+
+/**
+ * Phase 6 shift-based lateness: late when check-in is after
+ * shift.startTime + gracePeriodMinutes. Derived from lateMinutesForShift so the
+ * boolean and the magnitude can never disagree.
+ */
+export function isLateForShift(
+  at: Date,
+  startTime: string,
+  gracePeriodMinutes: number,
+): boolean {
+  return lateMinutesForShift(at, startTime, gracePeriodMinutes) !== null;
 }

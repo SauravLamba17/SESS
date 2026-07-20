@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getEffectiveUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getCurrentRole } from "@/lib/auth";
 
@@ -16,6 +16,12 @@ const ZERO_WEIGHTS = {
   quality: 0,
   feedback: 0,
   warningPenaltyPoints: 0,
+  // Phase 8: punctuality frequency/severity split — the 4 main weights start at
+  // 0 (must be set), but these get sensible suggested defaults since 0/0 is
+  // never valid (they must sum to 100).
+  punctualityFrequencyWeight: 70,
+  punctualitySeverityWeight: 30,
+  punctualitySeverityCapMinutes: 60,
 };
 
 function normalizeDepartment(raw: string | null): string | null {
@@ -25,7 +31,7 @@ function normalizeDepartment(raw: string | null): string | null {
 }
 
 export async function GET(req: NextRequest) {
-  const { userId } = await auth();
+  const userId = await getEffectiveUserId();
   if (!userId) return fail("UNAUTHENTICATED", "Not authenticated", 401);
   // Read is Super-Admin-only too (this config is SA-owned).
   if ((await getCurrentRole()) !== "SUPER_ADMIN")
@@ -55,7 +61,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { userId } = await auth();
+  const userId = await getEffectiveUserId();
   if (!userId) return fail("UNAUTHENTICATED", "Not authenticated", 401);
   // Sole edit right — enforced at the API, not just hidden in the UI.
   if ((await getCurrentRole()) !== "SUPER_ADMIN")
@@ -78,6 +84,9 @@ export async function POST(req: NextRequest) {
     quality: Number(w.quality),
     feedback: Number(w.feedback),
     warningPenaltyPoints: Number(w.warningPenaltyPoints),
+    punctualityFrequencyWeight: Number(w.punctualityFrequencyWeight),
+    punctualitySeverityWeight: Number(w.punctualitySeverityWeight),
+    punctualitySeverityCapMinutes: Number(w.punctualitySeverityCapMinutes),
   };
 
   if (Object.values(nums).some((n) => !Number.isFinite(n) || n < 0)) {
@@ -89,6 +98,23 @@ export async function POST(req: NextRequest) {
     return fail(
       "BAD_WEIGHTS",
       `punctuality + production + quality + feedback must sum to 100 (got ${positiveSum}). warningPenaltyPoints is separate.`,
+      400,
+    );
+  }
+  // Phase 8: the punctuality frequency/severity split must sum to exactly 100.
+  const punctSplit =
+    nums.punctualityFrequencyWeight + nums.punctualitySeverityWeight;
+  if (punctSplit !== 100) {
+    return fail(
+      "BAD_PUNCTUALITY_SPLIT",
+      `punctualityFrequencyWeight + punctualitySeverityWeight must sum to 100 (got ${punctSplit}).`,
+      400,
+    );
+  }
+  if (!(nums.punctualitySeverityCapMinutes > 0)) {
+    return fail(
+      "BAD_PUNCTUALITY_CAP",
+      "punctualitySeverityCapMinutes must be a positive number of minutes.",
       400,
     );
   }

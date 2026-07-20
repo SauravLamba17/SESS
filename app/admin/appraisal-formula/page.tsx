@@ -2,13 +2,18 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Lock, ShieldAlert, Loader2, CheckCircle2 } from "lucide-react";
-import { PageHeader } from "@/components/portal/portal-shell";
+import { PageHeader } from "@/components/portal/page-header";
 import { Panel, PanelHeader } from "@/components/ui/panel";
 import { StatusDot } from "@/components/ui/status-dot";
 
-type Key = "punctuality" | "production" | "quality" | "feedback" | "warningPenaltyPoints";
+type MainKey = "punctuality" | "production" | "quality" | "feedback" | "warningPenaltyPoints";
+type Key =
+  | MainKey
+  | "punctualityFrequencyWeight"
+  | "punctualitySeverityWeight"
+  | "punctualitySeverityCapMinutes";
 
-const COMPONENTS: { key: Key; label: string; hint: string; penalty?: boolean }[] = [
+const COMPONENTS: { key: MainKey; label: string; hint: string; penalty?: boolean }[] = [
   { key: "punctuality", label: "Punctuality", hint: "On-time attendance & low late-flags" },
   { key: "production", label: "Production", hint: "Units produced vs target" },
   { key: "quality", label: "Quality", hint: "Quality score, defect-adjusted" },
@@ -18,6 +23,10 @@ const COMPONENTS: { key: Key; label: string; hint: string; penalty?: boolean }[]
 
 const ZERO: Record<Key, number> = {
   punctuality: 0, production: 0, quality: 0, feedback: 0, warningPenaltyPoints: 0,
+  // Suggested defaults (the split must sum to 100; 0/0 is never valid).
+  punctualityFrequencyWeight: 70,
+  punctualitySeverityWeight: 30,
+  punctualitySeverityCapMinutes: 60,
 };
 
 export default function AppraisalFormulaPage() {
@@ -60,6 +69,17 @@ export default function AppraisalFormulaPage() {
   const positiveSum =
     weights.punctuality + weights.production + weights.quality + weights.feedback;
   const balanced = positiveSum === 100;
+
+  // Phase 8 punctuality split validation (mirrors the server checks).
+  const punctSplit =
+    weights.punctualityFrequencyWeight + weights.punctualitySeverityWeight;
+  const splitOk = punctSplit === 100;
+  const capOk = weights.punctualitySeverityCapMinutes > 0;
+  const saveEnabled = balanced && splitOk && capOk;
+
+  function setW(k: Key, v: number) {
+    setWeights((prev) => ({ ...prev, [k]: v }));
+  }
 
   async function save() {
     setSaving(true);
@@ -129,6 +149,105 @@ export default function AppraisalFormulaPage() {
                 : "no formula configured yet"}
           </span>
         </span>
+      </Panel>
+
+      {/* Phase 8: punctuality frequency vs severity split */}
+      <Panel className="mb-4">
+        <PanelHeader
+          title="Punctuality — Frequency vs Severity"
+          action={
+            <span className="flex items-center gap-2 text-xs">
+              <StatusDot state={splitOk ? "good" : "warn"} />
+              <span className="font-mono text-text-muted">split = {punctSplit}%</span>
+            </span>
+          }
+        />
+        <div className="grid grid-cols-1 gap-5 p-4 md:grid-cols-3">
+          <div>
+            <div className="mb-1 flex items-center justify-between">
+              <label htmlFor="pfreq" className="text-sm text-text">Frequency weight</label>
+              <span className="font-mono text-sm text-text">{weights.punctualityFrequencyWeight}%</span>
+            </div>
+            <input
+              id="pfreq"
+              type="number"
+              min={0}
+              max={100}
+              value={weights.punctualityFrequencyWeight}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                setWeights((prev) => ({
+                  ...prev,
+                  punctualityFrequencyWeight: v,
+                  // Convenience: keep severity as the complement so the split
+                  // stays at 100 (Super Admin can still override severity below).
+                  punctualitySeverityWeight: Number.isFinite(v) ? Math.max(0, 100 - v) : prev.punctualitySeverityWeight,
+                }));
+              }}
+              disabled={loading}
+              className="w-full rounded border border-border bg-background px-3 py-2 font-mono text-sm text-text focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            />
+            <p className="mt-1 text-xs text-text-muted">
+              How much of punctuality comes from HOW OFTEN someone is late.{" "}
+              <span className="text-text-muted">
+                Suggested: 70. Industry HR-analytics practice generally weights how OFTEN
+                someone is late more heavily than how late any single instance was — occasional
+                lateness should have limited impact, while a consistent pattern is the stronger
+                signal. 70/30 is a reasonable starting split; adjust for your context.
+              </span>
+            </p>
+          </div>
+          <div>
+            <div className="mb-1 flex items-center justify-between">
+              <label htmlFor="psev" className="text-sm text-text">Severity weight</label>
+              <span className="font-mono text-sm text-text">{weights.punctualitySeverityWeight}%</span>
+            </div>
+            <input
+              id="psev"
+              type="number"
+              min={0}
+              max={100}
+              value={weights.punctualitySeverityWeight}
+              onChange={(e) => setW("punctualitySeverityWeight", Number(e.target.value))}
+              disabled={loading}
+              className="w-full rounded border border-border bg-background px-3 py-2 font-mono text-sm text-text focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            />
+            <p className="mt-1 text-xs text-text-muted">
+              How much comes from HOW LATE they are, on the days they ARE late. Must sum to 100
+              with frequency weight. Suggested: 30.
+            </p>
+          </div>
+          <div>
+            <div className="mb-1 flex items-center justify-between">
+              <label htmlFor="pcap" className="text-sm text-text">Severity cap (min)</label>
+              <span className="font-mono text-sm text-text">{weights.punctualitySeverityCapMinutes}m</span>
+            </div>
+            <input
+              id="pcap"
+              type="number"
+              min={1}
+              value={weights.punctualitySeverityCapMinutes}
+              onChange={(e) => setW("punctualitySeverityCapMinutes", Number(e.target.value))}
+              disabled={loading}
+              className="w-full rounded border border-border bg-background px-3 py-2 font-mono text-sm text-text focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            />
+            <p className="mt-1 text-xs text-text-muted">
+              Minutes-late at which the severity sub-score bottoms out at 0 (counted only on days
+              someone was actually late). Suggested: 60. A common reference point: many attendance
+              policies treat lateness beyond about an hour as materially more serious than a short
+              delay. This is a suggested default, not a fixed standard — set it to what your
+              organization considers a serious incident.
+            </p>
+          </div>
+        </div>
+        {!splitOk && (
+          <p className="px-4 pb-3 text-xs text-danger">
+            Frequency + severity must sum to exactly 100 (now {punctSplit}).
+          </p>
+        )}
+        {!capOk && (
+          <p className="px-4 pb-3 text-xs text-danger">Severity cap must be a positive number of minutes.</p>
+        )}
       </Panel>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -219,7 +338,7 @@ export default function AppraisalFormulaPage() {
           <button
             type="button"
             onClick={save}
-            disabled={!balanced || saving || loading}
+            disabled={!saveEnabled || saving || loading}
             className="flex w-full items-center justify-center gap-2 rounded bg-accent px-3 py-2.5 text-sm font-medium text-background hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-40"
           >
             {saving ? <Loader2 size={15} className="animate-spin" /> : <Lock size={15} />}

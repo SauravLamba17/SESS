@@ -1,4 +1,4 @@
-import { auth } from "@clerk/nextjs/server";
+import { getEffectiveUserId } from "@/lib/auth";
 import { PageHeader } from "@/components/portal/portal-shell";
 import { Panel, PanelHeader } from "@/components/ui/panel";
 import { StatusDot } from "@/components/ui/status-dot";
@@ -13,7 +13,7 @@ function ymd(d: Date): string {
 }
 
 async function load() {
-  const { userId } = await auth();
+  const userId = await getEffectiveUserId();
   if (!userId) return { employee: null, error: null };
   try {
     const employee = await getEmployeeByClerkId(userId);

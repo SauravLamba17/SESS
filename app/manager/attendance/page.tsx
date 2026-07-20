@@ -1,4 +1,4 @@
-import { auth } from "@clerk/nextjs/server";
+import { getEffectiveUserId } from "@/lib/auth";
 import { PageHeader } from "@/components/portal/portal-shell";
 import { Panel, PanelHeader } from "@/components/ui/panel";
 import { StatusDot } from "@/components/ui/status-dot";
@@ -14,7 +14,7 @@ function fmtDate(d: Date): string {
 }
 
 async function load() {
-  const { userId } = await auth();
+  const userId = await getEffectiveUserId();
   if (!userId) return { manager: null, error: null };
   try {
     const manager = await getEmployeeByClerkId(userId);
@@ -37,19 +37,25 @@ async function load() {
         orderBy: { createdAt: "desc" },
         take: 8,
       }),
-      // Single aggregate query — late marks this month across all reports.
-      db.attendance.groupBy({
-        by: ["employeeId"],
+      // Single query — the actual late occurrences this month across all
+      // reports (each with its minutes-late value), grouped in memory. No N+1.
+      db.attendance.findMany({
         where: {
           lateFlag: true,
           date: { gte: monthStart, lt: monthEnd },
           employee: { managerId: manager.id },
         },
-        _count: { _all: true },
+        select: { employeeId: true, date: true, lateMinutes: true },
+        orderBy: { date: "desc" },
       }),
     ]);
 
-    const lateByEmp = new Map(lateGroups.map((g) => [g.employeeId, g._count._all]));
+    const lateByEmp = new Map<string, { date: Date; lateMinutes: number | null }[]>();
+    for (const row of lateGroups) {
+      const arr = lateByEmp.get(row.employeeId) ?? [];
+      arr.push({ date: row.date, lateMinutes: row.lateMinutes });
+      lateByEmp.set(row.employeeId, arr);
+    }
     return {
       manager,
       error: null,
@@ -152,14 +158,36 @@ export default async function TeamAttendancePage() {
               <PanelHeader title="Late Marks · This Month" />
               <ul className="divide-y divide-border">
                 {data.reports.map((r) => {
-                  const n = data.lateByEmp.get(r.id) ?? 0;
+                  const occ = data.lateByEmp.get(r.id) ?? [];
                   return (
-                    <li key={r.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
-                      <span className="text-text">{r.name}</span>
-                      <span className="inline-flex items-center gap-2">
-                        <StatusDot state={n > 0 ? "warn" : "good"} />
-                        <span className="font-mono text-text-muted">{n}</span>
-                      </span>
+                    <li key={r.id} className="px-4 py-2.5 text-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="min-w-0">
+                          <span className="text-text">{r.name}</span>
+                          <span className="ml-2 font-mono text-[11px] text-text-muted">
+                            {r.shift ? `${r.shift.name} ${r.shift.startTime}` : "no shift"}
+                          </span>
+                        </span>
+                        <span className="inline-flex items-center gap-2">
+                          <StatusDot state={occ.length > 0 ? "warn" : "good"} />
+                          <span className="font-mono text-text-muted">{occ.length} late</span>
+                        </span>
+                      </div>
+                      {occ.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1.5">
+                          {occ.map((o, i) => (
+                            <span
+                              key={i}
+                              className="rounded border border-border bg-surface-raised px-1.5 py-0.5 font-mono text-[11px] text-text-muted"
+                            >
+                              {fmtDate(o.date)}:{" "}
+                              <span className="text-accent">
+                                {o.lateMinutes != null ? `${o.lateMinutes}m` : "late"}
+                              </span>
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </li>
                   );
                 })}

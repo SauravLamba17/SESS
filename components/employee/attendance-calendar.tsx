@@ -9,7 +9,14 @@ interface DayData {
   checkIn: string | null;
   checkOut: string | null;
   lateFlag: boolean;
+  lateMinutes: number | null;
   flaggedForReview: boolean;
+}
+
+/** Human label for a late record, gracefully handling null (historical) minutes. */
+function lateLabel(rec: DayData): string {
+  if (!rec.lateFlag) return "";
+  return rec.lateMinutes != null ? `${rec.lateMinutes} min late` : "Late";
 }
 
 interface MonthResponse {
@@ -218,9 +225,15 @@ export function AttendanceCalendar({
             const day = i + 1;
             const { state, note } = cellState(day);
             const rec = byDate.get(ymd(year, month, day));
+            const late = rec ? lateLabel(rec) : "";
             return (
               <div
                 key={day}
+                title={
+                  rec?.checkIn
+                    ? `${fmtTime(rec.checkIn)}–${rec.checkOut ? fmtTime(rec.checkOut) : "—"}${late ? ` · ${late}` : ""}`
+                    : undefined
+                }
                 className="flex aspect-square min-w-0 flex-col rounded border border-border bg-surface p-1.5"
               >
                 <div className="flex items-center justify-between">
@@ -233,7 +246,11 @@ export function AttendanceCalendar({
                   {rec?.checkIn ? (
                     <>
                       <div className="truncate">{fmtTime(rec.checkIn)}</div>
-                      <div className="truncate">{fmtTime(rec.checkOut)}</div>
+                      {late ? (
+                        <div className="truncate text-accent">{late}</div>
+                      ) : (
+                        <div className="truncate">{fmtTime(rec.checkOut)}</div>
+                      )}
                     </>
                   ) : (
                     note && <span className="text-danger">{note}</span>

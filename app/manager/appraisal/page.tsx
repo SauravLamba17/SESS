@@ -1,4 +1,4 @@
-import { auth } from "@clerk/nextjs/server";
+import { getEffectiveUserId } from "@/lib/auth";
 import { PageHeader } from "@/components/portal/portal-shell";
 import { Panel } from "@/components/ui/panel";
 import { StatusDot } from "@/components/ui/status-dot";
@@ -9,7 +9,7 @@ import { getEmployeeByClerkId, getDirectReports } from "@/lib/data/scope";
 export const dynamic = "force-dynamic";
 
 async function load() {
-  const { userId } = await auth();
+  const userId = await getEffectiveUserId();
   if (!userId) return { manager: null, error: null };
   try {
     const manager = await getEmployeeByClerkId(userId);

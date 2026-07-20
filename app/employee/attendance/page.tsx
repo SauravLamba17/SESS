@@ -1,4 +1,4 @@
-import { auth } from "@clerk/nextjs/server";
+import { getEffectiveUserId } from "@/lib/auth";
 import type { LeaveStatus } from "@prisma/client";
 import { PageHeader } from "@/components/portal/portal-shell";
 import { Panel, PanelHeader } from "@/components/ui/panel";
@@ -25,31 +25,37 @@ function fmtDate(d: Date): string {
 }
 
 async function loadOwnLeave() {
-  const { userId } = await auth();
-  if (!userId) return { employeeLinked: false as const, leaves: [], error: null };
+  const userId = await getEffectiveUserId();
+  if (!userId) return { employeeLinked: false as const, leaves: [], error: null, shift: null };
   try {
     const employee = await getEmployeeByClerkId(userId);
     if (!employee)
-      return { employeeLinked: false as const, leaves: [], error: null };
-    // Own requests only.
-    const leaves = await db.leaveRequest.findMany({
-      where: { employeeId: employee.id },
-      orderBy: { createdAt: "desc" },
-    });
-    return { employeeLinked: true as const, leaves, error: null };
+      return { employeeLinked: false as const, leaves: [], error: null, shift: null };
+    // Own requests + assigned shift.
+    const [leaves, shift] = await Promise.all([
+      db.leaveRequest.findMany({
+        where: { employeeId: employee.id },
+        orderBy: { createdAt: "desc" },
+      }),
+      employee.shiftId
+        ? db.shift.findUnique({ where: { id: employee.shiftId } })
+        : Promise.resolve(null),
+    ]);
+    return { employeeLinked: true as const, leaves, error: null, shift };
   } catch (err) {
     console.error("[my-attendance] load leave failed:", err);
     return {
       employeeLinked: true as const,
       leaves: [],
       error: "Leave history is unavailable right now.",
+      shift: null,
     };
   }
 }
 
 export default async function MyAttendancePage() {
   const now = new Date();
-  const { employeeLinked, leaves, error } = await loadOwnLeave();
+  const { employeeLinked, leaves, error, shift } = await loadOwnLeave();
 
   return (
     <>
@@ -65,6 +71,22 @@ export default async function MyAttendancePage() {
             No employee record is linked to your account yet. Attendance and
             leave will appear once HR completes onboarding.
           </span>
+        </Panel>
+      )}
+
+      {employeeLinked && (
+        <Panel className="mb-5 flex items-center gap-2 px-4 py-2.5 text-sm">
+          <StatusDot state={shift ? "good" : "warn"} />
+          <span className="text-text-muted">Your shift:</span>
+          {shift ? (
+            <span className="font-mono text-text">
+              {shift.name} · {shift.startTime}–{shift.endTime}
+              {shift.gracePeriodMinutes > 0 ? ` (+${shift.gracePeriodMinutes}m grace)` : ""} — check in
+              after this is marked late
+            </span>
+          ) : (
+            <span className="text-text-muted">not assigned — ask HR</span>
+          )}
         </Panel>
       )}
 

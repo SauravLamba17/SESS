@@ -1,4 +1,4 @@
-import { auth } from "@clerk/nextjs/server";
+import { getEffectiveUserId } from "@/lib/auth";
 import { PageHeader } from "@/components/portal/portal-shell";
 import { Panel, PanelHeader } from "@/components/ui/panel";
 import { StatusDot } from "@/components/ui/status-dot";
@@ -9,7 +9,7 @@ import { db } from "@/lib/db";
 export const dynamic = "force-dynamic";
 
 async function load() {
-  const { userId } = await auth();
+  const userId = await getEffectiveUserId();
   if (!userId) return { cycles: null, error: null };
   try {
     const cycles = await db.appraisalCycle.findMany({

@@ -1,10 +1,11 @@
-import { auth } from "@clerk/nextjs/server";
+import { getEffectiveUserId } from "@/lib/auth";
 import { PageHeader } from "@/components/portal/portal-shell";
 import { Panel } from "@/components/ui/panel";
 import { StatusDot } from "@/components/ui/status-dot";
 import { TargetInput } from "@/components/manager/target-input";
+import { ShiftAssignSelect } from "@/components/shifts/shift-assign-select";
 import { db } from "@/lib/db";
-import { getEmployeeByClerkId, getDirectReports } from "@/lib/data/scope";
+import { getEmployeeByClerkId, getDirectReports, getActiveShifts } from "@/lib/data/scope";
 import { currentPeriod } from "@/lib/period";
 import { timeEfficiency, formatEfficiency } from "@/lib/time-efficiency";
 
@@ -17,7 +18,7 @@ function ymd(d: Date): string {
 }
 
 async function load() {
-  const { userId } = await auth();
+  const userId = await getEffectiveUserId();
   if (!userId) return { manager: null, error: null };
   try {
     const manager = await getEmployeeByClerkId(userId);
@@ -29,7 +30,7 @@ async function load() {
     const inMonth = { gte: monthStart, lt: monthEnd };
 
     // Set-based queries, all keyed on employeeId IN (...) — independent of team size.
-    const [actuals, targets, daily, attendance] = await Promise.all([
+    const [actuals, targets, daily, attendance, shifts] = await Promise.all([
       db.production.groupBy({
         by: ["employeeId"],
         where: { employeeId: { in: ids }, date: inMonth },
@@ -45,6 +46,7 @@ async function load() {
         where: { employeeId: { in: ids }, date: inMonth },
         select: { employeeId: true, date: true, checkIn: true, checkOut: true },
       }),
+      getActiveShifts(),
     ]);
 
     const actualByEmp = new Map(actuals.map((a) => [a.employeeId, a._sum.unitsProduced ?? 0]));
@@ -59,7 +61,8 @@ async function load() {
     // Attendance keyed by employeeId|date for efficiency lookup.
     const attByKey = new Map(attendance.map((a) => [`${a.employeeId}|${ymd(a.date)}`, a]));
 
-    return { manager, error: null, period, reports, actualByEmp, targetByEmp, dailyByEmp, attByKey };
+    const shiftOptions = shifts.map((s) => ({ id: s.id, name: s.name }));
+    return { manager, error: null, period, reports, actualByEmp, targetByEmp, dailyByEmp, attByKey, shiftOptions };
   } catch (err) {
     console.error("[manager/production] failed:", err);
     return { manager: null, error: "Production data is unavailable right now." };
@@ -134,6 +137,22 @@ export default async function ProductionTargetsPage() {
                           <div className="flex justify-end">
                             <TargetInput employeeId={r.id} current={target} />
                           </div>
+                        </div>
+
+                        {/* Shift (display + reassign a direct report) */}
+                        <div className="mt-2 flex items-center gap-2 text-xs text-text-muted">
+                          <span>
+                            Shift:{" "}
+                            <span className="font-mono text-text">
+                              {r.shift ? `${r.shift.name} (${r.shift.startTime}–${r.shift.endTime})` : "—"}
+                            </span>
+                          </span>
+                          <ShiftAssignSelect
+                            employeeId={r.id}
+                            currentShiftId={r.shiftId}
+                            shifts={data.shiftOptions}
+                            endpoint="/api/manager/shift"
+                          />
                         </div>
 
                         {/* Per-employee daily breakdown (native disclosure) */}

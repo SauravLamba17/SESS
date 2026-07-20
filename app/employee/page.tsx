@@ -4,6 +4,8 @@ import { Panel, PanelHeader, StatCard } from "@/components/ui/panel";
 import { StatusDot, StatusLabel, type StatusState } from "@/components/ui/status-dot";
 import { ClockInWidget } from "@/components/employee/clock-in-widget";
 import { NotificationPanel } from "@/components/employee/notification-panel";
+import { TodayWidgets } from "@/components/engagement/today-widgets";
+import { loadToday } from "@/lib/engagement/today";
 import { db } from "@/lib/db";
 import { getEmployeeByClerkId } from "@/lib/data/scope";
 import { currentPeriod } from "@/lib/period";
@@ -124,7 +126,9 @@ async function loadMetrics() {
 }
 
 export default async function EmployeeDashboard() {
-  const m = await loadMetrics();
+  // Both loads run in parallel — the engagement widgets add one batched call,
+  // not one query per widget.
+  const [m, engagementToday] = await Promise.all([loadMetrics(), loadToday()]);
 
   // Production vs Target card
   const prodPct =
@@ -207,6 +211,8 @@ export default async function EmployeeDashboard() {
         title="My Dashboard"
         description="Your attendance, production, quality and appraisal at a glance."
       />
+
+      <TodayWidgets data={engagementToday} />
 
       {m && m.notifications.length > 0 && (
         <div className="mb-4">

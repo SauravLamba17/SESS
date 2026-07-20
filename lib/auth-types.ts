@@ -32,6 +32,21 @@ export const ROLE_HOME: Record<Role, string> = {
 
 export type PortalKey = "employee" | "manager" | "hr" | "admin";
 
+/**
+ * Which portal shell (and therefore which sidebar) a given role should see.
+ *
+ * Phase 9 added shared routes — /community and /pulse — that every role can
+ * reach. They are not owned by any one portal, so their layout uses this map
+ * to render the viewer's OWN sidebar, keeping their navigation intact instead
+ * of dumping them into a foreign portal's chrome.
+ */
+export const PORTAL_FOR_ROLE: Record<Role, PortalKey> = {
+  EMPLOYEE: "employee",
+  MANAGER: "manager",
+  HR: "hr",
+  SUPER_ADMIN: "admin",
+};
+
 export const PORTAL_PREFIX: Record<PortalKey, string> = {
   employee: "/employee",
   manager: "/manager",
@@ -91,6 +106,8 @@ export const NAV: Record<PortalKey, NavItem[]> = {
     { label: "Expense Claims", href: "/employee/expenses", icon: "ReceiptText" },
     { label: "My Documents", href: "/employee/documents", icon: "FileText" },
     { label: "My Profile", href: "/employee/profile", icon: "UserCircle" },
+    { label: "Community", href: "/community", icon: "Megaphone" },
+    { label: "Pulse Surveys", href: "/pulse", icon: "Activity" },
   ],
   manager: [
     { label: "Team Dashboard", href: "/manager", icon: "LayoutDashboard" },
@@ -103,6 +120,8 @@ export const NAV: Record<PortalKey, NavItem[]> = {
     { label: "Candidates", href: "/manager/candidates", icon: "UserSearch" },
     { label: "Warning Letters", href: "/manager/warnings", icon: "AlertTriangle" },
     { label: "Client Mail", href: "/manager/client-mail", icon: "Mail" },
+    { label: "Community", href: "/community", icon: "Megaphone" },
+    { label: "Pulse Surveys", href: "/pulse", icon: "Activity" },
   ],
   hr: [
     { label: "HR Dashboard", href: "/hr", icon: "LayoutDashboard" },
@@ -117,6 +136,9 @@ export const NAV: Record<PortalKey, NavItem[]> = {
     { label: "Appraisal Cycles", href: "/hr/appraisal", icon: "Gauge" },
     { label: "Warning Letters", href: "/hr/warnings", icon: "AlertTriangle" },
     { label: "Compliance & Consent", href: "/hr/compliance", icon: "ShieldCheck" },
+    { label: "Holidays", href: "/hr/holidays", icon: "CalendarHeart" },
+    { label: "Pulse Surveys", href: "/hr/pulse-surveys", icon: "Activity" },
+    { label: "Community", href: "/community", icon: "Megaphone" },
   ],
   admin: [
     { label: "System Dashboard", href: "/admin", icon: "LayoutDashboard" },
@@ -127,5 +149,7 @@ export const NAV: Record<PortalKey, NavItem[]> = {
     { label: "Module Toggles", href: "/admin/modules", icon: "ToggleRight" },
     { label: "Machines & Assets", href: "/admin/machines", icon: "Cpu" },
     { label: "Audit Log", href: "/admin/audit", icon: "ScrollText" },
+    { label: "Community", href: "/community", icon: "Megaphone" },
+    { label: "Pulse Surveys", href: "/pulse", icon: "Activity" },
   ],
 };

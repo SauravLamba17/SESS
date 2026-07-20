@@ -5,6 +5,8 @@ import { StatusDot, type StatusState } from "@/components/ui/status-dot";
 import { db } from "@/lib/db";
 import { getEmployeeByClerkId, getDirectReports } from "@/lib/data/scope";
 import { currentPeriod } from "@/lib/period";
+import { TodayWidgets } from "@/components/engagement/today-widgets";
+import { loadToday } from "@/lib/engagement/today";
 
 export const dynamic = "force-dynamic";
 
@@ -80,7 +82,7 @@ async function load() {
 }
 
 export default async function ManagerDashboard() {
-  const data = await load();
+  const [data, today] = await Promise.all([load(), loadToday()]);
 
   return (
     <>
@@ -88,6 +90,8 @@ export default async function ManagerDashboard() {
         title="Team Dashboard"
         description="Your direct reports only. Multi-level reports are not visible to you."
       />
+
+      <TodayWidgets data={today} />
 
       {data.error && (
         <Panel className="mb-5 flex items-center gap-3 px-4 py-3">

@@ -5,6 +5,8 @@ import { NotificationPanel } from "@/components/employee/notification-panel";
 import { getEffectiveUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getEmployeeByClerkId } from "@/lib/data/scope";
+import { TodayWidgets } from "@/components/engagement/today-widgets";
+import { loadToday } from "@/lib/engagement/today";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +40,7 @@ async function loadNotifications() {
 }
 
 export default async function HRDashboard() {
-  const notifications = await loadNotifications();
+  const [notifications, today] = await Promise.all([loadNotifications(), loadToday()]);
 
   return (
     <>
@@ -46,6 +48,8 @@ export default async function HRDashboard() {
         title="HR Dashboard"
         description="Organisation-wide attendance, payroll, appraisal and compliance."
       />
+
+      <TodayWidgets data={today} />
 
       {notifications.length > 0 && (
         <div className="mb-4">

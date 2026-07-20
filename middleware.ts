@@ -26,6 +26,17 @@ const isPortalRoute = createRouteMatcher([
  */
 const isPublicRoute = createRouteMatcher(["/careers(.*)", "/api/careers/apply"]);
 
+/**
+ * Phase 9: shared surfaces every signed-in role may use — the community wall
+ * and pulse surveys. They require AUTHENTICATION but no particular role, so
+ * they are gated alongside the portals below and then fall through the
+ * role check, because portalForPath() returns null for them.
+ *
+ * Listing them here rather than adding them to isPortalRoute keeps the two
+ * ideas separate: portals are role-scoped, these are merely signed-in-only.
+ */
+const isSharedAuthedRoute = createRouteMatcher(["/community(.*)", "/pulse(.*)"]);
+
 function coerceRole(value: unknown): Role | null {
   if (
     value === "EMPLOYEE" ||
@@ -42,10 +53,10 @@ export default clerkMiddleware(async (auth, req) => {
   // Public career surface: never gated, never role-checked.
   if (isPublicRoute(req)) return;
 
-  // Everything else that is not a portal route is likewise ungated here —
-  // API routes under /api/** enforce their own auth + role in-route, which is
-  // where the 401/403 responses in this codebase come from.
-  if (!isPortalRoute(req)) return;
+  // Everything else that is not a portal or shared-authed route is likewise
+  // ungated here — API routes under /api/** enforce their own auth + role
+  // in-route, which is where the 401/403 responses in this codebase come from.
+  if (!isPortalRoute(req) && !isSharedAuthedRoute(req)) return;
 
   const { userId, sessionClaims, redirectToSignIn } = await auth();
 

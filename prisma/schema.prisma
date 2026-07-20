@@ -89,6 +89,10 @@ model Employee {
   // days, and `active` alone cannot express that.
   offboardedAt DateTime?
   pfUan       String? // Provident Fund UAN — nullable, not every employee has one yet
+  // Phase 9: used ONLY to surface a name on the birthday widget. Nullable —
+  // existing employees have none until HR backfills. Never displayed as a
+  // full date, and never used to compute or show an age.
+  dateOfBirth DateTime?
   createdAt   DateTime  @default(now())
 
   // Back-relations
@@ -109,6 +113,8 @@ model Employee {
   salaryAdvances SalaryAdvance[]
   notifications  Notification[]
   onboardingTasks OnboardingTask[]
+  shoutOutsSent     ShoutOut[] @relation("ShoutOutFrom")
+  shoutOutsReceived ShoutOut[] @relation("ShoutOutTo")
 }
 
 // Phase 6: named shifts replace the single global WORKDAY_START env var.
@@ -590,4 +596,82 @@ model OnboardingTask {
   createdAt   DateTime  @default(now())
 
   @@index([employeeId, completed])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Phase 9 — Engagement
+//
+// Deliberately standalone and lightweight. NOTHING here reads or writes
+// Attendance.lateFlag, QualityReport, AppraisalScore or WarningLetter, and
+// nothing here surfaces on an appraisal or manager-review screen. The single
+// exception is the "who's in today" widget, which reads Attendance and
+// LeaveRequest for PRESENCE only (in / on leave / not yet marked) — never
+// lateness, never a time, never a performance signal.
+// ─────────────────────────────────────────────────────────────
+
+model Holiday {
+  id        String   @id @default(cuid())
+  name      String
+  date      DateTime
+  createdBy String
+  createdAt DateTime @default(now())
+
+  // One explicit row per actual date. No recurrence rule by design: Indian
+  // festival dates (Holi, Diwali) move every year against the Gregorian
+  // calendar, and a wrong guess is worse than HR entering the real dates.
+  @@index([date])
+}
+
+model ShoutOut {
+  id             String   @id @default(cuid())
+  fromEmployeeId String
+  fromEmployee   Employee @relation("ShoutOutFrom", fields: [fromEmployeeId], references: [id])
+  toEmployeeId   String
+  toEmployee     Employee @relation("ShoutOutTo", fields: [toEmployeeId], references: [id])
+  message        String
+  createdAt      DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model PulseSurvey {
+  id        String    @id @default(cuid())
+  question  String
+  scaleMin  Int       @default(1)
+  scaleMax  Int       @default(5)
+  createdBy String
+  active    Boolean   @default(true)
+  closesAt  DateTime?
+  createdAt DateTime  @default(now())
+
+  responses       PulseSurveyResponse[]
+  responseRecords SurveyResponseRecord[]
+}
+
+// THE ANSWER. Deliberately has NO employeeId and no relation to any employee
+// or to SurveyResponseRecord. There is no foreign key, no shared column and no
+// timestamp precise enough to correlate — so no query, however written, can
+// attribute a rating to a person. Anonymity here is structural, not a policy
+// someone has to remember to honour.
+model PulseSurveyResponse {
+  id          String      @id @default(cuid())
+  surveyId    String
+  survey      PulseSurvey @relation(fields: [surveyId], references: [id])
+  ratingValue Int
+  createdAt   DateTime    @default(now())
+
+  @@index([surveyId])
+}
+
+// THE TURNSTILE. Records only THAT someone responded, never WHAT they said.
+// Its sole purpose is the unique constraint below, which blocks a second vote.
+// It is never joined to PulseSurveyResponse anywhere in the codebase.
+model SurveyResponseRecord {
+  id         String      @id @default(cuid())
+  surveyId   String
+  survey     PulseSurvey @relation(fields: [surveyId], references: [id])
+  employeeId String
+  createdAt  DateTime    @default(now())
+
+  @@unique([surveyId, employeeId])
 }

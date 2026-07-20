@@ -29,6 +29,9 @@ import {
   UserSearch,
   ClipboardCheck,
   FileSignature,
+  Megaphone,
+  Activity,
+  CalendarHeart,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -62,6 +65,9 @@ const ICONS: Record<string, LucideIcon> = {
   UserSearch,
   ClipboardCheck,
   FileSignature,
+  Megaphone,
+  Activity,
+  CalendarHeart,
 };
 
 export function Sidebar({ portal }: { portal: PortalKey }) {

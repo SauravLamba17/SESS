@@ -2,16 +2,22 @@ import { PageHeader } from "@/components/portal/portal-shell";
 import { Panel, PanelHeader, StatCard } from "@/components/ui/panel";
 import { StatusLabel } from "@/components/ui/status-dot";
 import { ImpersonatePanel } from "@/components/admin/impersonate-panel";
+import { TodayWidgets } from "@/components/engagement/today-widgets";
+import { loadToday } from "@/lib/engagement/today";
 
 export const dynamic = "force-dynamic";
 
-export default function SystemDashboard() {
+export default async function SystemDashboard() {
+  const today = await loadToday();
+
   return (
     <>
       <PageHeader
         title="System Dashboard"
         description="Platform-wide configuration, machines, audit and the appraisal formula."
       />
+
+      <TodayWidgets data={today} />
 
       <ImpersonatePanel />
 

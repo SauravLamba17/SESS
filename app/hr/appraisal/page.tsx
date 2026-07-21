@@ -5,6 +5,7 @@ import { StatusDot } from "@/components/ui/status-dot";
 import { CycleCreateForm } from "@/components/hr/cycle-create-form";
 import { CycleActions } from "@/components/hr/cycle-actions";
 import { db } from "@/lib/db";
+import { PrintButton } from "@/components/ui/print-button";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,7 @@ export default async function AppraisalCyclesPage() {
       <PageHeader
         title="Appraisal Cycles"
         description="Create cycles, compute scores from the snapshotted formula, and publish. HR cannot edit formula weights."
+        action={<PrintButton label="Print results" />}
       />
 
       {error && (

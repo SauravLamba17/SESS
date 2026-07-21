@@ -279,6 +279,7 @@ export default async function CandidateDetailPage({
                   applicationId={application.id}
                   stage={application.stage}
                   defaultDepartment={application.jobRequisition.department}
+                  candidateName={application.candidate.name}
                   managers={managers}
                   offer={
                     application.offer

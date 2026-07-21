@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getEffectiveUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getEmployeeByClerkId } from "@/lib/data/scope";
+import { notifyEmployee } from "@/lib/notify";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,6 +51,27 @@ export async function POST(req: NextRequest) {
       await tx.auditLog.create({
         data: { actorUserId: userId, action, targetEntity: id },
       });
+
+      // Notify the employee, in the same transaction as the decision — the
+      // person waiting on this answer is the one who most needs telling.
+      const lv = await tx.leaveRequest.findUnique({
+        where: { id },
+        select: { employeeId: true, startDate: true, endDate: true },
+      });
+      if (lv) {
+        const range =
+          lv.startDate.toDateString() === lv.endDate.toDateString()
+            ? lv.startDate.toISOString().slice(0, 10)
+            : `${lv.startDate.toISOString().slice(0, 10)} to ${lv.endDate.toISOString().slice(0, 10)}`;
+        await notifyEmployee(
+          tx,
+          lv.employeeId,
+          decision === "APPROVE" ? "LEAVE_APPROVED" : "LEAVE_REJECTED",
+          decision === "APPROVE"
+            ? `Your leave request for ${range} was approved.`
+            : `Your leave request for ${range} was not approved. Speak to your manager if you need to discuss it.`,
+        );
+      }
       return upd.count;
     });
 

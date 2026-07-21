@@ -210,7 +210,20 @@ model WarningLetter {
   status       WarningStatus @default(DRAFT)
   releasedBy   String?
   releasedAt   DateTime?
+  // Retained for backward compatibility with Phase 2's simple flow. Still set,
+  // alongside the richer attestation fields below.
   acknowledged Boolean       @default(false)
+
+  // ── Attestation Record (NOT a legal digital signature) ────────────
+  // The employee types their own name to acknowledge. Stronger than a bare
+  // checkbox because it records WHAT was typed, WHEN, and FROM WHERE — but it
+  // is an internal record only. A legally-binding signature under India's IT
+  // Act requires a licensed Certifying Authority / eSign provider, which this
+  // deliberately is not and must never be presented as.
+  attestedName String?
+  attestedAt   DateTime?
+  attestedIp   String?
+
   createdAt    DateTime      @default(now())
 }
 
@@ -398,12 +411,23 @@ model Notification {
   @@index([employeeId, read])
 }
 
+// Append-only. Nothing in this codebase updates or deletes an AuditLog row,
+// and the viewer (app/admin/audit-log) is strictly read-only.
 model AuditLog {
   id           String   @id @default(cuid())
   actorUserId  String
   action       String
   targetEntity String
   timestamp    DateTime @default(now())
+
+  // The viewer always sorts by timestamp DESC and pages server-side, so this
+  // index carries every query it makes. The two composites match the filtered
+  // cases: filtering by action or actor still sorts by timestamp, and a
+  // composite lets Postgres satisfy filter+sort from one index rather than
+  // sorting a filtered heap.
+  @@index([timestamp])
+  @@index([action, timestamp])
+  @@index([actorUserId, timestamp])
 }
 
 model ConsentRecord {
@@ -582,6 +606,18 @@ model Offer {
   approvedAt               DateTime?
   sentAt                   DateTime?
   respondedAt              DateTime?
+
+  // ── Attestation Record (NOT a legal digital signature) ────────────
+  // IMPORTANT DISTINCTION from WarningLetter's attestation: a candidate has no
+  // account here, so HR records the response on their behalf. `attestedName`
+  // is therefore the CANDIDATE's name as HR typed it (validated against the
+  // stored candidate name), and `attestedBy` is the HR user who entered it.
+  // This is a record of HR's data entry, not of the candidate's own act —
+  // weaker evidence than the employee case, and labelled as such in the UI.
+  attestedName String?
+  attestedAt   DateTime?
+  attestedIp   String?
+  attestedBy   String? // HR user id who recorded the response
 
   @@index([status])
 }

@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getEffectiveUserId, getCurrentRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { onboardEmployee, createDefaultOnboardingTasks } from "@/lib/employees/onboard";
+import { notifyHr } from "@/lib/notify";
+import { checkAttestation, attestationIp } from "@/lib/attestation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,7 +42,7 @@ export async function POST(req: NextRequest) {
   if (role !== "HR" && role !== "SUPER_ADMIN")
     return fail("FORBIDDEN", "Only HR or Super Admin may update an offer's status", 403);
 
-  let body: { id?: unknown; status?: unknown };
+  let body: { id?: unknown; status?: unknown; attestedName?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -75,6 +77,27 @@ export async function POST(req: NextRequest) {
         409,
       );
 
+    /**
+     * ATTESTATION RECORD on a candidate response.
+     *
+     * DISTINCTION FROM THE EMPLOYEE CASE, and it matters: a candidate has no
+     * account, so HR types the candidate's name while recording the response
+     * they received out-of-band (email, phone, signed paper). This therefore
+     * evidences HR's DATA ENTRY, not the candidate's own act — genuinely
+     * weaker than the warning-letter attestation, where the employee typed
+     * their own name in their own session. `attestedBy` records which HR user
+     * entered it so the two are never conflated.
+     *
+     * Required only for ACCEPTED/DECLINED — the candidate's actual decisions.
+     * SENT and WITHDRAWN are internal HR actions with no candidate response.
+     */
+    let attestation: { name: string; ip: string | null } | null = null;
+    if (status === "ACCEPTED" || status === "DECLINED") {
+      const att = checkAttestation(body.attestedName, offer.application.candidate.name);
+      if (!att.ok) return fail(att.code, att.message, 400);
+      attestation = { name: att.attestedName, ip: attestationIp(req.headers) };
+    }
+
     // ── SENT / DECLINED / WITHDRAWN: a guarded status flip ──
     if (status !== "ACCEPTED") {
       const now = new Date();
@@ -85,6 +108,14 @@ export async function POST(req: NextRequest) {
             status: status as never,
             ...(status === "SENT" ? { sentAt: now } : {}),
             ...(status === "DECLINED" || status === "WITHDRAWN" ? { respondedAt: now } : {}),
+            ...(attestation
+              ? {
+                  attestedName: attestation.name,
+                  attestedAt: now,
+                  attestedIp: attestation.ip,
+                  attestedBy: userId,
+                }
+              : {}),
           },
         });
         if (upd.count === 0) return 0;
@@ -100,6 +131,23 @@ export async function POST(req: NextRequest) {
             targetEntity: id,
           },
         });
+
+        // Candidates have no accounts, so an offer event is HR-facing news.
+        // Same HR-targeting used for NEW_APPLICATION in Phase 8.
+        const who = offer.application.candidate.name;
+        if (status === "SENT") {
+          await notifyHr(
+            tx,
+            "OFFER_SENT",
+            `Offer sent to ${who} for ${offer.proposedDesignation}. Awaiting their response.`,
+          );
+        } else if (status === "DECLINED") {
+          await notifyHr(
+            tx,
+            "OFFER_DECLINED",
+            `${who} declined the offer for ${offer.proposedDesignation}.`,
+          );
+        }
         return upd.count;
       });
       if (count === 0)
@@ -115,7 +163,14 @@ export async function POST(req: NextRequest) {
       // Guard first: if this fails, nothing else in the transaction happens.
       const upd = await tx.offer.updateMany({
         where: { id, status: "SENT" },
-        data: { status: "ACCEPTED", respondedAt: new Date() },
+        data: {
+          status: "ACCEPTED",
+          respondedAt: new Date(),
+          attestedName: attestation!.name,
+          attestedAt: new Date(),
+          attestedIp: attestation!.ip,
+          attestedBy: userId,
+        },
       });
       if (upd.count === 0) return { code: "CONCURRENT" as const };
 
@@ -159,6 +214,11 @@ export async function POST(req: NextRequest) {
       await tx.auditLog.create({
         data: { actorUserId: userId, action: "OFFER_ACCEPTED", targetEntity: id },
       });
+      await notifyHr(
+        tx,
+        "OFFER_ACCEPTED",
+        `${offer.application.candidate.name} accepted the offer for ${offer.proposedDesignation} and has been converted to employee ${onboarded.employee.employeeCode}. Their onboarding checklist is ready.`,
+      );
       await tx.auditLog.create({
         data: {
           actorUserId: userId,

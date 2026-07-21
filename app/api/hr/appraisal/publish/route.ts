@@ -3,6 +3,7 @@ import { getEffectiveUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getCurrentRole } from "@/lib/auth";
 import { getActiveEmployees } from "@/lib/data/scope";
+import { notifyEmployees } from "@/lib/notify";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -61,14 +62,26 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    await db.$transaction(async (tx) => {
+    // Only employees whose score was actually INCLUDED — an excluded employee
+    // has no published score, so telling them one is ready would be wrong.
+    const notifyIds = scores
+      .filter((s) => !s.excluded && s.finalScore !== null)
+      .map((s) => s.employeeId);
+
+    const notified = await db.$transaction(async (tx) => {
       await tx.appraisalCycle.update({ where: { id: cycleId }, data: { published: true } });
       await tx.auditLog.create({
         data: { actorUserId: userId, action: "APPRAISAL_CYCLE_PUBLISHED", targetEntity: cycleId },
       });
+      return notifyEmployees(
+        tx,
+        notifyIds,
+        "APPRAISAL_PUBLISHED",
+        `Your appraisal score for ${cycle.period} has been published and is available on My Appraisal.`,
+      );
     });
 
-    return NextResponse.json({ ok: true, cycleId, published: true });
+    return NextResponse.json({ ok: true, cycleId, published: true, notified });
   } catch (err) {
     console.error("[hr/appraisal/publish] failed:", err);
     return fail("SERVER_ERROR", "Could not publish the cycle", 503);

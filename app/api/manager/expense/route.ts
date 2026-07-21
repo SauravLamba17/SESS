@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getEffectiveUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getEmployeeByClerkId } from "@/lib/data/scope";
+import { notifyEmployee } from "@/lib/notify";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -52,6 +53,21 @@ export async function POST(req: NextRequest) {
       await tx.auditLog.create({
         data: { actorUserId: userId, action, targetEntity: id },
       });
+
+      const claim = await tx.expenseClaim.findUnique({
+        where: { id },
+        select: { employeeId: true, amount: true, category: true },
+      });
+      if (claim) {
+        await notifyEmployee(
+          tx,
+          claim.employeeId,
+          decision === "APPROVE" ? "EXPENSE_APPROVED" : "EXPENSE_REJECTED",
+          decision === "APPROVE"
+            ? `Your ${claim.category.toLowerCase()} expense claim for ₹${claim.amount.toFixed(2)} was approved. It will be reimbursed with your next finalized payroll run.`
+            : `Your ${claim.category.toLowerCase()} expense claim for ₹${claim.amount.toFixed(2)} was not approved. Speak to your manager if you need to discuss it.`,
+        );
+      }
       return upd.count;
     });
 

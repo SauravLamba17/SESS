@@ -57,3 +57,89 @@ select option:disabled {
   background: #2a333a;
   border-radius: 4px;
 }
+
+/* ─────────────────────────────────────────────────────────────
+   PRINT STYLESHEET
+   For on-screen REPORTS that need to print cleanly (payroll run
+   overview, appraisal cycle results, audit log). Real documents —
+   payslips, Form 16, offer letters — are generated as proper PDFs
+   via @react-pdf/renderer and are NOT affected by any of this.
+   ───────────────────────────────────────────────────────────── */
+@media print {
+  /* Chrome/Edge drop backgrounds by default; force ink-on-paper instead
+     of the dark instrument-panel theme, which would waste toner and be
+     unreadable on white paper. */
+  :root {
+    background: #fff !important;
+  }
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  /* Structural chrome: sidebar, topbar, impersonation banner, filter
+     forms, pagination controls, action buttons. */
+  aside,
+  header,
+  nav,
+  button,
+  [role="banner"],
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* The shell locks the viewport to h-screen with an internal scroll
+     region; for print the content must flow across pages instead. */
+  .h-screen,
+  .overflow-hidden,
+  .overflow-y-auto {
+    height: auto !important;
+    overflow: visible !important;
+  }
+  main {
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* Panels become plain bordered blocks that don't split mid-row. */
+  .shadow-panel {
+    box-shadow: none !important;
+  }
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+  thead {
+    display: table-header-group; /* repeat headers on every page */
+  }
+  tr,
+  li {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Force readable text/borders regardless of the dark palette. */
+  .bg-surface,
+  .bg-surface-raised,
+  .bg-background {
+    background: #fff !important;
+  }
+  .text-text,
+  .text-text-muted {
+    color: #000 !important;
+  }
+  .border-border,
+  td,
+  th {
+    border-color: #999 !important;
+  }
+
+  a {
+    text-decoration: none !important;
+    color: #000 !important;
+  }
+
+  @page {
+    margin: 14mm;
+  }
+}

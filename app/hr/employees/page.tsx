@@ -4,6 +4,7 @@ import { Panel, PanelHeader } from "@/components/ui/panel";
 import { StatusDot } from "@/components/ui/status-dot";
 import { OnboardForm } from "@/components/hr/onboard-form";
 import { OffboardButton } from "@/components/hr/offboard-button";
+import { BulkImport } from "@/components/hr/bulk-import";
 import { ShiftAssignSelect } from "@/components/shifts/shift-assign-select";
 import { getAllEmployees, getActiveEmployees, getActiveShifts } from "@/lib/data/scope";
 
@@ -52,6 +53,13 @@ export default async function EmployeeMaster() {
       )}
 
       <div className="space-y-6">
+        <Panel>
+          <PanelHeader title="Bulk Import from CSV" />
+          <div className="p-4">
+            <BulkImport />
+          </div>
+        </Panel>
+
         <Panel>
           <PanelHeader title="Onboard Employee" />
           <div className="p-4">

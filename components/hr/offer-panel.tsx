@@ -38,12 +38,15 @@ export function OfferPanel({
   offer,
   managers,
   defaultDepartment,
+  candidateName,
 }: {
   applicationId: string;
   stage: string;
   offer: OfferView | null;
   managers: { id: string; name: string; employeeCode: string }[];
   defaultDepartment: string;
+  /** Needed for the attestation record when HR records the response. */
+  candidateName: string;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -57,6 +60,9 @@ export function OfferPanel({
   const [department, setDepartment] = useState(offer?.proposedDepartment ?? defaultDepartment);
   const [managerId, setManagerId] = useState(offer?.proposedManagerId ?? "");
   const [joiningDate, setJoiningDate] = useState(offer?.joiningDate ?? "");
+  // Which candidate response HR is recording, and the name they type for it.
+  const [responding, setResponding] = useState<"ACCEPTED" | "DECLINED" | null>(null);
+  const [attestedName, setAttestedName] = useState("");
 
   const editable = !offer || offer.status === "DRAFT";
   const locked = offer && (offer.status === "SENT" || offer.status === "ACCEPTED");
@@ -115,7 +121,7 @@ export function OfferPanel({
     });
   }
 
-  function advance(status: string, label: string) {
+  function advance(status: string, label: string, attestedName?: string) {
     setError(null);
     setSaved(null);
     start(async () => {
@@ -123,7 +129,11 @@ export function OfferPanel({
         const res = await fetch("/api/hr/offer/status", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: offer!.id, status }),
+          body: JSON.stringify({
+            id: offer!.id,
+            status,
+            ...(attestedName ? { attestedName } : {}),
+          }),
         });
         const data = await res.json();
         if (!res.ok) {
@@ -316,11 +326,11 @@ export function OfferPanel({
           </button>
         )}
 
-        {offer?.status === "SENT" && (
+        {offer?.status === "SENT" && !responding && (
           <>
             <button
               type="button"
-              onClick={() => advance("ACCEPTED", "Accepted.")}
+              onClick={() => setResponding("ACCEPTED")}
               disabled={pending}
               className={`${btn} border-good/40 text-good hover:bg-good/10 focus-visible:ring-good`}
             >
@@ -328,7 +338,7 @@ export function OfferPanel({
             </button>
             <button
               type="button"
-              onClick={() => advance("DECLINED", "Offer declined.")}
+              onClick={() => setResponding("DECLINED")}
               disabled={pending}
               className={`${btn} border-danger/40 text-danger hover:bg-danger/10 focus-visible:ring-danger`}
             >
@@ -348,6 +358,65 @@ export function OfferPanel({
           </button>
         )}
       </div>
+
+      {/* ATTESTATION RECORD — HR recording the candidate's response.
+          Distinct from the employee case: HR types the CANDIDATE's name, so
+          this evidences HR's data entry, not the candidate's own act. */}
+      {responding && (
+        <div className="rounded border border-accent/40 bg-accent/5 p-3">
+          <p className="text-xs font-medium text-accent">Attestation Record</p>
+          <p className="mt-0.5 text-[10px] text-text-muted">
+            (internal record, not a legal digital signature)
+          </p>
+          <p className="mt-2 text-[11px] text-text-muted">
+            You are recording that <span className="text-text">{candidateName}</span>{" "}
+            {responding === "ACCEPTED" ? "accepted" : "declined"} this offer.
+            Type their full name to confirm what you were told. Your user id, the
+            time and your IP are recorded alongside it — this is a record of your
+            data entry on the candidate&apos;s behalf, not of their own signature.
+          </p>
+          <input
+            type="text"
+            value={attestedName}
+            onChange={(e) => setAttestedName(e.target.value)}
+            placeholder={candidateName}
+            autoComplete="off"
+            className={`${inputClass} mt-2`}
+          />
+          <div className="mt-2 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setResponding(null);
+                setAttestedName("");
+              }}
+              disabled={pending}
+              className="rounded border border-border px-2 py-1 text-xs text-text-muted hover:text-text"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={pending || !attestedName.trim()}
+              onClick={() =>
+                advance(
+                  responding,
+                  responding === "ACCEPTED" ? "Accepted." : "Offer declined.",
+                  attestedName.trim(),
+                )
+              }
+              className={`${btn} ${
+                responding === "ACCEPTED"
+                  ? "border-good/40 text-good hover:bg-good/10 focus-visible:ring-good"
+                  : "border-danger/40 text-danger hover:bg-danger/10 focus-visible:ring-danger"
+              }`}
+            >
+              {pending && <Loader2 size={13} className="animate-spin" />}
+              Record {responding === "ACCEPTED" ? "acceptance" : "decline"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {saved && (
         <p className="flex items-start gap-2 rounded border border-good/40 bg-good/10 px-3 py-2 text-xs text-good">

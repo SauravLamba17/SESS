@@ -1,5 +1,6 @@
 import { UserButton } from "@clerk/nextjs";
 import { Sidebar } from "@/components/portal/sidebar";
+import { GlobalSearch } from "@/components/portal/global-search";
 import { StatusDot } from "@/components/ui/status-dot";
 import { getImpersonation } from "@/lib/auth";
 import { stopImpersonation } from "@/app/admin/impersonate/actions";
@@ -58,6 +59,9 @@ export async function PortalShell({
             </span>
           </div>
           <div className="flex items-center gap-4">
+            {/* Role-scoped server-side by /api/search — reachable from all
+                four portals because this shell is shared by all four. */}
+            <GlobalSearch />
             <span className="rounded border border-border bg-surface-raised px-2.5 py-1 font-mono text-[11px] uppercase tracking-wide text-text-muted">
               {roleLabel}
             </span>

@@ -6,6 +6,7 @@ import { StatusDot } from "@/components/ui/status-dot";
 import { PayrollRunActions } from "@/components/hr/payroll-run-actions";
 import { PayrollRowEditor } from "@/components/hr/payroll-row-editor";
 import { CreateAdjustmentButton } from "@/components/hr/create-adjustment-button";
+import { PrintButton } from "@/components/ui/print-button";
 import { db } from "@/lib/db";
 import { currentPeriod, isPeriod, financialYearOf } from "@/lib/period";
 import { inr, periodLabel, PAYROLL_STATUS_DOT } from "@/lib/payroll/format";
@@ -210,6 +211,7 @@ export default async function HRPayrollPage({
       <PageHeader
         title="Payroll & Financials"
         description="Create and edit the monthly run, then submit it. Finalizing is a Super Admin action — once finalized, no figure can be changed through any code path."
+        action={<PrintButton label="Print run" />}
       />
 
       {error && (

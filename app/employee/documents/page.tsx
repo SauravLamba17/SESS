@@ -79,12 +79,34 @@ export default async function MyDocumentsPage() {
                     )}
                   </div>
                   {l.acknowledged ? (
-                    <span className="inline-flex shrink-0 items-center gap-2 text-xs">
-                      <StatusDot state="good" />
-                      <span className="text-text-muted">Acknowledged</span>
-                    </span>
+                    <div className="shrink-0 text-right">
+                      <span className="inline-flex items-center gap-2 text-xs">
+                        <StatusDot state="good" />
+                        <span className="text-text-muted">Acknowledged</span>
+                      </span>
+                      {/* The Attestation Record itself — what was typed, when,
+                          and from where. Labelled so it is never mistaken for
+                          a legal signature. */}
+                      {l.attestedName && (
+                        <div className="mt-1 rounded border border-border bg-surface-raised/40 px-2 py-1.5 text-left">
+                          <p className="text-[10px] font-medium uppercase tracking-wide text-text-muted">
+                            Attestation Record
+                          </p>
+                          <p className="mt-0.5 font-mono text-[11px] text-text">
+                            {l.attestedName}
+                          </p>
+                          <p className="font-mono text-[10px] text-text-muted">
+                            {l.attestedAt ? l.attestedAt.toISOString().slice(0, 19).replace("T", " ") : "—"}
+                            {l.attestedIp ? ` · ${l.attestedIp}` : ""}
+                          </p>
+                          <p className="mt-0.5 text-[9px] text-text-muted">
+                            (internal record, not a legal digital signature)
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   ) : (
-                    <AcknowledgeButton id={l.id} />
+                    <AcknowledgeButton id={l.id} employeeName={data.employee.name} />
                   )}
                 </li>
               ))}

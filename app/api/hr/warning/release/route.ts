@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getEffectiveUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getCurrentRole } from "@/lib/auth";
+import { notifyEmployee } from "@/lib/notify";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,6 +40,21 @@ export async function POST(req: NextRequest) {
       await tx.auditLog.create({
         data: { actorUserId: userId, action: "WARNING_LETTER_RELEASED", targetEntity: id },
       });
+
+      // No notification existed for this before — a released warning letter is
+      // among the most important things an employee needs to be told about.
+      const letter = await tx.warningLetter.findUnique({
+        where: { id },
+        select: { employeeId: true },
+      });
+      if (letter) {
+        await notifyEmployee(
+          tx,
+          letter.employeeId,
+          "WARNING_RELEASED",
+          "A warning letter has been issued to you and requires your acknowledgement. Please review it in My Documents.",
+        );
+      }
       return upd.count;
     });
 

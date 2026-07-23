@@ -1,0 +1,14 @@
+{
+  "name": "sess-idle-agent",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SESS idle/active tracking agent — records only whether the machine was in use. No screenshots, no application tracking, no productivity scoring.",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "selfcheck": "node src/selfcheck.js"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0"
+  }
+}

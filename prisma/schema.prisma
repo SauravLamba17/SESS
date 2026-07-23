@@ -115,6 +115,7 @@ model Employee {
   onboardingTasks OnboardingTask[]
   shoutOutsSent     ShoutOut[] @relation("ShoutOutFrom")
   shoutOutsReceived ShoutOut[] @relation("ShoutOutTo")
+  agentToken        AgentToken?
 }
 
 // Phase 6: named shifts replace the single global WORKDAY_START env var.
@@ -179,15 +180,53 @@ model QualityReport {
   @@unique([employeeId, date])
 }
 
+// Idle/active tracking. ONLY these two totals per employee per day — there is
+// no per-event, per-application or per-window data anywhere in this model, by
+// design. See lib/idle/README-scope.md for the full constraint.
 model IdleLog {
   id            String   @id @default(cuid())
   employeeId    String
   employee      Employee @relation(fields: [employeeId], references: [id])
   date          DateTime
-  idleMinutes   Int
-  activeMinutes Int
+  idleMinutes   Int      @default(0)
+  activeMinutes Int      @default(0)
 
+  // REQUIRED for the heartbeat's atomic upsert: Prisma needs a unique target
+  // to upsert against, and this composite is what makes
+  // `update: { idleMinutes: { increment } }` compile to a single
+  // `UPDATE ... SET col = col + n` rather than a read-then-write.
+  @@unique([employeeId, date])
   @@index([employeeId, date])
+}
+
+// Authenticates the desktop agent. Deliberately NOT a Clerk session: the agent
+// is a background service on a machine, with no browser and no interactive
+// login. One token per employee (@unique) — reissuing replaces the old one,
+// so a decommissioned machine's token stops working the moment a new one is
+// generated.
+model AgentToken {
+  id         String    @id @default(cuid())
+  employeeId String    @unique
+  employee   Employee  @relation(fields: [employeeId], references: [id])
+  token      String    @unique // long random secret, generated server-side
+  active     Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  // Bumped on every accepted heartbeat, so HR can spot an agent that has gone
+  // silent (machine off, uninstalled, network blocked) without guessing.
+  lastSeenAt DateTime?
+
+  @@index([active])
+}
+
+// Small key/value store for values a Super Admin must be able to change
+// without a redeploy. The existing env-var convention (ATTENDANCE_VALIDATION_MODE)
+// is fine for deploy-time config, but the idle threshold needs to be
+// adjustable from the UI, and an env var cannot be.
+model SystemSetting {
+  key       String   @id
+  value     String
+  updatedBy String
+  updatedAt DateTime @updatedAt
 }
 
 model ClientMail {

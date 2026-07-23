@@ -1,0 +1,16 @@
+# The agent is its own npm package — its dependencies (Electron, ~200MB) must
+# never be committed. The root .gitignore's /node_modules is anchored to the
+# repo root and does NOT cover this directory.
+node_modules/
+
+# The agent's runtime config contains the REAL AgentToken — a credential.
+# It normally lives in the OS app-data dir (outside this repo), but if anyone
+# ever runs the agent with a local config for testing, it must not be staged.
+config.json
+
+# Build output, if electron-builder is ever used.
+dist/
+out/
+
+# Generated previews from tools/make-icons.js debugging.
+assets/_preview-*.png

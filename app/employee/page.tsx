@@ -8,6 +8,7 @@ import { TodayWidgets } from "@/components/engagement/today-widgets";
 import { loadToday } from "@/lib/engagement/today";
 import { db } from "@/lib/db";
 import { getEmployeeByClerkId } from "@/lib/data/scope";
+import { ownIdleTotals, hm } from "@/lib/idle/aggregate";
 import { currentPeriod } from "@/lib/period";
 
 export const dynamic = "force-dynamic";
@@ -44,7 +45,7 @@ async function loadMetrics() {
     const weekStart = weekStartMonday(now);
     const weekEnd = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 7);
 
-    const [prod, target, qual, appraisal, todayAtt, weekAtt, consents, shift, notifications] = await Promise.all([
+    const [prod, target, qual, appraisal, todayAtt, weekAtt, consents, shift, notifications, ownIdle] = await Promise.all([
       db.production.aggregate({
         where: { employeeId: employee.id, date: inMonth },
         _sum: { unitsProduced: true },
@@ -91,6 +92,8 @@ async function loadMetrics() {
         orderBy: [{ read: "asc" }, { createdAt: "desc" }],
         take: 8,
       }),
+      // Their OWN idle/active totals — batched into the same round trip.
+      ownIdleTotals(employee.id),
     ]);
 
     const weekByDate = new Map(weekAtt.map((a) => [ymd(a.date), a]));
@@ -110,6 +113,7 @@ async function loadMetrics() {
       face: latestConsent("FACE_VERIFICATION"),
       idle: latestConsent("IDLE_TRACKING"),
       shift,
+      ownIdle,
       // Serialize Dates — they don't cross the RSC boundary as Date objects.
       notifications: notifications.map((n) => ({
         id: n.id,
@@ -295,11 +299,27 @@ export default async function EmployeeDashboard() {
           status={aScore == null ? "Not yet appraised" : (m?.appraisalPeriod ?? "Published")}
           mono={aScore != null}
         />
+        {/* Your OWN idle/active data, shown as plainly as HR and your manager
+            see it. Nothing about your own tracking is hidden from you. */}
         <StatCard
-          label="Latest Payslip"
-          value="2026-06"
-          state="idle"
-          status="Available"
+          label="Active Time · MTD"
+          value={
+            !m?.ownIdle || m.ownIdle.month.activePct === null
+              ? "—"
+              : `${m.ownIdle.month.activePct}%`
+          }
+          state={
+            !m?.ownIdle?.consent.active || m.ownIdle.month.activePct === null
+              ? "idle"
+              : "good"
+          }
+          status={
+            !m?.ownIdle?.consent.active
+              ? "Tracking not active"
+              : m.ownIdle.month.totalMinutes === 0
+                ? "No data yet"
+                : `${hm(m.ownIdle.month.activeMinutes)} of ${hm(m.ownIdle.month.totalMinutes)}`
+          }
         />
       </div>
 

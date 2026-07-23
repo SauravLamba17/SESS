@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'" />
+    <title>SESS Idle Agent — Setup</title>
+    <style>
+      :root { color-scheme: dark; }
+      body {
+        margin: 0; padding: 20px;
+        font: 13px/1.5 -apple-system, "Segoe UI", system-ui, sans-serif;
+        background: #12171a; color: #e8ecee;
+      }
+      h1 { font-size: 15px; margin: 0 0 4px; }
+      p.sub { margin: 0 0 16px; color: #8b98a1; font-size: 12px; }
+      label { display: block; font-size: 10px; text-transform: uppercase;
+              letter-spacing: .08em; color: #8b98a1; margin-bottom: 4px; }
+      input {
+        width: 100%; box-sizing: border-box; padding: 8px 10px; margin-bottom: 14px;
+        background: #0d1114; color: #e8ecee;
+        border: 1px solid #2a333a; border-radius: 4px; font-size: 13px;
+      }
+      input:focus { outline: 2px solid #4a9eff; outline-offset: -1px; }
+      button {
+        padding: 8px 16px; border-radius: 4px; border: 1px solid #2a333a;
+        background: #4a9eff; color: #0d1114; font-weight: 600; cursor: pointer;
+      }
+      button.secondary { background: transparent; color: #8b98a1; }
+      .notice {
+        border: 1px solid #2a333a; border-left: 3px solid #2BB673;
+        background: #171d21; padding: 10px 12px; border-radius: 4px;
+        margin-bottom: 16px; font-size: 12px; color: #8b98a1;
+      }
+      .notice strong { color: #e8ecee; }
+      .msg { margin-top: 12px; font-size: 12px; }
+      .err { color: #E5484D; } .ok { color: #2BB673; }
+      code { font-family: ui-monospace, Consolas, monospace; font-size: 11px; color: #8b98a1; }
+    </style>
+  </head>
+  <body>
+    <h1>SESS Idle Agent</h1>
+    <p class="sub">Connect this machine to your organisation's SESS server.</p>
+
+    <div class="notice">
+      <strong>What this records:</strong> whether your machine received keyboard or
+      mouse input, summarised as idle/active minutes and sent every 15 minutes.
+      <br /><br />
+      <strong>What it does not record:</strong> no screenshots, no application or
+      window names, no websites, no keystrokes, and no productivity score.
+      <br /><br />
+      The tray icon stays visible whenever this is running, and you can pause
+      tracking at any time from its menu.
+    </div>
+
+    <label for="url">SESS server URL</label>
+    <input id="url" type="url" placeholder="https://sess.example.com" autocomplete="off" />
+
+    <label for="token">Agent token (from HR)</label>
+    <input id="token" type="password" placeholder="sess_agent_…" autocomplete="off" />
+    <p class="sub" style="margin-top:-8px">
+      Treat this like a password — it identifies this machine to the server.
+    </p>
+
+    <button id="save">Save &amp; start</button>
+    <button id="dir" class="secondary" type="button">Open config folder</button>
+
+    <p class="msg" id="msg"></p>
+    <p><code id="path"></code></p>
+
+    <script src="./setup.js"></script>
+  </body>
+</html>

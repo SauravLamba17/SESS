@@ -2,13 +2,15 @@ import { PageHeader } from "@/components/portal/portal-shell";
 import { Panel, PanelHeader, StatCard } from "@/components/ui/panel";
 import { StatusLabel } from "@/components/ui/status-dot";
 import { ImpersonatePanel } from "@/components/admin/impersonate-panel";
+import { IdleThresholdForm } from "@/components/admin/idle-threshold-form";
+import { idleThresholdSeconds } from "@/lib/idle/settings";
 import { TodayWidgets } from "@/components/engagement/today-widgets";
 import { loadToday } from "@/lib/engagement/today";
 
 export const dynamic = "force-dynamic";
 
 export default async function SystemDashboard() {
-  const today = await loadToday();
+  const [today, threshold] = await Promise.all([loadToday(), idleThresholdSeconds()]);
 
   return (
     <>
@@ -20,6 +22,13 @@ export default async function SystemDashboard() {
       <TodayWidgets data={today} />
 
       <ImpersonatePanel />
+
+      <Panel className="mb-6">
+        <PanelHeader title="Idle Tracking — System Threshold" />
+        <div className="p-4">
+          <IdleThresholdForm current={threshold} />
+        </div>
+      </Panel>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard

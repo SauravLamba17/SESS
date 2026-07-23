@@ -32,6 +32,7 @@ import {
   Megaphone,
   Activity,
   CalendarHeart,
+  MonitorSmartphone,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -68,6 +69,7 @@ const ICONS: Record<string, LucideIcon> = {
   Megaphone,
   Activity,
   CalendarHeart,
+  MonitorSmartphone,
 };
 
 export function Sidebar({ portal }: { portal: PortalKey }) {

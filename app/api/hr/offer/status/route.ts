@@ -4,6 +4,9 @@ import { db } from "@/lib/db";
 import { onboardEmployee, createDefaultOnboardingTasks } from "@/lib/employees/onboard";
 import { notifyHr } from "@/lib/notify";
 import { checkAttestation, attestationIp } from "@/lib/attestation";
+import { sendEmployeeInvitation } from "@/lib/employees/invite";
+import { clerkCreateInvitation } from "@/lib/employees/invite-clerk";
+import { ROLES, type Role } from "@/lib/auth-types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,7 +45,13 @@ export async function POST(req: NextRequest) {
   if (role !== "HR" && role !== "SUPER_ADMIN")
     return fail("FORBIDDEN", "Only HR or Super Admin may update an offer's status", 403);
 
-  let body: { id?: unknown; status?: unknown; attestedName?: unknown };
+  let body: {
+    id?: unknown;
+    status?: unknown;
+    attestedName?: unknown;
+    sendInvitation?: unknown;
+    inviteRole?: unknown;
+  };
   try {
     body = await req.json();
   } catch {
@@ -60,7 +69,7 @@ export async function POST(req: NextRequest) {
           select: {
             id: true,
             stage: true,
-            candidate: { select: { id: true, name: true } },
+            candidate: { select: { id: true, name: true, email: true } },
           },
         },
       },
@@ -185,6 +194,9 @@ export async function POST(req: NextRequest) {
           designation: offer.proposedDesignation,
           managerId: offer.proposedManagerId,
           joiningDate: offer.joiningDate,
+          // The candidate's application email — stored so the Clerk webhook
+          // can correlate their eventual signup back to this Employee.
+          email: offer.application.candidate.email,
         },
         userId,
       );
@@ -241,8 +253,30 @@ export async function POST(req: NextRequest) {
       return fail(
         result.detail.code,
         `Could not create the employee record: ${result.detail.message}`,
-        result.detail.code === "DUPLICATE_CODE" ? 409 : 400,
+        result.detail.code === "DUPLICATE_CODE" || result.detail.code === "DUPLICATE_EMAIL"
+          ? 409
+          : 400,
       );
+
+    // OPT-IN login invitation, AFTER the conversion committed — same shared
+    // logic as manual onboarding; a Clerk failure never undoes the hire.
+    let invitation: { sent: boolean; error?: string } | null = null;
+    if (body.sendInvitation === true) {
+      const inviteRole = (ROLES as string[]).includes(String(body.inviteRole))
+        ? (body.inviteRole as Role)
+        : "EMPLOYEE";
+      const inv = await sendEmployeeInvitation(
+        db,
+        {
+          employeeId: result.employee.id,
+          email: offer.application.candidate.email,
+          role: inviteRole,
+          actorUserId: userId,
+        },
+        clerkCreateInvitation,
+      );
+      invitation = inv.ok ? { sent: true } : { sent: false, error: inv.message };
+    }
 
     return NextResponse.json({
       ok: true,
@@ -251,6 +285,7 @@ export async function POST(req: NextRequest) {
       employeeId: result.employee.id,
       employeeCode: result.employee.employeeCode,
       onboardingTasksCreated: result.taskCount,
+      invitation,
     });
   } catch (err) {
     console.error("[hr/offer/status] failed:", err);

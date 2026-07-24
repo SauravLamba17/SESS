@@ -58,11 +58,16 @@ function parseNumber(raw: string | undefined): number | null {
 }
 
 /**
- * Run IP-lock and/or geofence validation against env configuration.
- * Reads process.env directly so route handlers stay thin.
+ * Run IP-lock and/or geofence validation.
+ *
+ * Phase 11: the mode is now DB-backed (SystemSetting, adjustable from
+ * /admin/modules without a redeploy) — callers resolve it via
+ * lib/system-settings.ts attendanceValidationMode() and pass it in. When
+ * omitted, falls back to the env var, preserving pre-Phase-11 behaviour for
+ * any caller not yet updated.
  */
-export function validatePunch(input: PunchInput): ValidationResult {
-  const mode = readMode(process.env.ATTENDANCE_VALIDATION_MODE);
+export function validatePunch(input: PunchInput, modeOverride?: ValidationMode): ValidationResult {
+  const mode = modeOverride ?? readMode(process.env.ATTENDANCE_VALIDATION_MODE);
   const failures: string[] = [];
   const checksRun: string[] = [];
 

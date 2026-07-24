@@ -145,10 +145,12 @@ export const NAV: Record<PortalKey, NavItem[]> = {
   admin: [
     { label: "System Dashboard", href: "/admin", icon: "LayoutDashboard" },
     { label: "Roles & Permissions", href: "/admin/roles", icon: "KeyRound" },
+    { label: "Organization", href: "/admin/organization", icon: "Network" },
     { label: "Payroll Finalization", href: "/admin/payroll", icon: "Lock" },
     { label: "Offer Approvals", href: "/admin/offers", icon: "FileSignature" },
     { label: "Appraisal Formula", href: "/admin/appraisal-formula", icon: "SlidersHorizontal" },
     { label: "Module Toggles", href: "/admin/modules", icon: "ToggleRight" },
+    { label: "Integrations", href: "/admin/integrations", icon: "Plug" },
     { label: "Machines & Assets", href: "/admin/machines", icon: "Cpu" },
     { label: "Audit Log", href: "/admin/audit-log", icon: "ScrollText" },
     { label: "Community", href: "/community", icon: "Megaphone" },

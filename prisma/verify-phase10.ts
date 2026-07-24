@@ -266,6 +266,7 @@ async function main() {
     const ctx: ValidationContext = {
       existingCodes: new Set(existing.map((e) => e.employeeCode)),
       activeManagerCodes: new Map(active.map((m) => [m.employeeCode, m.id])),
+      existingEmails: new Set(),
     };
 
     // One valid row, one with a bad manager reference.

@@ -10,6 +10,8 @@ import { db } from "@/lib/db";
 import { getEmployeeByClerkId } from "@/lib/data/scope";
 import { loadToday } from "@/lib/engagement/today";
 import { BirthdaysToday, SpecialDayBanner } from "@/components/engagement/today-widgets";
+import { ModulePaused } from "@/components/engagement/module-paused";
+import { engagementEnabled } from "@/lib/system-settings";
 
 export const dynamic = "force-dynamic";
 
@@ -66,6 +68,9 @@ async function load() {
 }
 
 export default async function CommunityPage() {
+  // Phase 11: org-wide engagement pause (Module Toggles).
+  if (!(await engagementEnabled())) return <ModulePaused title="Community Wall" />;
+
   const { me, shoutOuts, people, today, error } = await load();
   const now = new Date();
   const cutoff = new Date(now.getTime() - DELETE_WINDOW_MINUTES * 60 * 1000);

@@ -84,6 +84,8 @@ export function getAllEmployees() {
     include: {
       manager: { select: { name: true } },
       shift: { select: { id: true, name: true, startTime: true, endTime: true } },
+      // Account status on the roster: linked User = active login.
+      user: { select: { id: true } },
     },
     orderBy: [{ active: "desc" }, { employeeCode: "asc" }],
   });

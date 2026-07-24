@@ -10,8 +10,6 @@ import { idleConsentStates, consentLabel } from "@/lib/idle/consent";
 
 export const dynamic = "force-dynamic";
 
-const TYPES = ["FACE_VERIFICATION", "IDLE_TRACKING"] as const;
-
 function ymd(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
@@ -63,7 +61,7 @@ export default async function CompliancePage() {
     <>
       <PageHeader
         title="Compliance & Consent"
-        description="Record and track employee consent for face verification and idle tracking — and issue the desktop agent token from the same place."
+        description="Record and track employee consent for idle tracking — and issue the desktop agent token from the same place."
         action={
           <Link
             href="/hr/idle-tracking"
@@ -103,7 +101,6 @@ export default async function CompliancePage() {
               <thead>
                 <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-text-muted">
                   <th className="px-4 py-3 font-medium">Employee</th>
-                  <th className="px-4 py-3 font-medium">Face Verification</th>
                   <th className="px-4 py-3 font-medium">Idle Tracking</th>
                   <th className="px-4 py-3 font-medium">Agent Token</th>
                 </tr>
@@ -118,11 +115,11 @@ export default async function CompliancePage() {
                         <div className="text-text">{e.name}</div>
                         <div className="font-mono text-xs text-text-muted">{e.employeeCode}</div>
                       </td>
-                      {TYPES.map((t) => {
-                        const rec = latest.get(`${e.id}|${t}`);
+                      {(() => {
+                        const rec = latest.get(`${e.id}|IDLE_TRACKING`);
                         const expired = rec?.retentionExpiry ? rec.retentionExpiry < now : false;
                         return (
-                          <td key={t} className="px-4 py-3">
+                          <td className="px-4 py-3">
                             {rec ? (
                               <span className="inline-flex items-center gap-2">
                                 <StatusDot state={expired ? "danger" : "good"} />
@@ -139,7 +136,7 @@ export default async function CompliancePage() {
                             )}
                           </td>
                         );
-                      })}
+                      })()}
                       {/* Inline token control — the whole point of this change.
                           Gated on the SAME consent state the server enforces. */}
                       <td className="min-w-[16rem] px-4 py-3">
@@ -161,7 +158,7 @@ export default async function CompliancePage() {
                 })}
                 {employees.length === 0 && !error && (
                   <tr>
-                    <td colSpan={4} className="px-4 py-8 text-text-muted">No active employees.</td>
+                    <td colSpan={3} className="px-4 py-8 text-text-muted">No active employees.</td>
                   </tr>
                 )}
               </tbody>

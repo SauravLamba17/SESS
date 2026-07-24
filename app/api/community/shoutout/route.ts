@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getEffectiveUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getEmployeeByClerkId } from "@/lib/data/scope";
+import { engagementEnabled } from "@/lib/system-settings";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,6 +24,10 @@ const DELETE_WINDOW_MINUTES = 15;
 export async function POST(req: NextRequest) {
   const userId = await getEffectiveUserId();
   if (!userId) return fail("UNAUTHENTICATED", "Not authenticated", 401);
+
+  // Phase 11: org-wide engagement pause (Module Toggles).
+  if (!(await engagementEnabled()))
+    return fail("MODULE_DISABLED", "The engagement module is currently paused by the administrator.", 403);
 
   let body: { action?: unknown; id?: unknown; toEmployeeId?: unknown; message?: unknown };
   try {

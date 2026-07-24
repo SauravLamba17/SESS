@@ -110,7 +110,6 @@ async function loadMetrics() {
       today: todayAtt,
       weekStart,
       weekByDate,
-      face: latestConsent("FACE_VERIFICATION"),
       idle: latestConsent("IDLE_TRACKING"),
       shift,
       ownIdle,
@@ -201,13 +200,8 @@ export default async function EmployeeDashboard() {
           return { key: ymd(d), label, t, s, l };
         });
 
-  const face = m?.face ?? null;
   const idle = m?.idle ?? null;
-  const retention = [face?.retentionExpiry, idle?.retentionExpiry].filter(Boolean) as Date[];
-  const earliestRetention =
-    retention.length > 0
-      ? retention.reduce((a, b) => (a < b ? a : b))
-      : null;
+  const earliestRetention = idle?.retentionExpiry ?? null;
 
   return (
     <>
@@ -253,19 +247,31 @@ export default async function EmployeeDashboard() {
           status={todayStatus}
           hint={today?.channel ?? undefined}
         />
-        <StatCard
-          label="Face Verification"
-          value="Verified"
-          state="good"
-          status="Camera match 98.4%"
-          mono={false}
-        />
+        {/* Real today totals from the same ownIdleTotals batch as the MTD card. */}
         <StatCard
           label="Idle Time (today)"
-          value="41"
-          unit="min"
-          state="warn"
-          status="Active 6h 12m"
+          value={
+            !m?.ownIdle?.consent.active || m.ownIdle.today.totalMinutes === 0
+              ? "—"
+              : String(m.ownIdle.today.idleMinutes)
+          }
+          unit={
+            m?.ownIdle?.consent.active && m.ownIdle.today.totalMinutes > 0 ? "min" : undefined
+          }
+          state={
+            !m?.ownIdle?.consent.active || m.ownIdle.today.totalMinutes === 0
+              ? "idle"
+              : m.ownIdle.today.activePct !== null && m.ownIdle.today.activePct < 70
+                ? "warn"
+                : "good"
+          }
+          status={
+            !m?.ownIdle?.consent.active
+              ? "Tracking not active"
+              : m.ownIdle.today.totalMinutes === 0
+                ? "No data yet"
+                : `Active ${hm(m.ownIdle.today.activeMinutes)}`
+          }
         />
         <StatCard
           label="Production vs Target"
@@ -349,12 +355,6 @@ export default async function EmployeeDashboard() {
         <Panel>
           <PanelHeader title="Consent & Compliance" />
           <div className="space-y-3 p-4 text-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-text-muted">Face verification</span>
-              <StatusLabel state={face ? "good" : "idle"}>
-                {face ? "Consent on file" : "Not on file"}
-              </StatusLabel>
-            </div>
             <div className="flex items-center justify-between">
               <span className="text-text-muted">Idle-time tracking</span>
               <StatusLabel state={idle ? "good" : "idle"}>

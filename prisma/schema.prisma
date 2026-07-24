@@ -89,6 +89,12 @@ model Employee {
   // days, and `active` alone cannot express that.
   offboardedAt DateTime?
   pfUan       String? // Provident Fund UAN — nullable, not every employee has one yet
+  // Invitation phase: how a Clerk signup is correlated back to this Employee.
+  // Stored lowercased; the webhook matches user.created emails against it.
+  // Nullable — historical/bulk-imported employees may never get login access.
+  email       String?   @unique
+  // Clerk invitation id while "sent, awaiting acceptance"; cleared on link.
+  pendingInvitationId String?
   // Phase 9: used ONLY to surface a name on the birthday widget. Nullable —
   // existing employees have none until HR backfills. Never displayed as a
   // full date, and never used to compute or show an age.
@@ -141,7 +147,6 @@ model Attendance {
   ipAddress      String?
   lat            Float?
   long           Float?
-  verifiedByFace Boolean           @default(false)
   lateFlag       Boolean           @default(false)
   lateMinutes    Int? // Phase 7: minutes past (shift.startTime + grace) if late; null if not late / no shift data
   checkInNote    String? // mandatory employee comment captured at web clock-in
@@ -473,7 +478,10 @@ model ConsentRecord {
   id              String    @id @default(cuid())
   employeeId      String
   employee        Employee  @relation(fields: [employeeId], references: [id])
-  consentType     String // "FACE_VERIFICATION" | "IDLE_TRACKING"
+  // Phase 11: "FACE_VERIFICATION" was removed along with the feature (cut from
+  // scope; zero rows ever recorded it). Only "IDLE_TRACKING" is valid now —
+  // enforced in app/api/hr/consent/route.ts.
+  consentType     String // "IDLE_TRACKING"
   givenOn         DateTime
   retentionExpiry DateTime?
 }

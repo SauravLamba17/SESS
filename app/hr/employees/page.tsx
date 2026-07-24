@@ -5,6 +5,7 @@ import { StatusDot } from "@/components/ui/status-dot";
 import { OnboardForm } from "@/components/hr/onboard-form";
 import { OffboardButton } from "@/components/hr/offboard-button";
 import { BulkImport } from "@/components/hr/bulk-import";
+import { InviteButton } from "@/components/hr/invite-button";
 import { ShiftAssignSelect } from "@/components/shifts/shift-assign-select";
 import { getAllEmployees, getActiveEmployees, getActiveShifts } from "@/lib/data/scope";
 
@@ -85,6 +86,7 @@ export default async function EmployeeMaster() {
                   <th className="px-4 py-3 font-medium">Manager</th>
                   <th className="px-4 py-3 font-medium">Joining Date</th>
                   <th className="px-4 py-3 font-medium">Shift</th>
+                  <th className="px-4 py-3 font-medium">Login</th>
                   <th className="px-4 py-3 font-medium">Status</th>
                   <th className="px-4 py-3 text-right font-medium">Action</th>
                 </tr>
@@ -112,6 +114,31 @@ export default async function EmployeeMaster() {
                       )}
                     </td>
                     <td className="px-4 py-3">
+                      {e.user ? (
+                        <span className="inline-flex items-center gap-2">
+                          <StatusDot state="good" />
+                          <span className="text-text-muted">Active account</span>
+                        </span>
+                      ) : e.pendingInvitationId ? (
+                        <div className="space-y-1">
+                          <span className="inline-flex items-center gap-2">
+                            <StatusDot state="warn" />
+                            <span className="text-text-muted">Invitation sent, awaiting acceptance</span>
+                          </span>
+                          {e.active && (
+                            <InviteButton employeeId={e.id} email={e.email} resend />
+                          )}
+                        </div>
+                      ) : (
+                        <div className="space-y-1">
+                          <span className="text-text-muted">No login access</span>
+                          {e.active && (
+                            <InviteButton employeeId={e.id} email={e.email} resend={false} />
+                          )}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
                       <span className="inline-flex items-center gap-2">
                         <StatusDot state={e.active ? "good" : "idle"} />
                         <span className="text-text-muted">{e.active ? "Active" : "Offboarded"}</span>
@@ -124,7 +151,7 @@ export default async function EmployeeMaster() {
                 ))}
                 {employees.length === 0 && !error && (
                   <tr>
-                    <td colSpan={8} className="px-4 py-8 text-text-muted">
+                    <td colSpan={9} className="px-4 py-8 text-text-muted">
                       No employees yet — onboard the first one above.
                     </td>
                   </tr>

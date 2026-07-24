@@ -3,6 +3,9 @@ import { getEffectiveUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getCurrentRole } from "@/lib/auth";
 import { onboardEmployee } from "@/lib/employees/onboard";
+import { sendEmployeeInvitation } from "@/lib/employees/invite";
+import { clerkCreateInvitation } from "@/lib/employees/invite-clerk";
+import { ROLES, type Role } from "@/lib/auth-types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,6 +47,13 @@ export async function POST(req: NextRequest) {
   const managerId = str(body.managerId) || null;
   const machineId = str(body.machineId) || null;
   const joiningDate = parseDateOnly(body.joiningDate);
+  const email = str(body.email) || null;
+  // OPT-IN: HR may onboard a record without granting system access (historical
+  // employees, bulk-import-style cases). Sending is an explicit choice.
+  const sendInvitation = body.sendInvitation === true;
+  const inviteRole = (ROLES as string[]).includes(str(body.inviteRole))
+    ? (str(body.inviteRole) as Role)
+    : "EMPLOYEE";
 
   if (!employeeCode || !name || !department || !joiningDate) {
     return fail(
@@ -52,6 +62,8 @@ export async function POST(req: NextRequest) {
       400,
     );
   }
+  if (sendInvitation && !email)
+    return fail("BAD_INPUT", "An email address is required to send a login invitation", 400);
 
   try {
     // Delegates to the SHARED onboarding function (lib/employees/onboard.ts).
@@ -61,25 +73,43 @@ export async function POST(req: NextRequest) {
     const result = await db.$transaction((tx) =>
       onboardEmployee(
         tx,
-        { employeeCode, name, department, designation, managerId, machineId, joiningDate },
+        { employeeCode, name, department, designation, managerId, machineId, joiningDate, email },
         userId,
       ),
     );
 
     if (!result.ok) {
-      const status = result.code === "DUPLICATE_CODE" ? 409 : 400;
+      const status =
+        result.code === "DUPLICATE_CODE" || result.code === "DUPLICATE_EMAIL" ? 409 : 400;
       return fail(result.code, result.message, status);
+    }
+
+    // Invitation AFTER the commit — the Employee exists whatever happens here.
+    // A Clerk failure is reported to HR, never allowed to undo the onboard.
+    let invitation: { sent: boolean; error?: string } | null = null;
+    if (sendInvitation) {
+      const inv = await sendEmployeeInvitation(
+        db,
+        { employeeId: result.employee.id, email, role: inviteRole, actorUserId: userId },
+        clerkCreateInvitation,
+      );
+      invitation = inv.ok ? { sent: true } : { sent: false, error: inv.message };
     }
 
     return NextResponse.json({
       ok: true,
       id: result.employee.id,
       employeeCode: result.employee.employeeCode,
+      invitation,
     });
   } catch (err) {
-    // Unique-violation backstop if two onboards race the pre-check.
-    if (typeof err === "object" && err && (err as { code?: string }).code === "P2002")
-      return fail("DUPLICATE_CODE", `Employee code ${employeeCode} already exists`, 409);
+    // Unique-violation backstop if two onboards race the pre-checks.
+    if (typeof err === "object" && err && (err as { code?: string }).code === "P2002") {
+      const target = String((err as { meta?: { target?: unknown } }).meta?.target ?? "");
+      return target.includes("email")
+        ? fail("DUPLICATE_EMAIL", `Email ${email} is already in use`, 409)
+        : fail("DUPLICATE_CODE", `Employee code ${employeeCode} already exists`, 409);
+    }
     console.error("[hr/employee onboard] failed:", err);
     return fail("SERVER_ERROR", "Could not onboard the employee", 503);
   }

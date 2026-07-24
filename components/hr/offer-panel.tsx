@@ -63,6 +63,8 @@ export function OfferPanel({
   // Which candidate response HR is recording, and the name they type for it.
   const [responding, setResponding] = useState<"ACCEPTED" | "DECLINED" | null>(null);
   const [attestedName, setAttestedName] = useState("");
+  // Opt-in: send the new employee a Clerk login invitation on hire.
+  const [sendInvitation, setSendInvitation] = useState(true);
 
   const editable = !offer || offer.status === "DRAFT";
   const locked = offer && (offer.status === "SENT" || offer.status === "ACCEPTED");
@@ -133,6 +135,7 @@ export function OfferPanel({
             id: offer!.id,
             status,
             ...(attestedName ? { attestedName } : {}),
+            ...(status === "ACCEPTED" ? { sendInvitation } : {}),
           }),
         });
         const data = await res.json();
@@ -143,7 +146,12 @@ export function OfferPanel({
         }
         setSaved(
           status === "ACCEPTED"
-            ? `Hired. Employee ${data.employeeCode} created with a salary structure and ${data.onboardingTasksCreated} onboarding tasks.`
+            ? `Hired. Employee ${data.employeeCode} created with a salary structure and ${data.onboardingTasksCreated} onboarding tasks.` +
+              (!data.invitation
+                ? ""
+                : data.invitation.sent
+                  ? " Login invitation sent."
+                  : ` Login invitation FAILED: ${data.invitation.error} — retry from the Employee Master roster.`)
             : label,
         );
         router.refresh();
@@ -383,6 +391,16 @@ export function OfferPanel({
             autoComplete="off"
             className={`${inputClass} mt-2`}
           />
+          {responding === "ACCEPTED" && (
+            <label className="mt-2 flex items-center gap-2 text-[11px] text-text-muted">
+              <input
+                type="checkbox"
+                checked={sendInvitation}
+                onChange={(e) => setSendInvitation(e.target.checked)}
+              />
+              Send a SESS login invitation to the candidate&apos;s email (as Employee)
+            </label>
+          )}
           <div className="mt-2 flex items-center justify-end gap-2">
             <button
               type="button"

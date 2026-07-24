@@ -7,6 +7,7 @@ import {
   isLateCheckIn,
   lateMinutesForShift,
 } from "@/lib/attendance/validation";
+import { attendanceValidationMode } from "@/lib/system-settings";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -80,8 +81,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Run validation regardless of punch direction.
-    const validation = validatePunch({ ip, lat, long, at: now });
+    // Run validation regardless of punch direction. Mode is DB-backed since
+    // Phase 11 (Super Admin adjusts it on /admin/modules; env var is the
+    // default) — a failed mode read falls back rather than dropping the punch.
+    const validation = validatePunch({ ip, lat, long, at: now }, await attendanceValidationMode());
     const flaggedForReview = !validation.passed;
     const reviewReason = flaggedForReview
       ? validation.failures.join("; ")

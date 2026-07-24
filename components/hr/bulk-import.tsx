@@ -29,8 +29,8 @@ interface Preview {
 }
 
 const TEMPLATE =
-  "employeeCode,name,department,designation,managerEmployeeCode,joiningDate,machineId\n" +
-  "EMP-1001,Asha Verma,Assembly,Line Operator,EMP-0002,2026-08-01,M-12\n";
+  "employeeCode,name,department,designation,managerEmployeeCode,joiningDate,machineId,email\n" +
+  "EMP-1001,Asha Verma,Assembly,Line Operator,EMP-0002,2026-08-01,M-12,asha.verma@example.com\n";
 
 /**
  * Two-stage import: preview (writes nothing) → confirm (all-or-nothing).
@@ -124,9 +124,10 @@ export function BulkImport() {
 
       <p className="text-[11px] text-text-muted">
         Columns: employeeCode, name, department, designation, managerEmployeeCode,
-        joiningDate (YYYY-MM-DD), machineId. Managers are referenced by their
-        employee <em>code</em>, not an internal id. Nothing is written until you
-        confirm.
+        joiningDate (YYYY-MM-DD), machineId, email (optional). Managers are
+        referenced by their employee <em>code</em>, not an internal id. Login
+        invitations are NOT sent at import — use &quot;Send invitation&quot; on the
+        roster afterwards. Nothing is written until you confirm.
       </p>
 
       {error && (

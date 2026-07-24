@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
   try {
     // Context for validation — two queries, regardless of file size.
     const [existing, activeManagers] = await Promise.all([
-      db.employee.findMany({ select: { employeeCode: true } }),
+      db.employee.findMany({ select: { employeeCode: true, email: true } }),
       db.employee.findMany({
         where: { active: true },
         select: { id: true, employeeCode: true },
@@ -76,6 +76,9 @@ export async function POST(req: NextRequest) {
     const ctx: ValidationContext = {
       existingCodes: new Set(existing.map((e) => e.employeeCode)),
       activeManagerCodes: new Map(activeManagers.map((m) => [m.employeeCode, m.id])),
+      existingEmails: new Set(
+        existing.flatMap((e) => (e.email ? [e.email.toLowerCase()] : [])),
+      ),
     };
 
     const result = validateCsv(csv, ctx);
@@ -102,6 +105,7 @@ export async function POST(req: NextRequest) {
         managerEmployeeCode: r.managerEmployeeCode,
         joiningDate: r.joiningDate!.toISOString().slice(0, 10),
         machineId: r.machineId,
+        email: r.email,
       })),
       invalid: result.invalid,
     };
@@ -145,6 +149,9 @@ export async function POST(req: NextRequest) {
                 : null,
               machineId: row.machineId,
               joiningDate: row.joiningDate!,
+              // Stored only — invitations are sent later, per-employee, from
+              // the roster. Mass-inviting an entire import is never implicit.
+              email: row.email,
             },
             userId,
           );

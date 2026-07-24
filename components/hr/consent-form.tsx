@@ -22,7 +22,9 @@ export function ConsentForm({
   const router = useRouter();
   const [pending, start] = useTransition();
   const [employeeId, setEmployeeId] = useState("");
-  const [consentType, setConsentType] = useState("FACE_VERIFICATION");
+  // Phase 11: face verification was cut from scope — idle tracking is the only
+  // consent type left, so the type selector is gone.
+  const consentType = "IDLE_TRACKING";
   const [givenOn, setGivenOn] = useState(todayStr());
   const [retentionExpiry, setRetentionExpiry] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -32,7 +34,7 @@ export function ConsentForm({
   const [token, setToken] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const isIdle = consentType === "IDLE_TRACKING";
+  const isIdle = true;
   const selectedName =
     employees.find((e) => e.id === employeeId)?.name ?? "this employee";
 
@@ -97,10 +99,7 @@ export function ConsentForm({
         </div>
         <div>
           <label className={labelClass} htmlFor="ct">Consent type</label>
-          <select id="ct" value={consentType} onChange={(e) => setConsentType(e.target.value)} className={inputClass}>
-            <option value="FACE_VERIFICATION">Face verification</option>
-            <option value="IDLE_TRACKING">Idle tracking</option>
-          </select>
+          <input id="ct" value="Idle tracking" disabled readOnly className={`${inputClass} opacity-70`} />
         </div>
         <div>
           <label className={labelClass} htmlFor="cg">Given on</label>
@@ -112,7 +111,6 @@ export function ConsentForm({
         </div>
       </div>
 
-      {/* Only meaningful for idle tracking — face verification has no agent. */}
       {isIdle && (
         <label
           htmlFor="alsoToken"

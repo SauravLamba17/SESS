@@ -7,6 +7,8 @@ import { getEffectiveUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getEmployeeByClerkId } from "@/lib/data/scope";
 import { answeredSurveyIds } from "@/lib/engagement/pulse";
+import { ModulePaused } from "@/components/engagement/module-paused";
+import { engagementEnabled } from "@/lib/system-settings";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +52,9 @@ async function load() {
 }
 
 export default async function PulsePage() {
+  // Phase 11: org-wide engagement pause (Module Toggles).
+  if (!(await engagementEnabled())) return <ModulePaused title="Pulse Surveys" />;
+
   const { me, surveys, answered, error } = await load();
   const open = surveys.filter((s) => !answered.has(s.id));
 

@@ -74,7 +74,7 @@ export function ClientMailForm({
       </div>
       <div>
         <label className={labelClass} htmlFor="msum">Summary / notes</label>
-        <textarea id="msum" rows={3} value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="Manager-entered summary (AI summarization comes in a later phase)" className={inputClass} />
+        <textarea id="msum" rows={3} value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="Manager-entered summary" className={inputClass} />
       </div>
 
       {msg && (

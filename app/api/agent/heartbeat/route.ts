@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { idleConsentState } from "@/lib/idle/consent";
 import { idleThresholdSeconds } from "@/lib/idle/settings";
+import { idleTrackingEnabled } from "@/lib/system-settings";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -73,6 +74,18 @@ export async function POST(req: NextRequest) {
     return fail("BAD_INPUT", "windowEnd must be an ISO date-time", 400);
 
   try {
+    // ── GATE 0 (Phase 11): the org-wide kill switch ──
+    // Checked before the token is even looked up: when Super Admin turns idle
+    // tracking off, EVERY heartbeat is rejected regardless of tokens or
+    // individual consent records. shouldPause tells agents to stop retrying.
+    if (!(await idleTrackingEnabled()))
+      return fail(
+        "IDLE_TRACKING_DISABLED",
+        "Idle tracking is disabled org-wide by the administrator. Tracking is paused — this batch was not stored.",
+        403,
+        { shouldPause: true },
+      );
+
     const agent = await db.agentToken.findUnique({
       where: { token },
       select: {

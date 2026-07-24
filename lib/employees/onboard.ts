@@ -34,11 +34,22 @@ export interface OnboardInput {
   managerId?: string | null;
   machineId?: string | null;
   joiningDate: Date;
+  /**
+   * Optional — stored lowercased. This is how the Clerk webhook later
+   * correlates an accepted invitation back to this Employee. Invitation
+   * SENDING deliberately lives outside this function (lib/employees/invite.ts),
+   * so an external API call never sits inside a caller's transaction.
+   */
+  email?: string | null;
 }
 
 export type OnboardResult =
   | { ok: true; employee: { id: string; employeeCode: string; name: string } }
-  | { ok: false; code: "DUPLICATE_CODE" | "BAD_MANAGER" | "BAD_INPUT"; message: string };
+  | {
+      ok: false;
+      code: "DUPLICATE_CODE" | "DUPLICATE_EMAIL" | "BAD_MANAGER" | "BAD_INPUT";
+      message: string;
+    };
 
 /**
  * Next free employee code in the EMP-#### series.
@@ -95,6 +106,22 @@ export async function onboardEmployee(
       message: `Employee code ${employeeCode} already exists`,
     };
 
+  const email = input.email?.trim().toLowerCase() || null;
+  if (email) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+      return { ok: false, code: "BAD_INPUT", message: `"${email}" is not a valid email address` };
+    const emailDupe = await tx.employee.findUnique({
+      where: { email },
+      select: { employeeCode: true },
+    });
+    if (emailDupe)
+      return {
+        ok: false,
+        code: "DUPLICATE_EMAIL",
+        message: `Email ${email} already belongs to employee ${emailDupe.employeeCode}`,
+      };
+  }
+
   const managerId = input.managerId?.trim() || null;
   if (managerId) {
     const mgr = await tx.employee.findFirst({
@@ -118,6 +145,7 @@ export async function onboardEmployee(
       managerId,
       machineId: input.machineId?.trim() || null,
       joiningDate: input.joiningDate,
+      email,
     },
   });
 

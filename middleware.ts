@@ -23,8 +23,15 @@ const isPortalRoute = createRouteMatcher([
  * Scope is exact: /careers and the single POST endpoint the form submits to.
  * Resume FILES are NOT public — they are served by
  * app/api/resume/[applicationId]/route.ts, which is role-checked in-route.
+ *
+ * /api/webhooks/clerk is called by Clerk's servers, not a signed-in user —
+ * its trust boundary is svix signature verification in-route, not a session.
  */
-const isPublicRoute = createRouteMatcher(["/careers(.*)", "/api/careers/apply"]);
+const isPublicRoute = createRouteMatcher([
+  "/careers(.*)",
+  "/api/careers/apply",
+  "/api/webhooks/clerk",
+]);
 
 /**
  * Phase 9: shared surfaces every signed-in role may use — the community wall

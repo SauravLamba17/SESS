@@ -6,7 +6,8 @@ import { getCurrentRole } from "@/lib/auth";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const CONSENT_TYPES = ["FACE_VERIFICATION", "IDLE_TRACKING"] as const;
+// Phase 11: FACE_VERIFICATION removed with the feature (never had any rows).
+const CONSENT_TYPES = ["IDLE_TRACKING"] as const;
 
 function fail(code: string, error: string, status: number) {
   return NextResponse.json({ error, code }, { status });

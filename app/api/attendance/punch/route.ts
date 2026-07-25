@@ -6,6 +6,8 @@ import {
   validatePunch,
   isLateCheckIn,
   lateMinutesForShift,
+  resolvePunch,
+  MAX_OPEN_SHIFT_HOURS,
 } from "@/lib/attendance/validation";
 import { attendanceValidationMode } from "@/lib/system-settings";
 
@@ -32,13 +34,6 @@ function coerceCoord(value: unknown): number | null {
   return null;
 }
 
-function startOfDay(d: Date): Date {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-}
-
-function endOfDay(d: Date): Date {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
-}
 
 export async function POST(req: NextRequest) {
   // ── Auth: resolve the employee from the Clerk session ──────
@@ -90,20 +85,36 @@ export async function POST(req: NextRequest) {
       ? validation.failures.join("; ")
       : null;
 
-    // Find today's row to decide check-in vs check-out.
-    const existing = await db.attendance.findFirst({
-      where: {
-        employeeId: employee.id,
-        date: { gte: startOfDay(now), lt: endOfDay(now) },
-      },
-      orderBy: { date: "desc" },
+    // The employee's shift decides both lateness and which calendar day this
+    // punch belongs to, so it is resolved once, up front.
+    const shift = employee.shiftId
+      ? await db.shift.findUnique({ where: { id: employee.shiftId } })
+      : null;
+
+    /**
+     * Decide check-in vs check-out from the most recent OPEN row rather than
+     * from "a row dated today".
+     *
+     * The old date-keyed lookup could not see the night shift's open row once
+     * the clock passed midnight: an 18:00–03:00 worker punching out at 03:05
+     * was given a brand-new check-in row on the next day, leaving the real
+     * shift permanently open and un-closeable. Keying on the open row makes
+     * both shifts behave identically — the day shift's 17:00 punch and the
+     * night shift's 03:05 punch each simply close what is open.
+     */
+    const openSince = new Date(now.getTime() - MAX_OPEN_SHIFT_HOURS * 3_600_000);
+    const recentRow = await db.attendance.findFirst({
+      where: { employeeId: employee.id, checkIn: { not: null, gte: openSince } },
+      orderBy: { checkIn: "desc" },
     });
+
+    const decision = resolvePunch({ at: now, shift, recentRow });
 
     let punchType: PunchType;
     let record;
 
-    if (!existing) {
-      // First punch of the day → CHECK-IN. A comment is mandatory (enforced
+    if (decision.action === "CHECK_IN") {
+      // First punch of the shift → CHECK-IN. A comment is mandatory (enforced
       // server-side, not just in the modal).
       if (!note) {
         return NextResponse.json(
@@ -121,11 +132,15 @@ export async function POST(req: NextRequest) {
       // lateMinutes stays null (we have no shift start to measure against).
       let lateFlag: boolean;
       let lateMinutes: number | null = null;
-      const shift = employee.shiftId
-        ? await db.shift.findUnique({ where: { id: employee.shiftId } })
-        : null;
       if (shift) {
-        lateMinutes = lateMinutesForShift(now, shift.startTime, shift.gracePeriodMinutes);
+        // endTime is passed so an after-midnight arrival on the night shift is
+        // measured against the previous evening's start, not called on time.
+        lateMinutes = lateMinutesForShift(
+          now,
+          shift.startTime,
+          shift.gracePeriodMinutes,
+          shift.endTime,
+        );
         lateFlag = lateMinutes !== null;
       } else {
         console.warn(
@@ -137,7 +152,9 @@ export async function POST(req: NextRequest) {
       record = await db.attendance.create({
         data: {
           employeeId: employee.id,
-          date: startOfDay(now),
+          // THE SHIFT'S START DATE, not the punch's own date. For the night
+          // shift this keeps the whole 18:00→03:00 span on the day it began.
+          date: decision.shiftDate,
           checkIn: now,
           channel: "WEB",
           ipAddress: ip,
@@ -150,8 +167,11 @@ export async function POST(req: NextRequest) {
           reviewReason,
         },
       });
-    } else if (existing.checkIn && !existing.checkOut) {
-      // Second punch → CHECK-OUT. A failed checkout still flags the row.
+    } else if (decision.action === "CHECK_OUT") {
+      // Second punch → CHECK-OUT. Closes the open row whatever calendar day it
+      // started on, which is what makes the night shift work. A failed
+      // checkout still flags the row.
+      const existing = recentRow!;
       punchType = "OUT";
       record = await db.attendance.update({
         where: { id: existing.id },
@@ -169,12 +189,13 @@ export async function POST(req: NextRequest) {
         },
       });
     } else {
-      // Already checked in AND out today — nothing new to record.
+      // Already checked in AND out for this shift — nothing new to record.
+      const existing = recentRow!;
       return NextResponse.json({
         ok: true,
         punchType: existing.checkOut ? "OUT" : "IN",
         status: "already_complete" as PunchStatus,
-        message: "You have already checked in and out today.",
+        message: "You have already checked in and out for this shift.",
         attendanceId: existing.id,
         checkIn: existing.checkIn,
         checkOut: existing.checkOut,

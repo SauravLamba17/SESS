@@ -105,6 +105,9 @@ export const NAV: Record<PortalKey, NavItem[]> = {
     { label: "Payslips & Financials", href: "/employee/payslips", icon: "Wallet" },
     { label: "Expense Claims", href: "/employee/expenses", icon: "ReceiptText" },
     { label: "My Documents", href: "/employee/documents", icon: "FileText" },
+    // Self-service data export. The Employee portal's ONLY reports-adjacent
+    // entry — employees still have no access to any organisation report.
+    { label: "My Data", href: "/employee/my-data", icon: "DatabaseBackup" },
     { label: "My Profile", href: "/employee/profile", icon: "UserCircle" },
     { label: "Community", href: "/community", icon: "Megaphone" },
     { label: "Pulse Surveys", href: "/pulse", icon: "Activity" },
@@ -118,6 +121,7 @@ export const NAV: Record<PortalKey, NavItem[]> = {
     { label: "Team Payroll", href: "/manager/payroll", icon: "Wallet" },
     { label: "Team Expenses", href: "/manager/expenses", icon: "ReceiptText" },
     { label: "Candidates", href: "/manager/candidates", icon: "UserSearch" },
+    { label: "Reports", href: "/manager/reports", icon: "BarChart3" },
     { label: "Team Activity", href: "/manager/idle-tracking", icon: "MonitorSmartphone" },
     { label: "Warning Letters", href: "/manager/warnings", icon: "AlertTriangle" },
     { label: "Client Mail", href: "/manager/client-mail", icon: "Mail" },
@@ -136,6 +140,7 @@ export const NAV: Record<PortalKey, NavItem[]> = {
     { label: "Payroll & Financials", href: "/hr/payroll", icon: "Wallet" },
     { label: "Appraisal Cycles", href: "/hr/appraisal", icon: "Gauge" },
     { label: "Warning Letters", href: "/hr/warnings", icon: "AlertTriangle" },
+    { label: "Reports", href: "/hr/reports", icon: "BarChart3" },
     { label: "Compliance & Consent", href: "/hr/compliance", icon: "ShieldCheck" },
     { label: "Idle Tracking", href: "/hr/idle-tracking", icon: "MonitorSmartphone" },
     { label: "Holidays", href: "/hr/holidays", icon: "CalendarHeart" },
@@ -149,6 +154,7 @@ export const NAV: Record<PortalKey, NavItem[]> = {
     { label: "Payroll Finalization", href: "/admin/payroll", icon: "Lock" },
     { label: "Offer Approvals", href: "/admin/offers", icon: "FileSignature" },
     { label: "Appraisal Formula", href: "/admin/appraisal-formula", icon: "SlidersHorizontal" },
+    { label: "Reports", href: "/admin/reports", icon: "BarChart3" },
     { label: "Module Toggles", href: "/admin/modules", icon: "ToggleRight" },
     { label: "Integrations", href: "/admin/integrations", icon: "Plug" },
     { label: "Machines & Assets", href: "/admin/machines", icon: "Cpu" },

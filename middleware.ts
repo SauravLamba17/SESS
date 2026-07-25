@@ -42,7 +42,16 @@ const isPublicRoute = createRouteMatcher([
  * Listing them here rather than adding them to isPortalRoute keeps the two
  * ideas separate: portals are role-scoped, these are merely signed-in-only.
  */
-const isSharedAuthedRoute = createRouteMatcher(["/community(.*)", "/pulse(.*)"]);
+const isSharedAuthedRoute = createRouteMatcher([
+  "/community(.*)",
+  "/pulse(.*)",
+  // Account/security (where MFA is enabled) and the MFA gate itself: both must
+  // require a signed-in user but NO particular role — an HR user who has not
+  // set up MFA yet must still be able to reach them, which is exactly why the
+  // MFA check lives in the portal layouts and not here.
+  "/account(.*)",
+  "/mfa-required(.*)",
+]);
 
 function coerceRole(value: unknown): Role | null {
   if (

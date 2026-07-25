@@ -134,7 +134,9 @@ export function PayrollRowEditor({ row }: { row: EditableRow }) {
       )}
 
       {isAdjustment && (
-        <div className="grid grid-cols-3 gap-2">
+        // Two up at 375px, three from sm: three money inputs side by side on a
+        // phone left each ~90px wide, too narrow to read an amount in.
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {EARNING_FIELDS.map(([key, label]) => (
             <div key={key}>
               <label className="mb-1 block text-[10px] uppercase tracking-wide text-text-muted">
@@ -153,7 +155,8 @@ export function PayrollRowEditor({ row }: { row: EditableRow }) {
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+      {/* Six statutory amount fields: 2 up at 375px, 6 from sm. */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-6">
         {FIELDS.map(([key, label]) => (
           <div key={key}>
             <label className="mb-1 block text-[10px] uppercase tracking-wide text-text-muted">

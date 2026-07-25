@@ -302,7 +302,9 @@ export default async function HRPayrollPage({
         </div>
       </Panel>
 
-      <div className="mb-5 grid grid-cols-2 gap-4 xl:grid-cols-4">
+      {/* Single column at 375px — two stat cards side by side truncated their
+          money values; two up from sm, four from xl as before. */}
+      <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label={`Rows · ${periodLabel(period)}`}
           value={rows.length}

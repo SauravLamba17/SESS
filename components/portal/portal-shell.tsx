@@ -31,7 +31,7 @@ export async function PortalShell({
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background">
       {imp && (
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-danger/40 bg-danger/15 px-6 py-2 text-sm">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-danger/40 bg-danger/15 px-4 py-2 text-sm lg:gap-3 lg:px-6">
           <span className="inline-flex items-center gap-2 text-danger">
             <StatusDot state="danger" />
             Viewing as {ROLE_LABEL[imp.role]} — {imp.code}/{imp.name}
@@ -47,22 +47,28 @@ export async function PortalShell({
         </div>
       )}
 
-      <div className="flex min-h-0 flex-1 overflow-hidden">
+      {/* Below lg the shell stacks (nav strip on top, content beneath) and the
+          page scrolls as one document; from lg it is the original two-column
+          layout with an independently scrolling main pane. */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
         <Sidebar portal={portal} />
 
         <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-surface px-6">
-          <div className="flex items-center gap-2.5">
+        <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border bg-surface px-4 lg:px-6">
+          <div className="flex min-w-0 items-center gap-2.5">
             <StatusDot state="good" />
-            <span className="text-sm font-medium text-text">
+            {/* The portal name is already on the nav strip on mobile. */}
+            <span className="hidden truncate text-sm font-medium text-text sm:inline">
               {meta.title} Portal
             </span>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 lg:gap-4">
             {/* Role-scoped server-side by /api/search — reachable from all
                 four portals because this shell is shared by all four. */}
             <GlobalSearch />
-            <span className="rounded border border-border bg-surface-raised px-2.5 py-1 font-mono text-[11px] uppercase tracking-wide text-text-muted">
+            {/* Role chip is a nicety, not information the user lacks — dropped
+                on the narrowest screens to keep the topbar from wrapping. */}
+            <span className="hidden rounded border border-border bg-surface-raised px-2.5 py-1 font-mono text-[11px] uppercase tracking-wide text-text-muted sm:inline">
               {roleLabel}
             </span>
             <UserButton
@@ -71,7 +77,9 @@ export async function PortalShell({
           </div>
         </header>
 
-          <main className="flex-1 overflow-y-auto px-6 py-6">{children}</main>
+          <main className="flex-1 px-4 py-5 lg:overflow-y-auto lg:px-6 lg:py-6">
+            {children}
+          </main>
         </div>
       </div>
     </div>

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getEffectiveUserId, getCurrentRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { MODULE_KEYS, VALIDATION_MODES } from "@/lib/system-settings";
+import { withPrivilegedRoute } from "@/lib/mfa-guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,7 +22,7 @@ const ALLOWED: Record<string, (v: string) => boolean> = {
  * Flip a module toggle, Super Admin only. Same SystemSetting upsert + audit
  * shape as the Phase 10 idle-threshold route.
  */
-export async function POST(req: NextRequest) {
+async function POSTHandler(req: NextRequest) {
   const userId = await getEffectiveUserId();
   if (!userId) return fail("UNAUTHENTICATED", "Not authenticated", 401);
   const role = await getCurrentRole();
@@ -61,3 +62,8 @@ export async function POST(req: NextRequest) {
     return fail("SERVER_ERROR", "Could not update the setting", 503);
   }
 }
+
+// MFA gate — see lib/mfa-guard.ts. Rejects only when the caller's role
+// requires two-factor auth and it is not enabled; every other status this
+// route returns is produced by the handler above, unchanged.
+export const POST = withPrivilegedRoute(POSTHandler);

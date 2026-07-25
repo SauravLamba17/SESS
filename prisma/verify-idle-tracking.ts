@@ -353,10 +353,19 @@ async function main() {
   } finally {
     console.log("\n── CLEANUP ───────────────────────────────────────────");
     await cleanup();
+    // Scoped to THIS script's own rows, matching exactly what cleanup() above
+    // deletes. These two counts used to be db.agentToken.count() and
+    // db.idleLog.count() with no filter, which asserted the whole table was
+    // empty and therefore failed against any seeded demo employee's rows —
+    // data cleanup() deliberately does not touch.
     const left = {
       employees: await db.employee.count({ where: { employeeCode: { startsWith: TAG } } }),
-      tokens: await db.agentToken.count(),
-      idleLogs: await db.idleLog.count(),
+      tokens: await db.agentToken.count({
+        where: { employee: { employeeCode: { startsWith: TAG } } },
+      }),
+      idleLogs: await db.idleLog.count({
+        where: { employee: { employeeCode: { startsWith: TAG } } },
+      }),
     };
     check("CLEANUP every test row removed",
       left.employees === 0 && left.tokens === 0 && left.idleLogs === 0,

@@ -9,6 +9,124 @@
 
 export type ValidationMode = "NONE" | "IP_LOCK" | "GEOFENCE" | "BOTH";
 
+// ─────────────────────────────────────────────────────────────────────────
+// OVERNIGHT SHIFTS — the single definition of "which day does this shift
+// belong to", used by attendance, time-efficiency and reporting alike.
+//
+// The company runs two shifts: 09:00–17:00 (day) and 18:00–03:00 (night).
+// The night shift crosses midnight, so its check-out lands on the NEXT
+// calendar day. THE RULE, applied everywhere: a shift belongs entirely to the
+// calendar day it STARTED on. The 18:00–03:00 shift beginning on the 8th is
+// the 8th's shift, including the 03:05 punch-out on the 9th.
+//
+// These helpers are pure so every module agrees by construction rather than
+// by each re-deriving the rule and drifting.
+// ─────────────────────────────────────────────────────────────────────────
+
+export interface ShiftWindow {
+  startTime: string; // "HH:MM"
+  endTime: string; // "HH:MM"
+}
+
+/** "HH:MM" → minutes since midnight, or null when malformed. */
+export function parseHHMM(value: string | null | undefined): number | null {
+  const m = /^(\d{1,2}):(\d{2})$/.exec((value ?? "").trim());
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h > 23 || min > 59) return null;
+  return h * 60 + min;
+}
+
+/**
+ * Does this shift run past midnight? True when the end time is at or before
+ * the start time — 18:00→03:00 does, 09:00→17:00 does not.
+ *
+ * A malformed or missing time answers false: an unparseable shift must not be
+ * silently reinterpreted as overnight.
+ */
+export function shiftCrossesMidnight(shift: ShiftWindow | null | undefined): boolean {
+  if (!shift) return false;
+  const start = parseHHMM(shift.startTime);
+  const end = parseHHMM(shift.endTime);
+  if (start === null || end === null) return false;
+  return end <= start;
+}
+
+/**
+ * The calendar day a punch at `at` belongs to, per the rule above.
+ *
+ * Day shift (and no shift at all): the punch's own date — IDENTICAL to the
+ * previous startOfDay() behaviour, so nothing about the 09:00–17:00 case
+ * changes.
+ *
+ * Night shift: a punch in the after-midnight TAIL — from 00:00 up to (not
+ * including) the shift's end time — belongs to the PREVIOUS day, because that
+ * is when its shift started. A 00:30 arrival for the 18:00–03:00 shift is the
+ * 8th's shift, not the 9th's.
+ *
+ * A punch past the end time (03:05 for an 03:00 end) is outside the shift
+ * window and gets its own day. That is deliberate and does not affect
+ * check-OUTS, which close the row that is already open — see resolvePunch —
+ * and never consult this function. Only a NEW row's date comes from here.
+ */
+export function shiftDateFor(at: Date, shift: ShiftWindow | null | undefined): Date {
+  const ownDay = new Date(at.getFullYear(), at.getMonth(), at.getDate());
+  if (!shiftCrossesMidnight(shift)) return ownDay;
+
+  const end = parseHHMM(shift!.endTime);
+  if (end === null) return ownDay;
+
+  const minutes = at.getHours() * 60 + at.getMinutes();
+  if (minutes < end) {
+    return new Date(at.getFullYear(), at.getMonth(), at.getDate() - 1);
+  }
+  return ownDay;
+}
+
+/**
+ * How long an open attendance row stays eligible to be closed by the next
+ * punch. Longer than any single shift (the night shift is 9h) but comfortably
+ * under 24h, so a forgotten check-out is never closed by the NEXT day's
+ * arrival — that stale row stays open and visible to HR instead.
+ */
+export const MAX_OPEN_SHIFT_HOURS = 18;
+
+export type PunchResolution =
+  | { action: "CHECK_IN"; shiftDate: Date }
+  | { action: "CHECK_OUT"; rowId: string }
+  | { action: "ALREADY_COMPLETE"; rowId: string };
+
+/**
+ * Decide what a punch means, given the employee's most recent attendance row
+ * within the MAX_OPEN_SHIFT_HOURS window.
+ *
+ * This replaces a lookup keyed on "a row dated today", which could not see the
+ * night shift's open row once the clock passed midnight and therefore turned
+ * every night-shift check-OUT into a second, bogus check-IN.
+ *
+ * Keying on the open row rather than on the calendar date makes the two shift
+ * patterns behave identically: the day shift's 17:00 punch and the night
+ * shift's 03:05 punch both simply close the row that is open.
+ */
+export function resolvePunch(args: {
+  at: Date;
+  shift: ShiftWindow | null | undefined;
+  /** Most recent row whose checkIn is within MAX_OPEN_SHIFT_HOURS of `at`. */
+  recentRow: { id: string; checkIn: Date | null; checkOut: Date | null } | null;
+}): PunchResolution {
+  const { at, shift, recentRow } = args;
+
+  if (recentRow && recentRow.checkIn) {
+    // Open → this punch closes it, whichever calendar day it falls on.
+    if (!recentRow.checkOut) return { action: "CHECK_OUT", rowId: recentRow.id };
+    // Already closed within the window → a stray third punch for this shift.
+    return { action: "ALREADY_COMPLETE", rowId: recentRow.id };
+  }
+
+  return { action: "CHECK_IN", shiftDate: shiftDateFor(at, shift) };
+}
+
 export interface PunchInput {
   ip: string | null;
   lat: number | null;
@@ -159,15 +277,32 @@ export function lateMinutesForShift(
   at: Date,
   startTime: string,
   gracePeriodMinutes: number,
+  /**
+   * OPTIONAL, and only meaningful for an overnight shift. Supply the shift's
+   * end time and a check-in that falls in the after-midnight tail is measured
+   * against the PREVIOUS evening's start rather than being compared to a
+   * larger number and declared on time.
+   *
+   * Without it the function behaves exactly as it always has, so every
+   * existing caller and the whole 09:00–17:00 case are untouched.
+   */
+  endTime?: string,
 ): number | null {
-  const m = /^(\d{1,2}):(\d{2})$/.exec((startTime ?? "").trim());
-  if (!m) return null;
-  const h = Number(m[1]);
-  const min = Number(m[2]);
-  if (h > 23 || min > 59) return null;
+  const start = parseHHMM(startTime);
+  if (start === null) return null;
   const grace = Number.isFinite(gracePeriodMinutes) ? gracePeriodMinutes : 0;
-  const cutoff = h * 60 + min + grace;
-  const actual = at.getHours() * 60 + at.getMinutes();
+  const cutoff = start + grace;
+
+  let actual = at.getHours() * 60 + at.getMinutes();
+
+  // Night shift, arriving after midnight: 00:30 is not "17.5 hours early" for
+  // an 18:00 start, it is 6.5 hours LATE for the shift that began yesterday.
+  // Rolling the clock forward a full day expresses that correctly.
+  const end = endTime === undefined ? null : parseHHMM(endTime);
+  if (end !== null && end <= start && actual < end) {
+    actual += 24 * 60;
+  }
+
   const diff = actual - cutoff;
   return diff > 0 ? diff : null; // floored at 0 → null when not late
 }
@@ -181,6 +316,7 @@ export function isLateForShift(
   at: Date,
   startTime: string,
   gracePeriodMinutes: number,
+  endTime?: string,
 ): boolean {
-  return lateMinutesForShift(at, startTime, gracePeriodMinutes) !== null;
+  return lateMinutesForShift(at, startTime, gracePeriodMinutes, endTime) !== null;
 }

@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { sendEmployeeInvitation } from "@/lib/employees/invite";
 import { clerkCreateInvitation } from "@/lib/employees/invite-clerk";
 import { ROLES, type Role } from "@/lib/auth-types";
+import { withPrivilegedRoute } from "@/lib/mfa-guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,7 +19,7 @@ function fail(code: string, error: string, status: number) {
  * notably bulk imports where inviting everyone at import time is undesirable.
  * Same shared sendEmployeeInvitation() the onboarding routes use.
  */
-export async function POST(req: NextRequest) {
+async function POSTHandler(req: NextRequest) {
   const userId = await getEffectiveUserId();
   if (!userId) return fail("UNAUTHENTICATED", "Not authenticated", 401);
   const role = await getCurrentRole();
@@ -70,3 +71,8 @@ export async function POST(req: NextRequest) {
     return fail("SERVER_ERROR", "Could not send the invitation", 503);
   }
 }
+
+// MFA gate — see lib/mfa-guard.ts. Rejects only when the caller's role
+// requires two-factor auth and it is not enabled; every other status this
+// route returns is produced by the handler above, unchanged.
+export const POST = withPrivilegedRoute(POSTHandler);

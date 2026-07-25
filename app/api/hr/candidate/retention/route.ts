@@ -7,6 +7,7 @@ import {
   addDays,
   EXTENSION_DAYS,
 } from "@/lib/recruitment/retention";
+import { withPrivilegedRoute } from "@/lib/mfa-guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,7 +24,7 @@ function fail(code: string, error: string, status: number) {
  * `extend` pushes the review date out when there is a legitimate reason to
  * keep the record (live dispute, pending reference check).
  */
-export async function POST(req: NextRequest) {
+async function POSTHandler(req: NextRequest) {
   const userId = await getEffectiveUserId();
   if (!userId) return fail("UNAUTHENTICATED", "Not authenticated", 401);
   const role = await getCurrentRole();
@@ -143,3 +144,8 @@ export async function POST(req: NextRequest) {
     return fail("SERVER_ERROR", "Could not complete the retention action", 503);
   }
 }
+
+// MFA gate — see lib/mfa-guard.ts. Rejects only when the caller's role
+// requires two-factor auth and it is not enabled; every other status this
+// route returns is produced by the handler above, unchanged.
+export const POST = withPrivilegedRoute(POSTHandler);

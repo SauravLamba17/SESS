@@ -2,6 +2,7 @@ import { ReportDocument, SummaryStats, DataTable, Note, fmtNum, type ReportMeta 
 import type { MyDataResult } from "../my-data.ts";
 import { ymd } from "../range.ts";
 import { inr } from "../../payroll/format.ts";
+import { formatScoreOutOfFive } from "../../appraisal/display.ts";
 
 function clock(d: Date | null): string {
   if (!d) return "—";
@@ -95,7 +96,12 @@ export function MyDataPdf({ r, meta }: { r: MyDataResult; meta: ReportMeta }) {
         rows={r.appraisals}
         columns={[
           { label: "Cycle", width: "28%", value: (a) => a.cyclePeriod },
-          { label: "Score", width: "17%", align: "right", value: (a) => fmtNum(a.finalScore) },
+          {
+            label: "Score",
+            width: "17%",
+            align: "right",
+            value: (a) => formatScoreOutOfFive(a.finalScore),
+          },
           { label: "Manager feedback", width: "55%", value: (a) => a.managerFeedback ?? "—" },
         ]}
         emptyMessage="No published appraisal scores in this period."

@@ -25,6 +25,7 @@ import type { RecruitmentFunnelResult } from "./recruitment-funnel.ts";
 import type { IdleTimeResult } from "./idle-time.ts";
 import type { WarningLettersResult } from "./warning-letters.ts";
 import { ymd } from "./range.ts";
+import { scoreOutOfFive, formatBandLabelOutOfFive } from "../appraisal/display.ts";
 
 export type CsvCell = string | number | null | undefined;
 
@@ -233,26 +234,47 @@ export function appraisalDistributionCsv(r: AppraisalDistributionResult): CsvSec
       headers: ["Measure", "Value"],
       rows: [
         ["Scores published", r.scoredCount],
-        ["Average", r.average],
-        ["Median", r.median],
-        ["Lowest", r.min],
-        ["Highest", r.max],
+        // Both scales are emitted: the /5 figure matches what people see in
+        // the app, and the raw 0-100 value is what the engine actually stores
+        // — a spreadsheet is exactly where someone needs to recompute against
+        // the real numbers.
+        ["Average (of 5)", scoreOutOfFive(r.average)],
+        ["Average (raw 0-100)", r.average],
+        ["Median (of 5)", scoreOutOfFive(r.median)],
+        ["Median (raw 0-100)", r.median],
+        ["Lowest (of 5)", scoreOutOfFive(r.min)],
+        ["Highest (of 5)", scoreOutOfFive(r.max)],
       ],
     },
     {
       title: "Score distribution",
-      headers: ["Band", "Employees", "Share %"],
-      rows: r.bands.map((b) => [b.label, b.count, b.sharePct]),
+      headers: ["Band (of 5)", "Band (raw 0-100)", "Employees", "Share %"],
+      rows: r.bands.map((b) => [
+        formatBandLabelOutOfFive(b.min, b.max),
+        b.label,
+        b.count,
+        b.sharePct,
+      ]),
     },
     {
       title: "Average by department",
-      headers: ["Department", "Scored", "Average"],
-      rows: r.byDepartment.map((d) => [d.department, d.count, d.average]),
+      headers: ["Department", "Scored", "Average (of 5)", "Average (raw 0-100)"],
+      rows: r.byDepartment.map((d) => [
+        d.department,
+        d.count,
+        scoreOutOfFive(d.average),
+        d.average,
+      ]),
     },
     {
       title: "By cycle",
-      headers: ["Cycle", "Scored", "Average"],
-      rows: r.byCycle.map((c) => [c.cyclePeriod, c.count, c.average]),
+      headers: ["Cycle", "Scored", "Average (of 5)", "Average (raw 0-100)"],
+      rows: r.byCycle.map((c) => [
+        c.cyclePeriod,
+        c.count,
+        scoreOutOfFive(c.average),
+        c.average,
+      ]),
     },
   ];
 }

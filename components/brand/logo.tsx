@@ -22,24 +22,33 @@ export function LogoMark({
       aria-label="SESS gauge mark"
       className={cn("shrink-0", className)}
     >
+      {/* Every stroke reads a theme token, so the mark re-colours with the
+          app — on the light theme the dial face becomes white with a grey
+          rim instead of staying a dark disc in the corner of a white page. */}
       {/* Dial face */}
-      <circle cx="16" cy="16" r="15" fill="#171D21" stroke="#2A333A" />
+      <circle
+        cx="16"
+        cy="16"
+        r="15"
+        fill="rgb(var(--color-surface))"
+        stroke="rgb(var(--color-border))"
+      />
       {/* Measurement arc (240°), colour graded left→right */}
       <path
         d="M6.34 24.5A13 13 0 0 1 6.34 7.5"
-        stroke="#E5484D"
+        stroke="rgb(var(--color-danger))"
         strokeWidth="2.4"
         strokeLinecap="round"
       />
       <path
         d="M6.34 7.5A13 13 0 0 1 25.66 7.5"
-        stroke="#8B98A1"
+        stroke="rgb(var(--color-text-muted))"
         strokeWidth="2.4"
         strokeLinecap="round"
       />
       <path
         d="M25.66 7.5A13 13 0 0 1 25.66 24.5"
-        stroke="#2BB673"
+        stroke="rgb(var(--color-good))"
         strokeWidth="2.4"
         strokeLinecap="round"
       />
@@ -49,12 +58,19 @@ export function LogoMark({
         y1="16"
         x2="22.5"
         y2="10.5"
-        stroke="#F5A623"
+        stroke="rgb(var(--color-accent))"
         strokeWidth="2"
         strokeLinecap="round"
       />
       {/* Hub */}
-      <circle cx="16" cy="16" r="2.4" fill="#0F1417" stroke="#F5A623" strokeWidth="1.2" />
+      <circle
+        cx="16"
+        cy="16"
+        r="2.4"
+        fill="rgb(var(--color-base))"
+        stroke="rgb(var(--color-accent))"
+        strokeWidth="1.2"
+      />
     </svg>
   );
 }

@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Loader2 } from "lucide-react";
+import { formatComponentOutOf5 } from "@/lib/appraisal/display";
 
 const field =
   "rounded border border-border bg-background px-2 py-1 text-sm text-text focus:outline-none focus-visible:ring-2 focus-visible:ring-accent";
@@ -48,17 +49,29 @@ export function FeedbackForm({
 
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
-      <input
-        type="number"
-        min={0}
-        max={100}
-        step="0.1"
-        value={score}
-        onChange={(e) => setScore(e.target.value)}
-        placeholder="score"
-        aria-label="Feedback score 0-100"
-        className={`${field} w-24 font-mono`}
-      />
+      {/* The INPUT stays 0-100 deliberately. Accepting /5 here would cap
+          granularity at 0.1/5 = 2 whole points, so a manager could no longer
+          enter 79 — a real loss of precision on a stored value. Instead the
+          /5 equivalent is shown live beside it, so what the manager types
+          lines up with what the employee will eventually see. */}
+      <div className="flex flex-col gap-0.5">
+        <input
+          type="number"
+          min={0}
+          max={100}
+          step="0.1"
+          value={score}
+          onChange={(e) => setScore(e.target.value)}
+          placeholder="score"
+          aria-label="Feedback score 0-100"
+          className={`${field} w-24 font-mono`}
+        />
+        <span className="font-mono text-[10px] text-text-muted">
+          {score.trim() === "" || !Number.isFinite(Number(score))
+            ? "0–100"
+            : `= ${formatComponentOutOf5(Number(score))}`}
+        </span>
+      </div>
       <input
         type="text"
         value={comment}

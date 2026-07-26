@@ -2,11 +2,17 @@ import { cn } from "@/lib/utils";
 
 export type StatusState = "good" | "warn" | "danger" | "idle";
 
-const DOT: Record<StatusState, { color: string; glow: string; label: string }> = {
-  good: { color: "#2BB673", glow: "rgba(43,182,115,0.55)", label: "Good" },
-  warn: { color: "#F5A623", glow: "rgba(245,166,35,0.55)", label: "Warning" },
-  danger: { color: "#E5484D", glow: "rgba(229,72,77,0.55)", label: "Critical" },
-  idle: { color: "#8B98A1", glow: "rgba(139,152,161,0.35)", label: "Idle" },
+/**
+ * Colours come from the theme tokens, not literal hexes, so the dot re-colours
+ * with the rest of the app. The glow reuses the same channel triplet at
+ * --dot-glow-alpha, which each theme tunes (subtler on light, stronger on
+ * high-contrast).
+ */
+const DOT: Record<StatusState, { token: string; label: string }> = {
+  good: { token: "--color-good", label: "Good" },
+  warn: { token: "--color-warn", label: "Warning" },
+  danger: { token: "--color-danger", label: "Critical" },
+  idle: { token: "--color-text-muted", label: "Idle" },
 };
 
 /**
@@ -21,7 +27,7 @@ export function StatusDot({
   state: StatusState;
   className?: string;
 }) {
-  const { color, glow, label } = DOT[state];
+  const { token, label } = DOT[state];
   return (
     <span
       role="img"
@@ -30,8 +36,8 @@ export function StatusDot({
       style={{
         width: 7,
         height: 7,
-        backgroundColor: color,
-        boxShadow: `0 0 0 1px rgba(0,0,0,0.25), 0 0 6px 1px ${glow}`,
+        backgroundColor: `rgb(var(${token}))`,
+        boxShadow: `0 0 0 1px rgb(0 0 0 / 0.25), 0 0 6px 1px rgb(var(${token}) / var(--dot-glow-alpha))`,
       }}
     />
   );

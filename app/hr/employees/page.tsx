@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { ShieldOff } from "lucide-react";
 import { getEffectiveUserId } from "@/lib/auth";
 import { PageHeader } from "@/components/portal/portal-shell";
 import { Panel, PanelHeader } from "@/components/ui/panel";
@@ -44,6 +46,15 @@ export default async function EmployeeMaster() {
       <PageHeader
         title="Employee Master"
         description="Onboard and offboard employees. Offboarding is a soft-delete — historical records stay intact."
+        action={
+          <Link
+            href="/hr/employees/retention-review"
+            className="inline-flex items-center gap-1.5 rounded border border-border px-3 py-1.5 text-xs text-text-muted hover:text-text focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            <ShieldOff size={13} />
+            Data retention review
+          </Link>
+        }
       />
 
       {error && (

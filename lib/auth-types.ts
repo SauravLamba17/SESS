@@ -157,7 +157,6 @@ export const NAV: Record<PortalKey, NavItem[]> = {
     { label: "Reports", href: "/admin/reports", icon: "BarChart3" },
     { label: "Module Toggles", href: "/admin/modules", icon: "ToggleRight" },
     { label: "Integrations", href: "/admin/integrations", icon: "Plug" },
-    { label: "Machines & Assets", href: "/admin/machines", icon: "Cpu" },
     { label: "Audit Log", href: "/admin/audit-log", icon: "ScrollText" },
     { label: "Community", href: "/community", icon: "Megaphone" },
     { label: "Pulse Surveys", href: "/pulse", icon: "Activity" },

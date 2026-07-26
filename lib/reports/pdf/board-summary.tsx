@@ -1,7 +1,8 @@
-import { ReportDocument, SummaryStats, DataTable, Note, fmtPct, fmtNum, type ReportMeta } from "../pdf-layout.tsx";
+import { ReportDocument, SummaryStats, DataTable, Note, fmtPct, type ReportMeta } from "../pdf-layout.tsx";
 import type { BoardSummaryResult } from "../board-summary.ts";
 // Relative, not the "@/" alias — see the note in ./payroll-cost.tsx.
 import { inr } from "../../payroll/format.ts";
+import { scoreOutOfFive, formatBandLabelOutOfFive } from "../../appraisal/display.ts";
 
 export function BoardSummaryPdf({ r, meta }: { r: BoardSummaryResult; meta: ReportMeta }) {
   const { headcount, hiresExits, appraisal, payroll, recruitment } = r;
@@ -17,7 +18,8 @@ export function BoardSummaryPdf({ r, meta }: { r: BoardSummaryResult; meta: Repo
             hint: `${hiresExits.hireCount} in / ${hiresExits.exitCount} out`,
           },
           { label: "Attrition", value: fmtPct(hiresExits.attritionPct) },
-          { label: "Avg appraisal", value: fmtNum(appraisal.average) },
+          // Same 5-point scale as everywhere else; the sub-result is raw.
+          { label: "Avg appraisal", value: scoreOutOfFive(appraisal.average) ?? "—", hint: "of 5" },
           { label: "Cost to company", value: `INR ${inr(payroll.totalCostToCompany)}` },
         ]}
       />
@@ -46,7 +48,7 @@ export function BoardSummaryPdf({ r, meta }: { r: BoardSummaryResult; meta: Repo
         title="Appraisal distribution"
         rows={appraisal.bands}
         columns={[
-          { label: "Band", width: "40%", value: (b) => b.label },
+          { label: "Band (of 5)", width: "40%", value: (b) => formatBandLabelOutOfFive(b.min, b.max) },
           { label: "Employees", width: "30%", align: "right", value: (b) => String(b.count) },
           { label: "Share", width: "30%", align: "right", value: (b) => fmtPct(b.sharePct) },
         ]}

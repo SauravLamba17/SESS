@@ -5,6 +5,7 @@ import { SalaryStructureForm } from "@/components/hr/salary-structure-form";
 import { SalaryAdvanceForm } from "@/components/hr/salary-advance-form";
 import { db } from "@/lib/db";
 import { inr } from "@/lib/payroll/format";
+import { buildSalaryTimeline, ymd as salaryYmd } from "@/lib/payroll/salary-history";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,11 @@ async function load() {
         designation: true,
         pfUan: true,
         salaryStructure: true,
+        // Phase 13: superseded versions, joined in the same query — still one
+        // round trip for the page, no per-employee history lookup.
+        salaryHistory: {
+          orderBy: { effectiveFrom: "asc" },
+        },
         // Active advance joined in — no per-employee lookup.
         salaryAdvances: {
           where: { status: "ACTIVE" },
@@ -123,7 +129,7 @@ export default async function SalaryStructurePage() {
                             )}
                           </div>
                           <div className="font-mono text-[11px] text-text-muted">
-                            eff. {s.effectiveFrom.toISOString().slice(0, 10)}
+                            eff. {salaryYmd(s.effectiveFrom)}
                           </div>
                         </>
                       ) : (
@@ -156,6 +162,96 @@ export default async function SalaryStructurePage() {
                     </div>
                   </details>
 
+                  {/* Phase 13: the full effective-dated timeline, current
+                      version included. Only rendered when there is history —
+                      a first structure has nothing to compare against. */}
+                  {e.salaryHistory.length > 0 && (
+                    <details className="mt-2 rounded border border-border bg-surface-raised/40">
+                      <summary className="cursor-pointer px-3 py-1.5 text-xs text-text-muted">
+                        Salary history · {e.salaryHistory.length + (s ? 1 : 0)} version
+                        {e.salaryHistory.length + (s ? 1 : 0) === 1 ? "" : "s"}
+                      </summary>
+                      <div className="overflow-x-auto p-3">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="border-b border-border text-left text-[10px] uppercase tracking-wide text-text-muted">
+                              <th className="py-1.5 pr-3 font-medium">Ver</th>
+                              <th className="py-1.5 pr-3 font-medium">Effective</th>
+                              <th className="py-1.5 pr-3 text-right font-medium">Basic</th>
+                              <th className="py-1.5 pr-3 text-right font-medium">HRA</th>
+                              <th className="py-1.5 pr-3 text-right font-medium">Special</th>
+                              <th className="py-1.5 pr-3 text-right font-medium">Gross</th>
+                              <th className="py-1.5 text-right font-medium">Change</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border">
+                            {buildSalaryTimeline(
+                              s
+                                ? {
+                                    basic: s.basic.toFixed(2),
+                                    hra: s.hra.toFixed(2),
+                                    specialAllowance: s.specialAllowance.toFixed(2),
+                                    effectiveFrom: s.effectiveFrom,
+                                    setBy: s.setBy,
+                                  }
+                                : null,
+                              e.salaryHistory.map((h) => ({
+                                basic: h.basic.toFixed(2),
+                                hra: h.hra.toFixed(2),
+                                specialAllowance: h.specialAllowance.toFixed(2),
+                                effectiveFrom: h.effectiveFrom,
+                                effectiveTo: h.effectiveTo,
+                                versionNumber: h.versionNumber,
+                                setBy: h.setBy,
+                                supersededBy: h.supersededBy,
+                                supersededAt: h.supersededAt,
+                              })),
+                            ).map((v) => (
+                              <tr key={v.versionNumber} className={v.current ? "text-text" : "text-text-muted"}>
+                                <td className="py-1.5 pr-3 font-mono">
+                                  v{v.versionNumber}
+                                  {v.current && (
+                                    <span className="ml-1 text-[9px] uppercase text-good">current</span>
+                                  )}
+                                </td>
+                                <td className="py-1.5 pr-3 font-mono">
+                                  {salaryYmd(v.effectiveFrom)} →{" "}
+                                  {v.effectiveTo ? salaryYmd(v.effectiveTo) : "present"}
+                                </td>
+                                <td className="py-1.5 pr-3 text-right font-mono">{inr(v.basic)}</td>
+                                <td className="py-1.5 pr-3 text-right font-mono">{inr(v.hra)}</td>
+                                <td className="py-1.5 pr-3 text-right font-mono">
+                                  {inr(v.specialAllowance)}
+                                </td>
+                                <td className="py-1.5 pr-3 text-right font-mono text-text">
+                                  {inr(v.gross)}
+                                </td>
+                                <td
+                                  className={`py-1.5 text-right font-mono ${
+                                    v.grossDelta === null
+                                      ? ""
+                                      : v.grossDelta.startsWith("-")
+                                        ? "text-danger"
+                                        : "text-good"
+                                  }`}
+                                >
+                                  {v.grossDelta === null
+                                    ? "—"
+                                    : `${v.grossDelta.startsWith("-") ? "" : "+"}${inr(v.grossDelta)}`}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        <p className="mt-2 text-[10px] text-text-muted">
+                          Ranges are half-open: a version ends on the day the next
+                          takes effect. Finalized payslips are unaffected by any
+                          later change — they snapshot the figures at run time.
+                        </p>
+                      </div>
+                    </details>
+                  )}
+
                   <details className="mt-2 rounded border border-border bg-surface-raised/40">
                     <summary className="cursor-pointer px-3 py-1.5 text-xs text-text-muted">
                       Salary advance
@@ -184,12 +280,14 @@ export default async function SalaryStructurePage() {
           </ul>
         )}
         <p className="border-t border-border px-4 py-3 text-xs text-text-muted">
-          One current structure per employee — saving replaces the previous one.
-          Historical structures (so a mid-year raise leaves an auditable trail of
-          what was in force when) are a clean future addition: add an
-          effective-dated table and select by period at run creation. Payroll
-          rows already snapshot Basic/HRA/Special Allowance at run time, so
-          finalized payslips are unaffected by a later structure change.
+          One current structure per employee. Saving no longer discards the old
+          one: the version being replaced is archived with its effective range
+          closed, and the full timeline appears under &quot;Salary history&quot;
+          above. The new structure must take effect after the current one — to
+          fix a typo in the version in force, correct its effective date rather
+          than recording a change that never happened. Payroll rows snapshot
+          Basic/HRA/Special Allowance at run time, so finalized payslips are
+          unaffected by any later structure change.
         </p>
       </Panel>
     </>

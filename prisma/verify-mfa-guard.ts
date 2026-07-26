@@ -160,7 +160,14 @@ function main() {
   walk(path.join(ROOT, "app/api/hr"));
   walk(path.join(ROOT, "app/api/admin"));
 
-  eq("36 privileged route files", files.length, 36);
+  // These two totals are expected to grow as privileged routes are added — they
+  // are a tripwire for a route appearing or vanishing unnoticed, not the real
+  // guarantee. The guarantee is the "NO route exports an unwrapped handler"
+  // assertion below, which holds at any count.
+  //   36/38 at introduction (MFA wrapper phase)
+  //   38/40 after Phase 13 added /api/hr/attendance/correct and
+  //         /api/hr/employee/retention
+  eq("38 privileged route files", files.length, 38);
 
   let unwrapped = 0;
   let handlerCount = 0;
@@ -194,7 +201,7 @@ function main() {
       console.log(`        MISSING IMPORT: ${rel}`);
     }
   }
-  eq("38 handlers wrapped (2 files export two methods each)", handlerCount, 38);
+  eq("40 handlers wrapped (2 files export two methods each)", handlerCount, 40);
   check("NO route exports an unwrapped handler", unwrapped === 0, `${unwrapped} problem(s)`);
 
   // The reports route has its own in-route check and is deliberately not here.

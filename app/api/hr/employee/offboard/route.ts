@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { getCurrentRole } from "@/lib/auth";
 import { assemblePayrollRow } from "@/lib/payroll/assemble";
 import { withPrivilegedRoute } from "@/lib/mfa-guard";
+import { scheduledRedactionFor, RETENTION_YEARS, ymd } from "@/lib/employees/retention";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -93,15 +94,24 @@ async function POSTHandler(req: NextRequest) {
           return { code: "BEFORE_JOINING" as const };
 
         // ── Phase 5: the soft-delete itself, plus the exit date ──
+        // Phase 13 adds the retention clock to this SAME update rather than a
+        // second offboarding path: an employee can never become inactive
+        // without their redaction date being set at the same instant.
         await tx.employee.update({
           where: { id: employeeId },
-          data: { active: false, offboardedAt: lastWorkingDay },
+          data: {
+            active: false,
+            offboardedAt: lastWorkingDay,
+            scheduledRedactionAt: scheduledRedactionFor(lastWorkingDay),
+          },
         });
         await tx.auditLog.create({
           data: {
             actorUserId: userId,
             action: "EMPLOYEE_OFFBOARDED",
-            targetEntity: employeeId,
+            targetEntity:
+              `${employeeId} lastWorkingDay=${ymd(lastWorkingDay)} ` +
+              `redactionDue=${ymd(scheduledRedactionFor(lastWorkingDay))} (+${RETENTION_YEARS}y)`,
           },
         });
 

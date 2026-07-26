@@ -69,7 +69,7 @@ export function OnboardingChecklist({
                 onChange={(e) =>
                   post({ action: "toggle", id: t.id, completed: e.target.checked })
                 }
-                className="h-4 w-4 shrink-0 rounded border-border bg-background accent-[#2BB673]"
+                className="h-4 w-4 shrink-0 rounded border-border bg-background accent-good"
               />
               <label
                 htmlFor={`task-${t.id}`}

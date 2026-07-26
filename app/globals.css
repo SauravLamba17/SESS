@@ -5,10 +5,121 @@
 /* --font-display / --font-body / --font-mono are injected by next/font
    on the <html> element (see app/layout.tsx). */
 
+/* ─────────────────────────────────────────────────────────────
+   THEME TOKENS
+
+   Every colour in the product resolves through these variables.
+   tailwind.config.ts maps its colour names onto them, so the
+   utility classes already written across all 14 phases keep
+   working and simply re-resolve when [data-theme] changes.
+
+   Values are RAW "R G B" CHANNELS, not #rrggbb — that is what
+   lets Tailwind's opacity modifiers (bg-accent/10, border-
+   danger/40) work through a variable.
+
+   [data-theme] is set on <html> before first paint by the inline
+   script in app/layout.tsx, so there is no flash of the wrong
+   theme. "system" is resolved to dark or light by that script and
+   kept in sync by components/theme/theme-provider.tsx.
+   ───────────────────────────────────────────────────────────── */
+
+/* DARK — the original instrument-panel palette, unchanged.
+   Also the fallback for a document with no data-theme yet. */
+:root,
+[data-theme="dark"] {
+  --color-base: 15 20 23; /* #0F1417 */
+  --color-surface: 23 29 33; /* #171D21 */
+  --color-surface-raised: 30 38 43; /* #1E262B */
+  --color-border: 42 51 58; /* #2A333A */
+  --color-text: 232 236 238; /* #E8ECEE */
+  --color-text-muted: 139 152 161; /* #8B98A1 */
+  --color-accent: 245 166 35; /* #F5A623 */
+  --color-good: 43 182 115; /* #2BB673 */
+  --color-warn: 245 166 35; /* #F5A623 */
+  /* Lightened from #E5484D, which measured 4.35:1 as text on --color-surface
+     — just under the 4.5 WCAG AA threshold for small text. Now 5.04:1. */
+  --color-danger: 240 87 92; /* #F0575C */
+  --color-info: 76 159 232; /* #4C9FE8 */
+
+  --border-width: 1px;
+  --shadow-panel: 0 1px 0 0 rgb(255 255 255 / 0.02) inset,
+    0 1px 2px rgb(0 0 0 / 0.4);
+  /* Alpha used for the status dot's glow — subtle on dark. */
+  --dot-glow-alpha: 0.55;
+  color-scheme: dark;
+}
+
+/* LIGHT — "Clean White". Accent/good/warn/danger/info are darkened
+   from their dark-theme values so they still pass as readable text
+   on a white surface; the dark theme's #F5A623 amber on white would
+   be roughly 2:1 and illegible. */
+[data-theme="light"] {
+  --color-base: 255 255 255; /* #FFFFFF */
+  --color-surface: 245 246 247; /* #F5F6F7 */
+  --color-surface-raised: 255 255 255; /* #FFFFFF */
+  --color-border: 217 220 225; /* #D9DCE1 */
+  --color-text: 20 23 26; /* #14171A */
+  /* Darkened from #6E7681, which measured 4.25:1 on --color-surface — under
+     the 4.5 WCAG AA threshold for small text. Now 5.29:1. */
+  --color-text-muted: 95 103 114; /* #5F6772 */
+  /* Darkened from #A8660A (4.25:1) to 4.92:1. Same hue (35°) and saturation
+     (~89%); only lightness moves, 34.9% → 31.9%, so it stays the same amber.
+     --color-warn carries the same value: accent and warn are the same amber
+     in every theme. */
+  --color-accent: 154 93 9; /* #9A5D09 */
+  --color-good: 26 127 75; /* #1A7F4B */
+  --color-warn: 154 93 9; /* #9A5D09 */
+  --color-danger: 193 59 54; /* #C13B36 */
+  --color-info: 37 105 168; /* #2569A8 */
+
+  --border-width: 1px;
+  /* The dark theme's inset white highlight is invisible on white and its
+     drop shadow is too heavy; a plain hairline shadow reads better. */
+  --shadow-panel: 0 1px 2px rgb(20 23 26 / 0.06);
+  --dot-glow-alpha: 0.35;
+  color-scheme: light;
+}
+
+/* HIGH-CONTRAST DARK — near-black surfaces, pure-white text, a
+   near-white border, and brighter status colours. Borders are
+   thickened globally via --border-width so structure is visible
+   without touching a single component's className. */
+[data-theme="high-contrast"] {
+  --color-base: 5 5 5; /* #050505 */
+  --color-surface: 22 22 22; /* #161616 */
+  --color-surface-raised: 28 28 28; /* #1C1C1C */
+  --color-border: 240 240 240; /* #F0F0F0 */
+  --color-text: 255 255 255; /* #FFFFFF */
+  --color-text-muted: 208 208 208; /* #D0D0D0 */
+  --color-accent: 255 194 77; /* #FFC24D */
+  --color-good: 76 226 138; /* #4CE28A */
+  --color-warn: 255 194 77; /* #FFC24D */
+  --color-danger: 255 107 107; /* #FF6B6B */
+  --color-info: 107 193 255; /* #6BC1FF */
+
+  --border-width: 2px;
+  --shadow-panel: none;
+  --dot-glow-alpha: 0.75;
+  color-scheme: dark;
+}
+
+/* High-contrast: thicken the hairlines on INTERACTIVE elements
+   specifically. The token above already widens `border` utilities;
+   these rules catch the directional ones (border-b on table rows,
+   border-t on footers) that would otherwise stay 1px. */
+[data-theme="high-contrast"] :is(button, a, input, select, textarea, [role="switch"]) {
+  border-width: var(--border-width);
+}
+[data-theme="high-contrast"] :is(th, td) {
+  border-bottom-width: var(--border-width);
+}
+/* Focus rings need to clear a near-white border, so they get thicker too. */
+[data-theme="high-contrast"] :focus-visible {
+  outline: 2px solid rgb(var(--color-accent));
+  outline-offset: 2px;
+}
+
 @layer base {
-  html {
-    color-scheme: dark;
-  }
   body {
     @apply bg-background text-text font-sans antialiased;
   }
@@ -33,28 +144,30 @@
   }
 }
 
-/* Dark-theme <select> popups: browsers render the option list with the system
-   (white) background while inheriting our near-white text, making options
-   invisible/unpickable. Force explicit colours on every option. */
+/* <select> popups: browsers render the option list with the system background
+   while inheriting our text colour, which makes options invisible on dark
+   themes. Forcing both from the tokens fixes it in every theme at once —
+   previously these were hardcoded to the dark palette, so on the light theme
+   the dropdown would have stayed dark. */
 select option {
-  background-color: #171d21; /* surface */
-  color: #e8ecee; /* text */
+  background-color: rgb(var(--color-surface));
+  color: rgb(var(--color-text));
 }
 select option:disabled {
-  color: #8b98a1; /* text-muted */
+  color: rgb(var(--color-text-muted));
 }
 
-/* Thin instrument-panel scrollbars. */
+/* Thin instrument-panel scrollbars, themed. */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #2a333a transparent;
+  scrollbar-color: rgb(var(--color-border)) transparent;
 }
 *::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 *::-webkit-scrollbar-thumb {
-  background: #2a333a;
+  background: rgb(var(--color-border));
   border-radius: 4px;
 }
 

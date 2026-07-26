@@ -41,6 +41,7 @@ import { computeIdleTime } from "../lib/reports/idle-time.ts";
 import { computeWarningLetters } from "../lib/reports/warning-letters.ts";
 import { computeBoardSummary } from "../lib/reports/board-summary.ts";
 import { REPORTS, scopeFor, reportsForRole } from "../lib/reports/registry.ts";
+import { formatScoreOutOfFive } from "../lib/appraisal/display.ts";
 
 const db = new PrismaClient();
 
@@ -589,7 +590,15 @@ async function main() {
   const headline = (label: string) => board.headlines.find((h) => h.label === label)?.value;
   eq("headline headcount matches report", headline("Active headcount"), String(headcount.totalActive));
   eq("headline attrition matches report", headline("Attrition (period)"), `${hiresExits.attritionPct}%`);
-  eq("headline avg appraisal matches report", headline("Avg appraisal score"), String(appraisal.average));
+  // The headline is a DISPLAY string and now carries the 5-point scale. The
+  // guarantee under test is unchanged — it must still be derived from the
+  // appraisal sub-result, which itself remains raw 0-100.
+  eq(
+    "headline avg appraisal matches report (formatted /5)",
+    headline("Avg appraisal score"),
+    formatScoreOutOfFive(appraisal.average),
+  );
+  eq("the sub-result itself is still raw 0-100", board.appraisal.average, appraisal.average);
   eq("headline payroll matches report", headline("Payroll cost to company"), `INR ${payroll.totalCostToCompany}`);
   eq("headline hired matches report", headline("Candidates hired"), String(funnel.hiredCount));
   check(

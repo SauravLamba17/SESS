@@ -96,33 +96,136 @@ it in SESS reaches every agent on its next beat — no reinstall.
 
 ---
 
-## Packaging for distribution
+## Packaging and code signing
 
-Not built in this phase. The app runs from source on any machine with Node and
-Electron, which is sufficient for a pilot. To produce installers later:
+The agent ships as a signed Windows installer, built with electron-builder and
+signed with a **self-signed** certificate.
+
+Self-signed is the deliberate choice, not a shortcut. The agent is never
+distributed publicly — it is installed by IT, in person, on machines at two
+centralised locations (the main floor and the Himachal office). There is no
+Windows domain and no Active Directory to push policy through, so a purchased CA
+certificate or a signing service (Azure Trusted Signing and similar) would be
+paying for public trust this application never needs. What signing buys here is
+integrity and a stable publisher identity: once a site's machines trust the
+certificate, every current and future installer runs without a publisher prompt,
+and a tampered installer fails to verify.
+
+### One-time: create the signing certificate
+
+Run **once**, on the build machine:
 
 ```bash
-npm install --save-dev electron-builder
+npm run make-cert
 ```
 
-then add to `package.json`:
+That runs `tools/make-cert.ps1`, which does the equivalent of:
 
-```json
-"build": {
-  "appId": "com.simplen.sess.idleagent",
-  "win": { "target": "nsis" },
-  "mac": { "target": "dmg" },
-  "linux": { "target": "AppImage" }
-},
-"scripts": { "dist": "electron-builder" }
+```powershell
+$cert = New-SelfSignedCertificate `
+  -Subject "CN=Simplen SESS Idle Agent, O=Simplen, C=IN" `
+  -Type CodeSigningCert `
+  -KeyUsage DigitalSignature `
+  -KeyAlgorithm RSA -KeyLength 2048 -HashAlgorithm SHA256 `
+  -CertStoreLocation "Cert:\CurrentUser\My" `
+  -NotAfter (Get-Date).AddYears(5)
+
+Export-PfxCertificate -Cert $cert -FilePath certs\sess-agent-signing.pfx -Password $pwd
+Export-Certificate    -Cert $cert -FilePath certs\sess-agent-signing.cer -Type CERT
 ```
 
-and run `npm run dist`. Signing certificates (Windows Authenticode, Apple
-notarisation) are required before wide distribution — unsigned builds will
-trigger SmartScreen/Gatekeeper warnings.
+`-Type CodeSigningCert` is the part that matters — a plain self-signed
+certificate cannot sign an executable.
 
-For fleet deployment, ship the config file alongside the installer rather than
-having each employee type a token by hand.
+It writes three files into `agent/certs/`, which is **gitignored**:
+
+| File | What it is |
+|---|---|
+| `sess-agent-signing.pfx` | Private key + certificate. **Build machine only. Never distribute.** Anyone holding this can sign software as Simplen. |
+| `sess-agent-signing.cer` | Public half. This is the file IT copies to each machine. |
+| `cert-password.txt` | The `.pfx` password, so the build can read it unattended. |
+
+Back the `.pfx` up somewhere safe. If it is lost, a new certificate must be
+generated and **every machine re-trusted**, because the identity changes.
+
+### Build the installer
+
+```bash
+npm install     # first time only
+npm run dist
+```
+
+Produces `dist/SESS Idle Agent Setup <version>.exe` (~78 MB, x64, NSIS,
+per-machine install) and signs it. The build prints the artefact it actually
+produced and its size — "the command exited 0" is not the same as "an installer
+exists".
+
+Signing is skipped with a clear notice if `certs/` is absent, so the project
+still builds for anyone who has not generated a certificate.
+
+Two implementation notes, both deliberate:
+
+- **Signing runs as a separate step** (`tools/sign.ps1`, using Windows'
+  built-in `Set-AuthenticodeSignature`) rather than through electron-builder's
+  own signing. electron-builder signs via a bundled `winCodeSign` toolchain
+  whose archive contains macOS symlinks; extracting it on Windows fails with
+  *"Cannot create symbolic link: A required privilege is not held by the
+  client"* unless the build runs elevated or with Developer Mode enabled.
+  Signing with a tool that ships with Windows removes that requirement — no
+  SDK, no elevation, no extra install.
+- The signature is **timestamped** against DigiCert's public timestamp server,
+  so it stays verifiable after the certificate's 5-year expiry. If the build
+  machine is offline it signs without a timestamp and says so.
+
+### Per-machine trust (one time, per site)
+
+Until a machine trusts the certificate, Windows shows an *"Unknown publisher"*
+prompt on install. Do this **once per machine**, during rollout at each site.
+After that, every future install and update on that machine is silent.
+
+Copy `certs/sess-agent-signing.cer` to the machine (USB stick or a share), then
+in an **Administrator** PowerShell:
+
+```powershell
+# 1. Trust the certificate as a publisher of software
+Import-Certificate -FilePath .\sess-agent-signing.cer `
+  -CertStoreLocation Cert:\LocalMachine\TrustedPublisher
+
+# 2. Trust it as a root authority (needed because it is self-signed —
+#    it is its own issuer, so there is no CA above it to vouch for it)
+Import-Certificate -FilePath .\sess-agent-signing.cer `
+  -CertStoreLocation Cert:\LocalMachine\Root
+```
+
+Both stores are required: `TrustedPublisher` is what suppresses the publisher
+prompt, `Root` is what makes the self-signed chain validate at all.
+
+Prefer clicking? Double-click `sess-agent-signing.cer` → **Install
+Certificate** → **Local Machine** → **Place all certificates in the following
+store** → **Browse** → **Trusted Publishers**. Then repeat, choosing **Trusted
+Root Certification Authorities**.
+
+Verify it took, on that machine:
+
+```powershell
+Get-AuthenticodeSignature ".\SESS Idle Agent Setup 1.0.0.exe" | Format-List Status, SignerCertificate
+```
+
+`Status` should read **`Valid`**. Before the import it reads
+`UnknownError` / `NotTrusted` — the signature is present and correct, but the
+machine does not yet trust who signed it. That is the whole point of this step.
+
+To undo on a machine, delete the certificate from both stores via `certlm.msc`.
+
+### Rollout checklist per site
+
+1. Build once, centrally: `npm run dist`.
+2. Copy the installer **and** `sess-agent-signing.cer` to the site.
+3. On each machine: import the `.cer` into both stores (above) — once, ever.
+4. Run the installer. It is per-machine, so it needs administrator rights.
+5. Enter the server URL and the employee's agent token, issued by HR from
+   **Compliance & Consent**. Ship the config alongside the installer rather than
+   having each employee type a token by hand where possible.
 
 ---
 

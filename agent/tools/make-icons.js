@@ -286,4 +286,23 @@ for (const [state, colour] of Object.entries(COLOURS)) {
   );
 }
 
+// ── The APPLICATION icon ───────────────────────────────────────────
+//
+// Separate from the tray icons, and larger. electron-builder requires at least
+// 256x256 for a Windows installer (it is what Explorer, the Start menu and the
+// installer's own window all render), while a tray icon is never drawn above
+// 64px — putting 256px entries in the tray file would just be dead weight.
+//
+// Uses the "active" green mark: this is the product's identity, not a state.
+const APP_SIZES = [16, 32, 48, 64, 128, 256];
+const appImages = APP_SIZES.map((size) => ({
+  size,
+  data: dibEntry(drawMark(size, COLOURS.active), size),
+}));
+const appIco = encodeIco(appImages);
+fs.writeFileSync(path.join(OUT_DIR, "app.ico"), appIco);
+console.log(
+  `  app.ico            ${appIco.length} bytes  (${APP_SIZES.join("/")} px)  <- installer / app icon`,
+);
+
 console.log(`\nWrote icons to ${OUT_DIR}`);

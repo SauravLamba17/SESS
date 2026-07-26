@@ -1,5 +1,11 @@
-import { ReportDocument, SummaryStats, DataTable, Note, fmtPct, fmtNum, type ReportMeta } from "../pdf-layout.tsx";
+import { ReportDocument, SummaryStats, DataTable, Note, fmtPct, type ReportMeta } from "../pdf-layout.tsx";
 import type { AppraisalDistributionResult } from "../appraisal-distribution.ts";
+// DISPLAY ONLY — the result object still carries real 0-100 values, and the
+// banding in appraisal-distribution.ts still buckets on them.
+import {
+  scoreOutOfFive,
+  formatBandLabelOutOfFive,
+} from "../../appraisal/display.ts";
 
 export function AppraisalDistributionPdf({
   r,
@@ -13,10 +19,10 @@ export function AppraisalDistributionPdf({
       <SummaryStats
         stats={[
           { label: "Scores published", value: r.scoredCount },
-          { label: "Average", value: fmtNum(r.average) },
-          { label: "Median", value: fmtNum(r.median) },
-          { label: "Lowest", value: fmtNum(r.min) },
-          { label: "Highest", value: fmtNum(r.max) },
+          { label: "Average", value: scoreOutOfFive(r.average) ?? "—", hint: "of 5" },
+          { label: "Median", value: scoreOutOfFive(r.median) ?? "—", hint: "of 5" },
+          { label: "Lowest", value: scoreOutOfFive(r.min) ?? "—", hint: "of 5" },
+          { label: "Highest", value: scoreOutOfFive(r.max) ?? "—", hint: "of 5" },
         ]}
       />
 
@@ -24,7 +30,7 @@ export function AppraisalDistributionPdf({
         title="Score distribution"
         rows={r.bands}
         columns={[
-          { label: "Band", width: "40%", value: (b) => b.label },
+          { label: "Band", width: "40%", value: (b) => formatBandLabelOutOfFive(b.min, b.max) },
           { label: "Employees", width: "25%", align: "right", value: (b) => String(b.count) },
           { label: "Share", width: "20%", align: "right", value: (b) => fmtPct(b.sharePct) },
           {
@@ -42,7 +48,12 @@ export function AppraisalDistributionPdf({
         columns={[
           { label: "Department", width: "50%", value: (d) => d.department },
           { label: "Scored", width: "25%", align: "right", value: (d) => String(d.count) },
-          { label: "Average", width: "25%", align: "right", value: (d) => fmtNum(d.average) },
+          {
+            label: "Average (of 5)",
+            width: "25%",
+            align: "right",
+            value: (d) => scoreOutOfFive(d.average) ?? "—",
+          },
         ]}
       />
 
@@ -53,16 +64,23 @@ export function AppraisalDistributionPdf({
           columns={[
             { label: "Cycle", width: "50%", value: (c) => c.cyclePeriod },
             { label: "Scored", width: "25%", align: "right", value: (c) => String(c.count) },
-            { label: "Average", width: "25%", align: "right", value: (c) => fmtNum(c.average) },
+            {
+              label: "Average (of 5)",
+              width: "25%",
+              align: "right",
+              value: (c) => scoreOutOfFive(c.average) ?? "—",
+            },
           ]}
         />
       )}
 
       <Note>
-        Bands are half-open — 0–40, 40–60 and 60–80 exclude their upper bound;
-        80–100 includes 100. Only PUBLISHED cycles are counted, and employees HR
-        excluded from a cycle are omitted. Scores are the values already computed
-        and published; nothing is recalculated for this report.
+        Scores are shown on the 5-point scale employees see. They are computed
+        and stored on a 0-100 basis; this report divides by 20 for display only
+        and recalculates nothing.{"\n"}
+        Bands are half-open — 0.0–2.0, 2.0–3.0 and 3.0–4.0 exclude their upper
+        bound; 4.0–5.0 includes 5.0. Only PUBLISHED cycles are counted, and
+        employees HR excluded from a cycle are omitted.
       </Note>
     </ReportDocument>
   );

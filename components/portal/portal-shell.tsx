@@ -1,6 +1,7 @@
 import { UserButton } from "@clerk/nextjs";
 import { Sidebar } from "@/components/portal/sidebar";
 import { GlobalSearch } from "@/components/portal/global-search";
+import { ThemeSwitcher } from "@/components/theme/theme-switcher";
 import { StatusDot } from "@/components/ui/status-dot";
 import { getImpersonation } from "@/lib/auth";
 import { stopImpersonation } from "@/app/admin/impersonate/actions";
@@ -66,6 +67,8 @@ export async function PortalShell({
             {/* Role-scoped server-side by /api/search — reachable from all
                 four portals because this shell is shared by all four. */}
             <GlobalSearch />
+            {/* Reachable from every portal, since all four share this shell. */}
+            <ThemeSwitcher />
             {/* Role chip is a nicety, not information the user lacks — dropped
                 on the narrowest screens to keep the topbar from wrapping. */}
             <span className="hidden rounded border border-border bg-surface-raised px-2.5 py-1 font-mono text-[11px] uppercase tracking-wide text-text-muted sm:inline">

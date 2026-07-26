@@ -81,6 +81,9 @@ model Employee {
   managerId   String?
   manager     Employee? @relation("ManagerToReports", fields: [managerId], references: [id])
   reports     Employee[] @relation("ManagerToReports")
+  // A free-text workstation/bench label, NOT a link to machine-performance
+  // tracking (that feature and its MachineLog model were cut — see below).
+  // Retained because it is part of the bulk-import CSV contract HR already uses.
   machineId   String?
   joiningDate DateTime
   active      Boolean   @default(true)
@@ -88,6 +91,15 @@ model Employee {
   // DATE, not just active=false — an employee who left on the 12th is owed 12
   // days, and `active` alone cannot express that.
   offboardedAt DateTime?
+  // Phase 13 retention policy: 5 years after the last working day, this
+  // employee's DIRECT PERSONAL IDENTIFIERS become due for redaction. Set when
+  // they are offboarded. It is NOT a deletion date — the Employee row and every
+  // financial/business record attached to it are kept permanently, because the
+  // statutory reason for the 5-year window is precisely that payroll must
+  // remain auditable. See app/hr/employees/retention-review.
+  scheduledRedactionAt DateTime?
+  /** Set once personal identifiers have actually been redacted. */
+  redactedAt  DateTime?
   pfUan       String? // Provident Fund UAN — nullable, not every employee has one yet
   // Invitation phase: how a Clerk signup is correlated back to this Employee.
   // Stored lowercased; the webhook matches user.created emails against it.
@@ -115,6 +127,7 @@ model Employee {
   leaveRequests  LeaveRequest[]
   monthlyTargets MonthlyTarget[]
   salaryStructure SalaryStructure?
+  salaryHistory   SalaryStructureHistory[]
   expenseClaims  ExpenseClaim[]
   salaryAdvances SalaryAdvance[]
   notifications  Notification[]
@@ -312,16 +325,12 @@ model AppraisalFormula {
   @@unique([department])
 }
 
-model MachineLog {
-  id                 String   @id @default(cuid())
-  machineId          String
-  date               DateTime
-  uptimeMinutes      Int
-  output             Int
-  avgPerformanceRate Float
-
-  @@index([machineId, date])
-}
+// Phase 13: `model MachineLog` was REMOVED here. It backed machine-performance
+// tracking, which was permanently cut from scope (there is no physical
+// production equipment to measure). The live table held ZERO rows and no
+// employee had a machineId set, verified before dropping it, so nothing was
+// lost. Employee.machineId survives as a plain workstation label — see the
+// comment on that field.
 
 // Phase 7. Every currency field is Decimal(12,2) (Postgres numeric), NEVER
 // Float — a payslip and a Form 16 are legal/financial documents and binary
@@ -391,9 +400,18 @@ model Payroll {
   @@index([status, month])
 }
 
-// Phase 7: the employee's current salary breakup. One row per employee
-// (upsert on employeeId). Historical structures for raises are deliberately
-// NOT modelled — see the note in app/hr/salary-structure/page.tsx.
+// Phase 7: the employee's CURRENT salary breakup. One row per employee.
+//
+// Phase 13 added history WITHOUT changing this model's shape. It stays 1:1 on
+// employeeId because eight call sites depend on that relation — payroll run,
+// offboarding's full & final settlement, hire-conversion, the payroll and
+// salary-structure pages. Turning it into a multi-row versioned table would
+// have rewritten how PAYROLL resolves an employee's pay, which is the last
+// thing in this system worth destabilising for a reporting feature.
+//
+// Instead, every superseded version is copied into SalaryStructureHistory
+// below at the moment it is replaced. "Current" stays a single indexed row;
+// the full timeline is current + history. See lib/payroll/salary-history.ts.
 model SalaryStructure {
   id               String   @id @default(cuid())
   employeeId       String   @unique
@@ -404,6 +422,36 @@ model SalaryStructure {
   effectiveFrom    DateTime
   setBy            String // HR user id
   updatedAt        DateTime @updatedAt
+}
+
+// Phase 13: every SUPERSEDED salary structure, so a raise leaves a trail.
+//
+// Only closed versions live here — the row currently in force is the
+// SalaryStructure above. A version is copied in at the instant it is replaced,
+// with effectiveTo set to the incoming version's effectiveFrom, so ranges are
+// half-open [effectiveFrom, effectiveTo) and can never overlap or gap.
+//
+// Nothing in payroll reads this table. It exists to answer "what was this
+// person paid in March", not to compute anything.
+model SalaryStructureHistory {
+  id               String   @id @default(cuid())
+  employeeId       String
+  employee         Employee @relation(fields: [employeeId], references: [id])
+  basic            Decimal  @db.Decimal(12, 2)
+  hra              Decimal  @db.Decimal(12, 2)
+  specialAllowance Decimal  @db.Decimal(12, 2)
+  effectiveFrom    DateTime
+  /// EXCLUSIVE upper bound: the effectiveFrom of the version that replaced this.
+  effectiveTo      DateTime
+  /// 1 for the first structure ever set, incrementing per replacement.
+  versionNumber    Int
+  /// Who set THIS version originally (carried over from the structure row).
+  setBy            String
+  /// Who replaced it, and when — the audit pair for the change itself.
+  supersededBy     String
+  supersededAt     DateTime @default(now())
+
+  @@index([employeeId, effectiveFrom])
 }
 
 model ExpenseClaim {

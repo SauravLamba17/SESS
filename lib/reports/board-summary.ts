@@ -36,6 +36,7 @@ import {
   type ApplicationRow,
   type RecruitmentFunnelResult,
 } from "./recruitment-funnel.ts";
+import { formatScoreOutOfFive } from "../appraisal/display.ts";
 
 export interface BoardSummaryInput {
   employees: ReportEmployee[];
@@ -101,8 +102,11 @@ export function computeBoardSummary(
       source: "New Hires & Exits",
     },
     {
+      // A headline is a DISPLAY string, so it carries the 5-point scale
+      // people see. `appraisal` above still holds the raw 0-100 sub-result
+      // untouched, which is what verify-phase12 compares against.
       label: "Avg appraisal score",
-      value: num(appraisal.average),
+      value: formatScoreOutOfFive(appraisal.average),
       source: "Appraisal Score Distribution",
     },
     {

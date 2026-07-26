@@ -36,6 +36,29 @@ export interface SearchHit {
  *   HR/SUPER_ADMIN → all employees, candidates and job requisitions.
  *
  * Every branch is bounded by `take` — no query here can return unbounded rows.
+ *
+ * ─── PHASE 13 RE-VERIFICATION: what was deliberately NOT added ───────────
+ * Reviewed against everything built since this route: Payroll, Recruitment,
+ * Engagement, Reports and Idle Tracking. Only Employee.email was missing (see
+ * below). The rest were considered and rejected on purpose:
+ *
+ *   Payroll        — a payslip has no name to type; you reach it through an
+ *                    employee, who IS searchable. Searching "2026-07" would
+ *                    return every employee's row for that month, which is a
+ *                    report, not a jump-to-record.
+ *   Shift, Holiday,
+ *   PulseSurvey    — configuration, not records. They live on one page each and
+ *                    are reached by navigating there, not by hunting for them.
+ *   IdleLog        — deliberately excluded. Making tracking data searchable
+ *                    would turn an aggregates-only subsystem into a lookup
+ *                    tool, which is exactly the constraint lib/idle/consent.ts
+ *                    exists to hold.
+ *   Reports        — outputs, not entities.
+ *
+ * A REDACTED former employee stays findable by name and employeeCode, which is
+ * correct: those fields are retained precisely so financial records remain
+ * traceable. Their email is null after redaction, so the new email match simply
+ * stops finding them by it.
  */
 export async function GET(req: NextRequest) {
   const userId = await getEffectiveUserId();
@@ -55,8 +78,18 @@ export async function GET(req: NextRequest) {
     if (role === "HR" || role === "SUPER_ADMIN") {
       const [employees, candidates, requisitions] = await Promise.all([
         db.employee.findMany({
-          where: { OR: [{ name: like }, { employeeCode: like }] },
-          select: { id: true, name: true, employeeCode: true, department: true, active: true },
+          // email added in Phase 13's re-verification: it became a first-class
+          // Employee field when invitations landed, and HR now onboards people
+          // BY email, so not searching it was an inconsistency with the
+          // candidate search below (which has always matched on email).
+          where: { OR: [{ name: like }, { employeeCode: like }, { email: like }] },
+          select: {
+            id: true,
+            name: true,
+            employeeCode: true,
+            department: true,
+            active: true,
+          },
           orderBy: [{ active: "desc" }, { name: "asc" }],
           take: LIMIT,
         }),

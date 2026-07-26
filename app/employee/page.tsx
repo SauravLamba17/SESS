@@ -10,6 +10,7 @@ import { db } from "@/lib/db";
 import { getEmployeeByClerkId } from "@/lib/data/scope";
 import { ownIdleTotals, hm } from "@/lib/idle/aggregate";
 import { currentPeriod } from "@/lib/period";
+import { scoreOutOfFive } from "@/lib/appraisal/display";
 
 export const dynamic = "force-dynamic";
 
@@ -298,9 +299,12 @@ export default async function EmployeeDashboard() {
           }
           mono={m?.qualityAvg != null}
         />
+        {/* Displayed on the 5-point scale; aState above still bands on the
+            real 0-100 value. */}
         <StatCard
           label="Appraisal"
-          value={aScore == null ? "—" : aScore.toFixed(1)}
+          value={scoreOutOfFive(aScore) ?? "—"}
+          unit={aScore == null ? undefined : "/ 5"}
           state={aState}
           status={aScore == null ? "Not yet appraised" : (m?.appraisalPeriod ?? "Published")}
           mono={aScore != null}

@@ -121,7 +121,7 @@ export function ConsentForm({
             type="checkbox"
             checked={alsoIssueToken}
             onChange={(e) => setAlsoIssueToken(e.target.checked)}
-            className="mt-0.5 h-4 w-4 shrink-0 rounded border-border bg-background accent-[#2BB673]"
+            className="mt-0.5 h-4 w-4 shrink-0 rounded border-border bg-background accent-good"
           />
           <span className="text-xs text-text">
             Also generate the desktop agent token

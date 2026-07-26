@@ -6,9 +6,45 @@
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
-    "selfcheck": "node src/selfcheck.js"
+    "selfcheck": "node src/selfcheck.js",
+    "make-cert": "powershell -ExecutionPolicy Bypass -File tools/make-cert.ps1",
+    "dist": "node tools/build.js",
+    "dist:unsigned": "electron-builder --win --publish never"
   },
   "devDependencies": {
-    "electron": "^33.2.0"
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "io.simplen.sess.idleagent",
+    "productName": "SESS Idle Agent",
+    "copyright": "Simplen",
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    },
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "assets/app.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": false,
+      "createDesktopShortcut": false,
+      "createStartMenuShortcut": true,
+      "shortcutName": "SESS Idle Agent",
+      "runAfterFinish": true
+    }
   }
 }

@@ -8,9 +8,15 @@ node_modules/
 # ever runs the agent with a local config for testing, it must not be staged.
 config.json
 
-# Build output, if electron-builder is ever used.
+# Build output from electron-builder.
 dist/
 out/
+
+# THE CODE-SIGNING KEY. certs/sess-agent-signing.pfx and its password file are
+# what let this machine sign software as Simplen — committing them would hand
+# that ability to anyone with repo access. Regenerate with `npm run make-cert`;
+# the public .cer that IT distributes lives here too and is derived from them.
+certs/
 
 # Generated previews from tools/make-icons.js debugging.
 assets/_preview-*.png

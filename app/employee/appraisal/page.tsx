@@ -4,6 +4,10 @@ import { Panel } from "@/components/ui/panel";
 import { StatusDot, type StatusState } from "@/components/ui/status-dot";
 import { db } from "@/lib/db";
 import { getEmployeeByClerkId } from "@/lib/data/scope";
+import {
+  formatScoreOutOfFive,
+  formatComponentOutOf5,
+} from "@/lib/appraisal/display";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +43,10 @@ const COMPONENT_LABELS: { key: keyof ComponentScores; label: string }[] = [
   { key: "feedback", label: "Manager Feedback" },
 ];
 
+/**
+ * Banding still compares the REAL 0-100 score. Only the rendering below is
+ * transformed to /5 — the thresholds must not drift onto a display scale.
+ */
 function scoreState(score: number): StatusState {
   if (score >= 80) return "good";
   if (score >= 60) return "warn";
@@ -121,7 +129,9 @@ export default async function MyAppraisalPage() {
                   </div>
                   <span className="inline-flex items-center gap-2">
                     <StatusDot state={scoreState(final)} />
-                    <span className="font-mono text-lg text-text">{final.toFixed(1)}</span>
+                    <span className="font-mono text-lg text-text">
+                      {formatScoreOutOfFive(final)}
+                    </span>
                   </span>
                 </div>
                 <div className="space-y-2 p-4 text-sm">
@@ -139,7 +149,7 @@ export default async function MyAppraisalPage() {
                           </span>
                           {d?.hasData ? (
                             <span className="font-mono text-text">
-                              {(d.value ?? 0).toFixed(1)}
+                              {formatComponentOutOf5(d.value)}
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1.5 text-xs text-text-muted">
@@ -150,8 +160,9 @@ export default async function MyAppraisalPage() {
                         {/* Frequency + severity breakdown — tells a pattern from a single incident. */}
                         {bd && (
                           <div className="mt-0.5 pl-1 text-[11px] text-text-muted">
-                            Frequency: {bd.frequencyScore.toFixed(0)}/100 — late {bd.lateCount} of{" "}
-                            {bd.totalPunchDays} days · Severity: {bd.severityScore.toFixed(0)}/100
+                            Frequency: {formatComponentOutOf5(bd.frequencyScore)} — late{" "}
+                            {bd.lateCount} of {bd.totalPunchDays} days · Severity:{" "}
+                            {formatComponentOutOf5(bd.severityScore)}
                             {bd.lateCount > 0
                               ? ` — averaged ${bd.avgLateMinutesAmongLateDays.toFixed(0)} min late on late days`
                               : " — never late"}

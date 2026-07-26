@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { getEffectiveUserId, getCurrentRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { withPrivilegedRoute } from "@/lib/mfa-guard";
+import { supersede } from "@/lib/payroll/salary-history";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,7 +24,14 @@ function parseMoney(v: unknown): Prisma.Decimal | null {
   }
 }
 
-/** Upsert an employee's salary structure. One current structure per employee. */
+/**
+ * Set an employee's salary structure.
+ *
+ * Phase 13: this no longer OVERWRITES silently. The structure being replaced is
+ * copied into SalaryStructureHistory with its effective range closed, so a
+ * raise leaves a trail. SalaryStructure itself still holds exactly one current
+ * row per employee — payroll's view of "what this person is paid" is unchanged.
+ */
 async function POSTHandler(req: NextRequest) {
   const userId = await getEffectiveUserId();
   if (!userId) return fail("UNAUTHENTICATED", "Not authenticated", 401);
@@ -78,7 +86,49 @@ async function POSTHandler(req: NextRequest) {
 
     const fields = { basic, hra, specialAllowance, effectiveFrom, setBy: userId };
 
-    await db.$transaction(async (tx) => {
+    const outcome = await db.$transaction(async (tx) => {
+      // What is in force right now, and everything already closed.
+      const [current, history] = await Promise.all([
+        tx.salaryStructure.findUnique({
+          where: { employeeId },
+          select: {
+            basic: true,
+            hra: true,
+            specialAllowance: true,
+            effectiveFrom: true,
+            setBy: true,
+          },
+        }),
+        tx.salaryStructureHistory.findMany({
+          where: { employeeId },
+          select: { versionNumber: true },
+        }),
+      ]);
+
+      const plan = supersede({
+        current: current
+          ? {
+              basic: current.basic.toFixed(2),
+              hra: current.hra.toFixed(2),
+              specialAllowance: current.specialAllowance.toFixed(2),
+              effectiveFrom: current.effectiveFrom,
+              setBy: current.setBy,
+            }
+          : null,
+        history,
+        newEffectiveFrom: effectiveFrom,
+        actorUserId: userId,
+      });
+      if (!plan.ok) return plan;
+
+      // Close the outgoing version BEFORE overwriting it, so the old figures
+      // are captured rather than read back after the update.
+      if (plan.historyRow) {
+        await tx.salaryStructureHistory.create({
+          data: { employeeId, ...plan.historyRow },
+        });
+      }
+
       await tx.salaryStructure.upsert({
         where: { employeeId },
         update: fields,
@@ -87,16 +137,28 @@ async function POSTHandler(req: NextRequest) {
       // UAN lives on Employee, not the structure, but it is captured on the
       // same form — so it is written in the same transaction.
       await tx.employee.update({ where: { id: employeeId }, data: { pfUan } });
+
+      // SALARY_STRUCTURE_SET already existed and still covers "a structure was
+      // set"; no second action is introduced for the same event. The version
+      // detail is appended to its target so the trail shows what was replaced.
       await tx.auditLog.create({
         data: {
           actorUserId: userId,
           action: "SALARY_STRUCTURE_SET",
-          targetEntity: employeeId,
+          targetEntity: plan.historyRow
+            ? `${employeeId} v${plan.historyRow.versionNumber}→v${plan.historyRow.versionNumber + 1} ` +
+              `(previous ${plan.historyRow.effectiveFrom.toISOString().slice(0, 10)}` +
+              `–${plan.historyRow.effectiveTo.toISOString().slice(0, 10)} archived)`
+            : `${employeeId} v1 (first structure)`,
         },
       });
+
+      return { ok: true as const, versioned: plan.historyRow !== null };
     });
 
-    return NextResponse.json({ ok: true, employeeId });
+    if (!outcome.ok) return fail(outcome.code, outcome.message, 409);
+
+    return NextResponse.json({ ok: true, employeeId, versioned: outcome.versioned });
   } catch (err) {
     console.error("[hr/salary-structure] failed:", err);
     return fail("SERVER_ERROR", "Could not save the salary structure", 503);

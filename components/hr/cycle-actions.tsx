@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Calculator, Send } from "lucide-react";
 import { StatusDot } from "@/components/ui/status-dot";
+import { formatComponentOutOf5 } from "@/lib/appraisal/display";
 
 interface Incomplete {
   employeeId: string;
@@ -171,13 +172,13 @@ export function CycleActions({ cycleId }: { cycleId: string }) {
                     <span className="text-text">
                       {s.name}{" "}
                       <span className="font-mono text-text-muted">
-                        punctuality {s.punctuality.value.toFixed(0)}/100
+                        punctuality {formatComponentOutOf5(s.punctuality.value)}
                       </span>
                     </span>
                     <span className="font-mono text-[11px] text-text-muted">
-                      Freq {s.punctuality.frequencyScore.toFixed(0)} (late{" "}
+                      Freq {formatComponentOutOf5(s.punctuality.frequencyScore)} (late{" "}
                       {s.punctuality.lateCount}/{s.punctuality.totalPunchDays}) · Sev{" "}
-                      {s.punctuality.severityScore.toFixed(0)}
+                      {formatComponentOutOf5(s.punctuality.severityScore)}
                       {s.punctuality.lateCount > 0
                         ? ` (avg ${s.punctuality.avgLateMinutesAmongLateDays.toFixed(0)}m late)`
                         : " (never late)"}

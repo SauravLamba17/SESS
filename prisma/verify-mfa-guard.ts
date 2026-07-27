@@ -23,6 +23,7 @@ import path from "node:path";
 import {
   mfaGateOutcome,
   roleRequiresMfa,
+  resolveMfaStatus,
   ROLES_REQUIRING_MFA,
   MFA_REQUIRED_MESSAGE,
 } from "../lib/mfa-policy.ts";
@@ -73,9 +74,79 @@ function statusFor(role: Role | null, twoFactorEnabled: boolean) {
   return { required, satisfied: required ? twoFactorEnabled : true };
 }
 
-function main() {
+async function main() {
+  // ── 0: the enforcement toggle ───────────────────────────────────
+  // Everything in section 1 describes behaviour that only applies while
+  // enforcement is ON. This section proves the toggle gates all of it, and
+  // that the Clerk call is never reached when it is off.
+  step("0", "the MFA_ENFORCEMENT_ENABLED toggle");
+
+  for (const role of ["HR", "SUPER_ADMIN", "MANAGER", "EMPLOYEE"] as const) {
+    let clerkCalls = 0;
+    const status = await resolveMfaStatus({
+      enforcementEnabled: async () => false,
+      realRole: async () => role,
+      fetchUserFacts: async () => {
+        clerkCalls++;
+        return { twoFactorEnabled: false, totpEnabled: false, backupCodeEnabled: false };
+      },
+    });
+    check(`toggle OFF — ${role} is not required to have MFA`, status.required === false);
+    check(`toggle OFF — ${role} is satisfied (nothing blocks)`, status.satisfied === true);
+    eq(`toggle OFF — ${role} made ZERO Clerk calls`, clerkCalls, 0);
+    check(`toggle OFF — ${role} still resolves realRole for /mfa-required`, status.realRole === role);
+    check(
+      `toggle OFF — ${role} passes the API gate`,
+      mfaGateOutcome(status).allow === true,
+    );
+  }
+
+  for (const role of ["HR", "SUPER_ADMIN"] as const) {
+    let clerkCalls = 0;
+    const status = await resolveMfaStatus({
+      enforcementEnabled: async () => true,
+      realRole: async () => role,
+      fetchUserFacts: async () => {
+        clerkCalls++;
+        return { twoFactorEnabled: false, totpEnabled: false, backupCodeEnabled: false };
+      },
+    });
+    check(`toggle ON — ${role} without MFA is NOT satisfied`, status.satisfied === false);
+    eq(`toggle ON — ${role} made exactly ONE Clerk call`, clerkCalls, 1);
+    eq(`toggle ON — ${role} is blocked by the API gate`, mfaGateOutcome(status).allow, false);
+  }
+
+  // Manager/Employee never reach Clerk even with enforcement on — the role
+  // rule short-circuits, exactly as before the toggle existed.
+  for (const role of ["MANAGER", "EMPLOYEE"] as const) {
+    let clerkCalls = 0;
+    const status = await resolveMfaStatus({
+      enforcementEnabled: async () => true,
+      realRole: async () => role,
+      fetchUserFacts: async () => {
+        clerkCalls++;
+        return { twoFactorEnabled: false, totpEnabled: false, backupCodeEnabled: false };
+      },
+    });
+    check(`toggle ON — ${role} is still not required`, status.required === false);
+    eq(`toggle ON — ${role} made ZERO Clerk calls`, clerkCalls, 0);
+  }
+
+  // Fail-closed on a Clerk outage, unchanged by the toggle work.
+  const outage = await resolveMfaStatus({
+    enforcementEnabled: async () => true,
+    realRole: async () => "HR",
+    fetchUserFacts: async () => {
+      throw new Error("clerk unreachable");
+    },
+  });
+  check("toggle ON — a Clerk outage fails CLOSED (not satisfied)", outage.satisfied === false);
+  check("toggle ON — a Clerk outage still reports required", outage.required === true);
+
   // ── 1: the decision ─────────────────────────────────────────────
-  step("1", "gate decision across every role × MFA state");
+  // NOTE: everything below assumes enforcement is ON. Section 0 covers the off
+  // state; these are the rules that apply once the Super Admin switches it on.
+  step("1", "gate decision across every role × MFA state (enforcement ON)");
   eq("roles requiring MFA are unchanged", ROLES_REQUIRING_MFA, ["HR", "SUPER_ADMIN"]);
 
   for (const role of ["HR", "SUPER_ADMIN"] as const) {
@@ -148,6 +219,52 @@ function main() {
 
   // ── 2: coverage ─────────────────────────────────────────────────
   step("2", "every privileged route is wrapped");
+
+  /**
+   * The walk covers app/api/** ENTIRELY, and the default is "must be wrapped".
+   *
+   * It used to scan only app/api/hr and app/api/admin, which silently missed
+   * three privileged routes that happen to live elsewhere — /api/payslip/[id],
+   * /api/form16 and /api/resume/[applicationId] all serve HR the whole org's
+   * salary or candidate data. Scanning by directory could never catch that,
+   * because the gap WAS the directory assumption.
+   *
+   * So the rule is inverted: a route file is REQUIRED to be wrapped unless it
+   * is listed below with a reason. A newly added route is, by default, not on
+   * the list — so it fails this test until someone either wraps it or writes
+   * down why it does not need wrapping. That is what makes this class of gap
+   * unable to recur silently.
+   */
+  const EXEMPT: Record<string, string> = {
+    // Not a Clerk session at all — authenticated by its own credential.
+    "app/api/agent/heartbeat/route.ts": "desktop agent, AgentToken auth, no session",
+    "app/api/webhooks/clerk/route.ts": "external webhook, svix signature auth, no session",
+    // Deliberately public.
+    "app/api/careers/apply/route.ts": "public job application form, unauthenticated by design",
+    // Self-service: the caller can only ever reach their OWN record, so there
+    // is no org-wide data behind them for a second factor to protect.
+    "app/api/attendance/punch/route.ts": "employee self-service, own punches only",
+    "app/api/attendance/month/route.ts": "employee self-service, own month only",
+    "app/api/employee/warning/acknowledge/route.ts": "employee self-service, own warning only",
+    "app/api/community/shoutout/route.ts": "employee self-service",
+    "app/api/pulse/respond/route.ts": "employee self-service, own survey response",
+    // MANAGER is not in ROLES_REQUIRING_MFA, and these are scoped to the
+    // caller's own team in-route, so the wrapper would be a no-op.
+    "app/api/manager/appraisal/feedback/route.ts": "manager scope, MANAGER does not require MFA",
+    "app/api/manager/client-mail/route.ts": "manager scope, MANAGER does not require MFA",
+    "app/api/manager/expense/route.ts": "manager scope, MANAGER does not require MFA",
+    "app/api/manager/leave/route.ts": "manager scope, MANAGER does not require MFA",
+    "app/api/manager/quality/route.ts": "manager scope, MANAGER does not require MFA",
+    "app/api/manager/shift/route.ts": "manager scope, MANAGER does not require MFA",
+    "app/api/manager/target/route.ts": "manager scope, MANAGER does not require MFA",
+    "app/api/manager/warning/route.ts": "manager scope, MANAGER does not require MFA",
+    // Role-scoped in-route: every branch narrows the result set to what the
+    // caller may already see elsewhere in the UI.
+    "app/api/search/route.ts": "results scoped per role in-route",
+    // Has its own equivalent MFA check inline — asserted separately below.
+    "app/api/reports/[report]/route.ts": "own in-route mfaStatus() check, not double-wrapped",
+  };
+
   const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"];
   const files: string[] = [];
   const walk = (d: string) => {
@@ -157,30 +274,44 @@ function main() {
       else if (e.name === "route.ts") files.push(p);
     }
   };
-  walk(path.join(ROOT, "app/api/hr"));
-  walk(path.join(ROOT, "app/api/admin"));
+  walk(path.join(ROOT, "app/api"));
 
-  // These two totals are expected to grow as privileged routes are added — they
-  // are a tripwire for a route appearing or vanishing unnoticed, not the real
-  // guarantee. The guarantee is the "NO route exports an unwrapped handler"
-  // assertion below, which holds at any count.
-  //   36/38 at introduction (MFA wrapper phase)
+  const rel = (f: string) => path.relative(ROOT, f).replace(/\\/g, "/");
+  const seen = new Set(files.map(rel));
+
+  // A stale exemption is its own hazard: a path that no longer exists means the
+  // list has drifted, and a future route could land on that path pre-excused.
+  for (const p of Object.keys(EXEMPT)) {
+    check(`exemption still points at a real file: ${p}`, seen.has(p));
+  }
+
+  const required = files.filter((f) => !(rel(f) in EXEMPT));
+
+  // These totals are expected to grow as routes are added — they are a tripwire
+  // for a route appearing or vanishing unnoticed, not the real guarantee. The
+  // guarantee is the "NO route exports an unwrapped handler" assertion below,
+  // which holds at any count.
+  //   36/38 at introduction (MFA wrapper phase), scanning hr/ + admin/ only
   //   38/40 after Phase 13 added /api/hr/attendance/correct and
   //         /api/hr/employee/retention
-  eq("38 privileged route files", files.length, 38);
+  //   41/43 after the walk widened to all of app/api and picked up the three
+  //         privileged routes it had never been looking at
+  eq("59 route files under app/api in total", files.length, 59);
+  eq("18 documented exemptions", Object.keys(EXEMPT).length, 18);
+  eq("41 route files REQUIRE the wrapper", required.length, 41);
 
   let unwrapped = 0;
   let handlerCount = 0;
-  for (const file of files) {
+  for (const file of required) {
     const src = fs.readFileSync(file, "utf8");
-    const rel = path.relative(ROOT, file).replace(/\\/g, "/");
+    const r = rel(file);
 
     // A raw `export async function POST` means the method is exposed WITHOUT
     // the gate — exactly the state this task existed to remove.
     for (const m of METHODS) {
       if (new RegExp(`^export async function ${m}\\s*\\(`, "m").test(src)) {
         unwrapped++;
-        console.log(`        UNWRAPPED: ${m} in ${rel}`);
+        console.log(`        UNWRAPPED: ${m} in ${r}`);
       }
     }
     for (const m of METHODS) {
@@ -192,19 +323,36 @@ function main() {
         ).test(src);
         if (!exported) {
           unwrapped++;
-          console.log(`        HANDLER NOT RE-EXPORTED: ${m} in ${rel}`);
+          console.log(`        HANDLER NOT RE-EXPORTED: ${m} in ${r}`);
         }
       }
     }
     if (!src.includes('from "@/lib/mfa-guard"')) {
       unwrapped++;
-      console.log(`        MISSING IMPORT: ${rel}`);
+      console.log(`        MISSING IMPORT: ${r}`);
     }
   }
-  eq("40 handlers wrapped (2 files export two methods each)", handlerCount, 40);
+  eq("43 handlers wrapped (2 files export two methods each)", handlerCount, 43);
   check("NO route exports an unwrapped handler", unwrapped === 0, `${unwrapped} problem(s)`);
 
-  // The reports route has its own in-route check and is deliberately not here.
+  // ── 2b: the three routes the old directory-scoped walk missed ───
+  step("2b", "the routes that lived outside hr/ and admin/");
+  for (const p of [
+    "app/api/payslip/[id]/route.ts",
+    "app/api/form16/route.ts",
+    "app/api/resume/[applicationId]/route.ts",
+  ]) {
+    const src = fs.readFileSync(path.join(ROOT, p), "utf8");
+    check(
+      `${p} is MFA-gated`,
+      src.includes('from "@/lib/mfa-guard"') &&
+        /^export const GET = withPrivilegedRoute\(GETHandler\);/m.test(src) &&
+        !/^export async function GET\s*\(/m.test(src),
+    );
+    check(`${p} is NOT exempt (the walk genuinely requires it)`, !(p in EXEMPT));
+  }
+
+  // The reports route has its own in-route check and is deliberately exempt.
   const reports = fs.readFileSync(
     path.join(ROOT, "app/api/reports/[report]/route.ts"),
     "utf8",
@@ -253,7 +401,7 @@ async function httpLayer() {
 }
 
 async function run() {
-  main();
+  await main();
   await httpLayer();
   console.log(`\n══ RESULT: ${pass} passed, ${fail} failed ══`);
   if (fail > 0) process.exitCode = 1;

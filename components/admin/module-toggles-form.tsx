@@ -2,9 +2,60 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Loader2 } from "lucide-react";
+import { CheckCircle2, Info, Loader2 } from "lucide-react";
 
 const MODES = ["NONE", "IP_LOCK", "GEOFENCE", "BOTH"] as const;
+
+/**
+ * Hover/tap guide for a toggle whose consequences aren't obvious from its
+ * label — currently just the MFA switch.
+ *
+ * Opens on hover AND on click, because a hover-only tooltip is unreachable on
+ * a touch device. Focus opens it too, so it is not keyboard-invisible; Escape
+ * and blur close it. `aria-describedby` ties the panel to the trigger so a
+ * screen reader announces the content rather than a bare icon.
+ */
+function HintPopover({ id, children }: { id: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <span
+      // Deliberately NOT `relative`: the panel below positions against the
+      // Row's text block instead, which spans the row's full width. Anchoring
+      // to this icon meant the panel started wherever the title happened to
+      // end and ran off the right edge on a narrow viewport.
+      className="inline-flex"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      <button
+        type="button"
+        aria-label="What does this do?"
+        aria-expanded={open}
+        aria-describedby={open ? id : undefined}
+        onClick={() => setOpen((v) => !v)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        onKeyDown={(e) => e.key === "Escape" && setOpen(false)}
+        className="rounded text-text-muted hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      >
+        <Info size={14} />
+      </button>
+      {open && (
+        <span
+          id={id}
+          role="tooltip"
+          // Positioned against the Row's text block (the nearest `relative`
+          // ancestor), pinned to its left edge and capped at its width, so it
+          // is on-screen at every viewport without any JS measurement.
+          className="absolute left-0 top-full z-20 mt-2 w-72 max-w-full rounded border border-border bg-surface-raised p-3 text-left text-xs leading-relaxed text-text-muted shadow-panel sm:w-80"
+        >
+          {children}
+        </span>
+      )}
+    </span>
+  );
+}
 
 async function saveToggle(key: string, value: string): Promise<string | null> {
   try {
@@ -23,18 +74,25 @@ async function saveToggle(key: string, value: string): Promise<string | null> {
 function Row({
   title,
   description,
+  hint,
   children,
   state,
 }: {
   title: string;
   description: string;
+  /** Optional hover/tap guide, rendered next to the title. */
+  hint?: React.ReactNode;
   children: React.ReactNode;
   state?: { pending: boolean; saved: boolean; error: string | null };
 }) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-3 px-4 py-4">
-      <div className="max-w-xl">
-        <p className="text-sm text-text">{title}</p>
+      {/* `relative` is the positioning context for a Row's HintPopover panel. */}
+      <div className="relative max-w-xl">
+        <p className="flex items-center gap-1.5 text-sm text-text">
+          {title}
+          {hint}
+        </p>
         <p className="mt-0.5 text-xs text-text-muted">{description}</p>
         {state?.error && <p className="mt-1 text-xs text-danger">{state.error}</p>}
       </div>
@@ -55,6 +113,7 @@ function BoolToggle({
   settingKey,
   title,
   description,
+  hint,
   initial,
   onLabel = "Enabled",
   offLabel = "Disabled",
@@ -62,6 +121,7 @@ function BoolToggle({
   settingKey: string;
   title: string;
   description: string;
+  hint?: React.ReactNode;
   initial: boolean;
   onLabel?: string;
   offLabel?: string;
@@ -85,7 +145,7 @@ function BoolToggle({
   }
 
   return (
-    <Row title={title} description={description} state={{ pending, saved, error }}>
+    <Row title={title} description={description} hint={hint} state={{ pending, saved, error }}>
       <button
         type="button"
         role="switch"
@@ -154,4 +214,4 @@ function ModeSelect({
   );
 }
 
-export { BoolToggle, ModeSelect };
+export { BoolToggle, ModeSelect, HintPopover };

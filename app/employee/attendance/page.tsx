@@ -7,6 +7,7 @@ import { LeaveForm } from "@/components/employee/leave-form";
 import { AttendanceCalendar } from "@/components/employee/attendance-calendar";
 import { db } from "@/lib/db";
 import { getEmployeeByClerkId } from "@/lib/data/scope";
+import { UnlinkedEmployeeNotice } from "@/components/ui/notice";
 
 export const dynamic = "force-dynamic";
 
@@ -65,13 +66,8 @@ export default async function MyAttendancePage() {
       />
 
       {!employeeLinked && (
-        <Panel className="mb-5 flex items-center gap-3 px-4 py-3">
-          <StatusDot state="warn" />
-          <span className="text-sm text-text-muted">
-            No employee record is linked to your account yet. Attendance and
-            leave will appear once HR completes onboarding.
-          </span>
-        </Panel>
+        <UnlinkedEmployeeNotice>No employee record is linked to your account yet. Attendance and
+            leave will appear once HR completes onboarding.</UnlinkedEmployeeNotice>
       )}
 
       {employeeLinked && (

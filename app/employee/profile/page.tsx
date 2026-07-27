@@ -1,9 +1,9 @@
 import { getEffectiveUserId } from "@/lib/auth";
 import { PageHeader } from "@/components/portal/portal-shell";
 import { Panel, PanelHeader } from "@/components/ui/panel";
-import { StatusDot } from "@/components/ui/status-dot";
 import { ProfileForm } from "@/components/employee/profile-form";
 import { getEmployeeByClerkId } from "@/lib/data/scope";
+import { ErrorPanel, UnlinkedEmployeeNotice } from "@/components/ui/notice";
 
 export const dynamic = "force-dynamic";
 
@@ -63,20 +63,12 @@ export default async function MyProfilePage() {
       />
 
       {error && (
-        <Panel className="mb-5 flex items-center gap-3 px-4 py-3">
-          <StatusDot state="danger" />
-          <span className="text-sm text-danger">{error}</span>
-        </Panel>
+        <ErrorPanel>{error}</ErrorPanel>
       )}
 
       {!employee && !error && (
-        <Panel className="mb-5 flex items-center gap-3 px-4 py-3">
-          <StatusDot state="warn" />
-          <span className="text-sm text-text-muted">
-            No employee record is linked to your account yet. Your profile will
-            appear once HR completes onboarding.
-          </span>
-        </Panel>
+        <UnlinkedEmployeeNotice>No employee record is linked to your account yet. Your profile will
+            appear once HR completes onboarding.</UnlinkedEmployeeNotice>
       )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

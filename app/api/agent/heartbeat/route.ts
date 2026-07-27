@@ -3,13 +3,10 @@ import { db } from "@/lib/db";
 import { idleConsentState } from "@/lib/idle/consent";
 import { idleThresholdSeconds } from "@/lib/idle/settings";
 import { idleTrackingEnabled } from "@/lib/system-settings";
+import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function fail(code: string, error: string, status: number, extra?: Record<string, unknown>) {
-  return NextResponse.json({ error, code, ...extra }, { status });
-}
 
 /** One 15-minute window can hold at most 15 minutes. Guards a bad/hostile agent. */
 const MAX_WINDOW_MINUTES = 60;

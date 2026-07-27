@@ -4,6 +4,48 @@ export function isPeriod(v: unknown): v is string {
 }
 
 /**
+ * Strict "YYYY-MM-DD" → local-midnight Date, or null.
+ *
+ * THE ROLLOVER CHECK IS THE WHOLE POINT. `new Date(2026, 1, 30)` does not
+ * throw and is not NaN — it silently becomes 2 March 2026. So a validator
+ * written as
+ *
+ *     const dt = new Date(y, m - 1, d);
+ *     return Number.isNaN(dt.getTime()) ? null : dt;
+ *
+ * accepts "2026-02-30" and hands back the wrong day. That shape was copied
+ * into eight separate files in this codebase; reading the fields back off the
+ * constructed Date is what actually rejects it.
+ *
+ * Local midnight, never UTC — the same local-date rule the attendance and
+ * payroll code depends on, so a date never shifts by a day for IST users.
+ *
+ * Lives in lib/period.ts because this file is client-safe: it imports nothing
+ * and must never import a server-only module, so form components can validate
+ * with the exact function the route will re-validate with.
+ */
+export function parseDateOnly(value: unknown): Date | null {
+  if (typeof value !== "string") return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  const dt = new Date(y, mo - 1, d);
+  if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null;
+  return dt;
+}
+
+/**
+ * Strict "YYYY-MM-DD" shape AND calendar check, for the call sites that keep
+ * the string rather than the Date. Same validation as parseDateOnly(), so a
+ * regex-only `.test()` can be swapped for this without letting 2026-02-30 in.
+ */
+export function isDateOnly(value: unknown): value is string {
+  return parseDateOnly(value) !== null;
+}
+
+/**
  * The 12 "YYYY-MM" months of an Indian financial year, April→March.
  * `fy` is the standard label, e.g. "2026-27" → 2026-04 … 2027-03.
  * Returns null if the label is malformed or the years aren't consecutive.

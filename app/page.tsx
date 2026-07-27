@@ -47,9 +47,9 @@ export default async function LandingPage() {
           <span className="text-accent">measured, not guessed.</span>
         </h1>
         <p className="mt-4 max-w-2xl text-text-muted">
-          SESS pairs camera-verified attendance, system idle-time tracking and
-          per-machine performance averages with a quality-linked production
-          appraisal formula. One app, four role-scoped portals.
+          SESS pairs shift-aware attendance, consent-gated system idle-time
+          tracking and production targets with a quality-linked appraisal
+          formula. One app, four role-scoped portals.
         </p>
 
         {userId && (

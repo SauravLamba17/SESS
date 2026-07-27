@@ -1,17 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getEffectiveUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { parseDateOnly } from "@/lib/period";
 import { getCurrentRole } from "@/lib/auth";
 import { assemblePayrollRow } from "@/lib/payroll/assemble";
 import { withPrivilegedRoute } from "@/lib/mfa-guard";
 import { scheduledRedactionFor, RETENTION_YEARS, ymd } from "@/lib/employees/retention";
+import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function fail(code: string, error: string, status: number) {
-  return NextResponse.json({ error, code }, { status });
-}
 
 /** "YYYY-MM" period a date falls in. */
 function periodOf(d: Date): string {
@@ -56,12 +54,9 @@ async function POSTHandler(req: NextRequest) {
   // Last working day drives the settlement's pro-ration. Defaults to today.
   let lastWorkingDay: Date;
   if (typeof body.lastWorkingDay === "string" && body.lastWorkingDay.trim()) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(body.lastWorkingDay.trim()))
-      return fail("BAD_INPUT", "lastWorkingDay must be YYYY-MM-DD", 400);
-    const [y, m, d] = body.lastWorkingDay.trim().split("-").map(Number);
-    lastWorkingDay = new Date(y, m - 1, d);
-    if (Number.isNaN(lastWorkingDay.getTime()))
-      return fail("BAD_INPUT", "lastWorkingDay is not a valid date", 400);
+    const parsed = parseDateOnly(body.lastWorkingDay);
+    if (!parsed) return fail("BAD_INPUT", "lastWorkingDay must be YYYY-MM-DD", 400);
+    lastWorkingDay = parsed;
   } else {
     const n = new Date();
     lastWorkingDay = new Date(n.getFullYear(), n.getMonth(), n.getDate());

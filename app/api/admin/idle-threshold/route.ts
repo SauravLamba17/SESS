@@ -7,13 +7,10 @@ import {
   MAX_IDLE_THRESHOLD_SECONDS,
 } from "@/lib/idle/settings";
 import { withPrivilegedRoute } from "@/lib/mfa-guard";
+import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function fail(code: string, error: string, status: number) {
-  return NextResponse.json({ error, code }, { status });
-}
 
 /**
  * Set the idle threshold, Super Admin only.

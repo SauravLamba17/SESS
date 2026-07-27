@@ -4,13 +4,10 @@ import { db } from "@/lib/db";
 import { onboardEmployee } from "@/lib/employees/onboard";
 import { validateCsv, type ValidationContext } from "@/lib/employees/csv-import";
 import { withPrivilegedRoute } from "@/lib/mfa-guard";
+import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function fail(code: string, error: string, status: number, extra?: Record<string, unknown>) {
-  return NextResponse.json({ error, code, ...extra }, { status });
-}
 
 const MAX_CSV_BYTES = 1024 * 1024; // 1 MB — thousands of rows, not a data dump
 const MAX_ROWS = 1000;

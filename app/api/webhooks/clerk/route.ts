@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { verifyWebhook } from "@clerk/nextjs/webhooks";
 import { db } from "@/lib/db";
-import type { Role } from "@/lib/auth-types";
+import { coerceRole } from "@/lib/auth-types";
 import { linkClerkUserToEmployee } from "@/lib/employees/invite";
 
 export const runtime = "nodejs";
@@ -25,18 +25,6 @@ export const dynamic = "force-dynamic";
  * career-page visitors), 503 only for genuine DB faults so Clerk redelivers.
  * Nothing here ever throws out of the handler.
  */
-
-function coerceRole(value: unknown): Role | null {
-  if (
-    value === "EMPLOYEE" ||
-    value === "MANAGER" ||
-    value === "HR" ||
-    value === "SUPER_ADMIN"
-  ) {
-    return value;
-  }
-  return null;
-}
 
 export async function POST(req: NextRequest) {
   let evt: Awaited<ReturnType<typeof verifyWebhook>>;

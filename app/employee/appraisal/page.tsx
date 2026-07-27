@@ -4,6 +4,7 @@ import { Panel } from "@/components/ui/panel";
 import { StatusDot, type StatusState } from "@/components/ui/status-dot";
 import { db } from "@/lib/db";
 import { getEmployeeByClerkId } from "@/lib/data/scope";
+import { ErrorPanel, UnlinkedEmployeeNotice } from "@/components/ui/notice";
 import {
   formatScoreOutOfFive,
   formatComponentOutOf5,
@@ -88,19 +89,11 @@ export default async function MyAppraisalPage() {
       />
 
       {data.error && (
-        <Panel className="mb-5 flex items-center gap-3 px-4 py-3">
-          <StatusDot state="danger" />
-          <span className="text-sm text-danger">{data.error}</span>
-        </Panel>
+        <ErrorPanel>{data.error}</ErrorPanel>
       )}
 
       {!data.employee && !data.error && (
-        <Panel className="mb-5 flex items-center gap-3 px-4 py-3">
-          <StatusDot state="warn" />
-          <span className="text-sm text-text-muted">
-            No employee record is linked to your account yet.
-          </span>
-        </Panel>
+        <UnlinkedEmployeeNotice />
       )}
 
       {data.employee && data.scores && data.scores.length === 0 && (

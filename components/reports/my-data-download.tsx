@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Download, Loader2 } from "lucide-react";
 import { StatusDot } from "@/components/ui/status-dot";
+import { useFileDownload } from "./use-file-download";
 
 const inputClass =
   "rounded border border-border bg-background px-2.5 py-1.5 text-xs text-text focus:outline-none focus-visible:ring-2 focus-visible:ring-accent";
@@ -23,41 +24,16 @@ export function MyDataDownload({
 }) {
   const [start, setStart] = useState(defaultStart);
   const [end, setEnd] = useState(defaultEnd);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { busy, error, rangeValid, download: run } = useFileDownload(start, end);
 
-  const rangeValid = start !== "" && end !== "" && start <= end;
-
-  async function download() {
-    setError(null);
-    if (!rangeValid) {
-      setError("Choose a start date on or before the end date.");
-      return;
-    }
-    setBusy(true);
-    try {
-      const res = await fetch(
-        `/api/reports/my-data?startDate=${start}&endDate=${end}`,
-      );
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setError(data.error ?? "Could not generate your data export.");
-        return;
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `my-data-${start}-to-${end}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch {
-      setError("Network error while generating your export.");
-    } finally {
-      setBusy(false);
-    }
+  function download() {
+    return run({
+      key: "my-data",
+      url: `/api/reports/my-data?startDate=${start}&endDate=${end}`,
+      filename: `my-data-${start}-to-${end}.pdf`,
+      failMessage: "Could not generate your data export.",
+      networkMessage: "Network error while generating your export.",
+    });
   }
 
   return (
@@ -96,11 +72,11 @@ export function MyDataDownload({
         <button
           type="button"
           onClick={download}
-          disabled={busy || !rangeValid}
+          disabled={busy !== null || !rangeValid}
           className="inline-flex items-center gap-2 rounded bg-accent px-4 py-2 text-sm font-medium text-background hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
         >
-          {busy ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
-          {busy ? "Preparing…" : "Download My Data"}
+          {busy !== null ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+          {busy !== null ? "Preparing…" : "Download My Data"}
         </button>
       </div>
 

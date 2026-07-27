@@ -1,8 +1,8 @@
 import { PageHeader } from "@/components/portal/portal-shell";
 import { Panel, PanelHeader } from "@/components/ui/panel";
-import { StatusDot } from "@/components/ui/status-dot";
 import { db } from "@/lib/db";
 import { departmentSummary } from "@/lib/admin/organization";
+import { ErrorPanel } from "@/components/ui/notice";
 
 export const dynamic = "force-dynamic";
 
@@ -51,10 +51,7 @@ export default async function OrganizationPage() {
       />
 
       {error && (
-        <Panel className="mb-5 flex items-center gap-3 px-4 py-3">
-          <StatusDot state="danger" />
-          <span className="text-sm text-danger">{error}</span>
-        </Panel>
+        <ErrorPanel>{error}</ErrorPanel>
       )}
 
       <Panel>

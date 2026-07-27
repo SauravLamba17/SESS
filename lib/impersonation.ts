@@ -12,6 +12,26 @@ import type { Role } from "@/lib/auth-types";
 
 export const IMP_COOKIE = "sess_impersonation";
 
+/**
+ * THE MASTER SWITCH for the entire impersonation feature.
+ *
+ * Impersonation exists so a demo deployment can show all four portals from one
+ * login. It has no place in a real production instance, where it would be a
+ * standing "log in as anyone" capability guarded only by a role check.
+ *
+ * DEFAULT OFF, and deliberately strict: only the exact string "true" enables
+ * it. Unset, empty, "TRUE", "1" and "yes" all mean off, so no accidental value
+ * can switch it on.
+ *
+ * Read from process.env directly rather than cached, because this file is
+ * imported by the edge middleware as well as Node server code — Next inlines
+ * process.env at build time for edge, the same way this file already reads
+ * CLERK_SECRET_KEY.
+ */
+export function demoModeEnabled(): boolean {
+  return process.env.DEMO_MODE === "true";
+}
+
 export interface ImpersonationPayload {
   su: string; // the REAL Super Admin's Clerk user id (binding)
   cid: string; // impersonated User.clerkId (the effective identity)
@@ -64,6 +84,12 @@ function timingSafeEqual(a: string, b: string): boolean {
 }
 
 export async function signImpersonation(p: ImpersonationPayload): Promise<string> {
+  // Defence in depth. The server action refuses first, but if a future call
+  // site ever forgets that check, no impersonation token can be minted at all
+  // outside a demo deployment.
+  if (!demoModeEnabled()) {
+    throw new Error("Impersonation is disabled: DEMO_MODE is not enabled on this deployment.");
+  }
   const body = b64urlEncode(JSON.stringify(p));
   const sig = await hmacHex(body);
   return `${body}.${sig}`;
@@ -73,11 +99,26 @@ export async function signImpersonation(p: ImpersonationPayload): Promise<string
  * Verify a token and return its payload — ONLY if the signature is valid AND
  * the payload is bound to `realUserId`. Returns null otherwise. The caller is
  * still responsible for checking that the real user is actually a Super Admin.
+ *
+ * ─── WHY THE DEMO_MODE CHECK IS HERE AND NOT ONLY AT THE START ACTION ─────
+ * Gating only the start action would leave impersonation *unstartable*, not
+ * *inert*. The cookie is signed with CLERK_SECRET_KEY, which does not change
+ * when DEMO_MODE does — so a token minted while demo mode was on (or lifted
+ * from a demo deployment sharing the secret) would still verify afterwards,
+ * and the holder would keep acting as someone else indefinitely.
+ *
+ * This function is the ONE place both consumers resolve a cookie into an
+ * identity: lib/auth.ts's resolveIdentity() and the edge middleware. Refusing
+ * here means that with DEMO_MODE off there is no code path in the application
+ * that can turn any cookie, however well-formed, into an impersonated
+ * identity. That is what makes the feature structurally inert rather than
+ * merely hidden.
  */
 export async function verifyImpersonation(
   token: string | undefined,
   realUserId: string,
 ): Promise<ImpersonationPayload | null> {
+  if (!demoModeEnabled()) return null;
   if (!token) return null;
   const dot = token.lastIndexOf(".");
   if (dot <= 0) return null;

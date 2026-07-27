@@ -5,13 +5,10 @@ import { changeUserRole } from "@/lib/admin/user-role";
 import { clerkUpdateUserRole } from "@/lib/admin/clerk";
 import { ROLES, type Role } from "@/lib/auth-types";
 import { withPrivilegedRoute } from "@/lib/mfa-guard";
+import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function fail(code: string, error: string, status: number) {
-  return NextResponse.json({ error, code }, { status });
-}
 
 /**
  * Change an existing User's role, Super Admin only. Creating users is NOT

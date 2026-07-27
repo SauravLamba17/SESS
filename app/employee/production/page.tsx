@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { getEmployeeByClerkId } from "@/lib/data/scope";
 import { currentPeriod } from "@/lib/period";
 import { timeEfficiency, formatEfficiency } from "@/lib/time-efficiency";
+import { ErrorPanel, UnlinkedEmployeeNotice } from "@/components/ui/notice";
 
 export const dynamic = "force-dynamic";
 
@@ -59,19 +60,11 @@ export default async function MyProductionPage() {
       />
 
       {data.error && (
-        <Panel className="mb-5 flex items-center gap-3 px-4 py-3">
-          <StatusDot state="danger" />
-          <span className="text-sm text-danger">{data.error}</span>
-        </Panel>
+        <ErrorPanel>{data.error}</ErrorPanel>
       )}
 
       {!data.employee && !data.error && (
-        <Panel className="mb-5 flex items-center gap-3 px-4 py-3">
-          <StatusDot state="warn" />
-          <span className="text-sm text-text-muted">
-            No employee record is linked to your account yet.
-          </span>
-        </Panel>
+        <UnlinkedEmployeeNotice />
       )}
 
       {data.employee && (

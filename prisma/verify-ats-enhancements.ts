@@ -22,6 +22,14 @@ const HR = "test-atsx-hr";
 const ADMIN = "test-atsx-admin";
 const EMAIL = "zz-atsx-candidate@example.invalid";
 
+// The suite's OWN HR recipient. The notification fan-out targets every active
+// Employee whose linked User has role HR; this used to rely on a seeded
+// HR-User existing in the database, which made the suite fail the moment that
+// demo data was removed. It now creates and deletes its own, like it already
+// does for the requisition and candidate.
+const HR_CODE = "ZZ-ATSX-HR";
+const HR_CLERK = "test-atsx-hr-user";
+
 let pass = 0;
 let fail = 0;
 
@@ -56,6 +64,36 @@ async function cleanup() {
   await db.jobRequisition.deleteMany({ where: { title: { startsWith: TAG } } });
   await db.notification.deleteMany({ where: { message: { contains: TAG } } });
   await db.auditLog.deleteMany({ where: { actorUserId: { in: [HR, ADMIN] } } });
+
+  // The suite's own HR recipient: notifications first, then the User that
+  // links it, then the Employee itself (User.employeeId → Employee).
+  const fixtures = await db.employee.findMany({
+    where: { employeeCode: HR_CODE },
+    select: { id: true },
+  });
+  const fIds = fixtures.map((e) => e.id);
+  if (fIds.length > 0) {
+    await db.notification.deleteMany({ where: { employeeId: { in: fIds } } });
+  }
+  await db.user.deleteMany({ where: { clerkId: HR_CLERK } });
+  await db.employee.deleteMany({ where: { employeeCode: HR_CODE } });
+}
+
+/** Create the HR Employee + linked HR User this suite notifies. */
+async function createHrFixture() {
+  const emp = await db.employee.create({
+    data: {
+      employeeCode: HR_CODE,
+      name: `${TAG} HR Recipient`,
+      department: "People Ops",
+      designation: "HR Generalist",
+      joiningDate: new Date("2020-01-01"),
+    },
+  });
+  await db.user.create({
+    data: { clerkId: HR_CLERK, role: "HR", employeeId: emp.id },
+  });
+  return emp;
 }
 
 async function main() {
@@ -64,7 +102,8 @@ async function main() {
     console.log("══ PHASE 8 ENHANCEMENTS VERIFICATION ═══════════════════");
 
     // ── SETUP ───────────────────────────────────────────────────────
-    step("SETUP", "requisition + candidate + application");
+    step("SETUP", "HR recipient + requisition + candidate + application");
+    await createHrFixture();
     const req = await db.jobRequisition.create({
       data: {
         title: `${TAG} QA Engineer`,

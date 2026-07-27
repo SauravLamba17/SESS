@@ -65,8 +65,3 @@ export function clientIp(headers: Headers): string {
   if (fwd) return fwd.split(",")[0].trim();
   return headers.get("x-real-ip")?.trim() || "unknown";
 }
-
-/** Test-only reset. */
-export function __resetRateLimit() {
-  hits.clear();
-}

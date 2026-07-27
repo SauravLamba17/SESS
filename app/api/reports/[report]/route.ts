@@ -5,13 +5,10 @@ import { parseRange } from "@/lib/reports/range";
 import { runReport } from "@/lib/reports/run";
 import { serializeCsv } from "@/lib/reports/csv";
 import { mfaStatus } from "@/lib/mfa";
+import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function fail(code: string, error: string, status: number) {
-  return NextResponse.json({ error, code }, { status });
-}
 
 /**
  * GET /api/reports/{report-name}?startDate=&endDate=&format=pdf|csv|json

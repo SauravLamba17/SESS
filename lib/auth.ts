@@ -3,24 +3,12 @@ import { cache } from "react";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { cookies } from "next/headers";
 import type { Role } from "@/lib/auth-types";
-import { ROLE_RANK } from "@/lib/auth-types";
+import { ROLE_RANK, coerceRole } from "@/lib/auth-types";
 import {
   IMP_COOKIE,
   verifyImpersonation,
   type ImpersonationPayload,
 } from "@/lib/impersonation";
-
-function coerceRole(value: unknown): Role | null {
-  if (
-    value === "EMPLOYEE" ||
-    value === "MANAGER" ||
-    value === "HR" ||
-    value === "SUPER_ADMIN"
-  ) {
-    return value;
-  }
-  return null;
-}
 
 async function realRoleOf(
   sessionClaims: { metadata?: { role?: unknown } } | null,

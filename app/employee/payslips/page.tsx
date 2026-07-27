@@ -8,6 +8,7 @@ import { getEmployeeByClerkId } from "@/lib/data/scope";
 import { currentPeriod, financialYearOf } from "@/lib/period";
 import { inr, periodLabel } from "@/lib/payroll/format";
 import { linkAdjustments, adjustmentLabel } from "@/lib/payroll/adjustments";
+import { ErrorPanel, UnlinkedEmployeeNotice } from "@/components/ui/notice";
 
 export const dynamic = "force-dynamic";
 
@@ -50,19 +51,11 @@ export default async function MyPayslipsPage() {
       />
 
       {error && (
-        <Panel className="mb-5 flex items-center gap-3 px-4 py-3">
-          <StatusDot state="danger" />
-          <span className="text-sm text-danger">{error}</span>
-        </Panel>
+        <ErrorPanel>{error}</ErrorPanel>
       )}
 
       {!employee && !error && (
-        <Panel className="mb-5 flex items-center gap-3 px-4 py-3">
-          <StatusDot state="warn" />
-          <span className="text-sm text-text-muted">
-            No employee record is linked to your account yet.
-          </span>
-        </Panel>
+        <UnlinkedEmployeeNotice />
       )}
 
       {employee && (

@@ -7,6 +7,7 @@ import { StatusDot, type StatusState } from "@/components/ui/status-dot";
 import { StageMoveButtons } from "@/components/hr/stage-move-buttons";
 import { db } from "@/lib/db";
 import { resolveRecruitmentScope } from "@/lib/recruitment/access";
+import { ErrorPanel } from "@/components/ui/notice";
 
 export const dynamic = "force-dynamic";
 
@@ -122,10 +123,7 @@ export default async function CandidatesPage() {
       />
 
       {error && (
-        <Panel className="mb-5 flex items-center gap-3 px-4 py-3">
-          <StatusDot state="danger" />
-          <span className="text-sm text-danger">{error}</span>
-        </Panel>
+        <ErrorPanel>{error}</ErrorPanel>
       )}
 
       <div className="mb-5 flex flex-wrap gap-2">

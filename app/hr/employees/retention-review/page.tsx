@@ -5,6 +5,7 @@ import { Panel, PanelHeader, StatCard } from "@/components/ui/panel";
 import { StatusDot } from "@/components/ui/status-dot";
 import { EmployeeRetentionActions } from "@/components/hr/employee-retention-actions";
 import { db } from "@/lib/db";
+import { ErrorPanel } from "@/components/ui/notice";
 import {
   RETENTION_YEARS,
   REDACTED_FIELDS,
@@ -109,10 +110,7 @@ export default async function EmployeeRetentionReview({
       />
 
       {error && (
-        <Panel className="mb-5 flex items-center gap-3 px-4 py-3">
-          <StatusDot state="danger" />
-          <span className="text-sm text-danger">{error}</span>
-        </Panel>
+        <ErrorPanel>{error}</ErrorPanel>
       )}
 
       <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">

@@ -2,13 +2,10 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getEffectiveUserId, getCurrentRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { withPrivilegedRoute } from "@/lib/mfa-guard";
+import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function fail(code: string, error: string, status: number) {
-  return NextResponse.json({ error, code }, { status });
-}
 
 /** HR/Super Admin: assign any employee (org-wide) to an active shift. */
 async function POSTHandler(req: NextRequest) {

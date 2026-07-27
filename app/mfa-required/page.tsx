@@ -55,17 +55,64 @@ export default async function MfaRequiredPage() {
 
           <div className="mt-5 rounded border border-border bg-surface-raised/50 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">
-              How to enable it
+              Setting it up — about a minute
             </p>
-            <ol className="mt-2 space-y-1.5 text-sm text-text-muted">
-              <li>
-                1. Open your account security settings using the button below.
+            <ol className="mt-3 space-y-3 text-sm text-text-muted">
+              <li className="flex gap-3">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border font-mono text-[11px] text-text">
+                  1
+                </span>
+                <span>
+                  <Link
+                    href="/account"
+                    className="text-accent underline underline-offset-2 hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                  >
+                    Go to your account security settings
+                  </Link>{" "}
+                  — or use the button below.
+                </span>
               </li>
-              <li>
-                2. Add an authenticator app (TOTP), and save your backup codes
-                somewhere safe.
+              <li className="flex gap-3">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border font-mono text-[11px] text-text">
+                  2
+                </span>
+                <span>
+                  In the <span className="text-text">Security</span> section,
+                  find the two-factor authentication option.
+                </span>
               </li>
-              <li>3. Come back here — access is restored immediately.</li>
+              <li className="flex gap-3">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border font-mono text-[11px] text-text">
+                  3
+                </span>
+                <span>
+                  Choose an{" "}
+                  <span className="text-text">authenticator app</span>{" "}
+                  (recommended — works offline) or{" "}
+                  <span className="text-text">SMS</span>.
+                </span>
+              </li>
+              <li className="flex gap-3">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border font-mono text-[11px] text-text">
+                  4
+                </span>
+                <span>
+                  Follow the prompts to finish setup, and save your backup codes
+                  somewhere safe.
+                </span>
+              </li>
+              <li className="flex gap-3">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border font-mono text-[11px] text-text">
+                  5
+                </span>
+                <span>
+                  Come back here — or just try your portal again.{" "}
+                  <span className="text-good">
+                    Access is restored automatically; there&apos;s no need to
+                    sign out and back in.
+                  </span>
+                </span>
+              </li>
             </ol>
           </div>
 
@@ -88,8 +135,10 @@ export default async function MfaRequiredPage() {
             </Link>
           </div>
 
+          {/* `warn`, not `danger` — nothing has gone wrong, this is a setup
+              step the user has not done yet. */}
           <div className="mt-5 flex items-center gap-2 border-t border-border pt-4">
-            <StatusDot state="danger" />
+            <StatusDot state={status.factors.totp ? "good" : "warn"} />
             <span className="text-xs text-text-muted">
               Authenticator app:{" "}
               <span className="font-mono text-text">

@@ -24,6 +24,94 @@ export function roleRequiresMfa(role: Role | null): boolean {
   return role !== null && ROLES_REQUIRING_MFA.includes(role);
 }
 
+// ─── THE RESOLVER ──────────────────────────────────────────────────────────
+
+export interface MfaFactors {
+  totp: boolean;
+  backupCode: boolean;
+}
+
+export interface MfaStatus {
+  /** The REAL signed-in user's role — never the impersonated one. */
+  realRole: Role | null;
+  required: boolean;
+  enabled: boolean;
+  /** True when the user may proceed: either MFA isn't required, or it is on. */
+  satisfied: boolean;
+  /** Which factors are on, for the setup page's status display. */
+  factors: MfaFactors;
+}
+
+/** The subset of Clerk's backend User this rule actually reads. */
+export interface MfaUserFacts {
+  twoFactorEnabled: boolean;
+  totpEnabled: boolean;
+  backupCodeEnabled: boolean;
+}
+
+const NO_FACTORS: MfaFactors = { totp: false, backupCode: false };
+
+function notRequired(realRole: Role | null): MfaStatus {
+  return { realRole, required: false, enabled: false, satisfied: true, factors: NO_FACTORS };
+}
+
+/**
+ * THE WHOLE MFA DECISION, in evaluation order, with every side-effecting
+ * dependency injected so a plain-Node script can drive it — including counting
+ * how many times the Clerk call was made.
+ *
+ * ─── ORDER IS THE POINT ───────────────────────────────────────────────────
+ * 1. The enforcement TOGGLE, first, before anything else. When it is off (the
+ *    default) this returns "not required" for every role and `fetchUserFacts`
+ *    is never invoked — so the feature costs one indexed SystemSetting read and
+ *    ZERO Clerk Backend API calls, app-wide. Not "returns false eventually":
+ *    the expensive dependency is never reached.
+ *
+ * 2. The ROLE rule. Manager/Employee exit here, as they always did, again
+ *    without a Clerk call.
+ *
+ * 3. Only for a role that requires MFA, with enforcement on, does the Clerk
+ *    lookup happen.
+ *
+ * `realRole` is resolved even on the toggle-off path because /mfa-required
+ * needs it to redirect the user home. That is the request's already-memoized
+ * session identity, not a second network call.
+ *
+ * FAIL CLOSED on a thrown `fetchUserFacts`: we cannot prove a second factor is
+ * on, and this gate protects payroll and personal data, so the answer is "not
+ * satisfied". The toggle read fails closed independently — see
+ * lib/system-settings.ts's mfaEnforcementEnabled().
+ */
+export async function resolveMfaStatus(deps: {
+  enforcementEnabled: () => Promise<boolean>;
+  realRole: () => Promise<Role | null>;
+  fetchUserFacts: () => Promise<MfaUserFacts | null>;
+  onError?: (err: unknown) => void;
+}): Promise<MfaStatus> {
+  if (!(await deps.enforcementEnabled())) return notRequired(await deps.realRole());
+
+  const realRole = await deps.realRole();
+  if (!roleRequiresMfa(realRole)) return notRequired(realRole);
+
+  try {
+    const facts = await deps.fetchUserFacts();
+    const enabled = facts?.twoFactorEnabled === true;
+    return {
+      realRole,
+      required: true,
+      enabled,
+      satisfied: enabled,
+      factors: {
+        totp: facts?.totpEnabled === true,
+        backupCode: facts?.backupCodeEnabled === true,
+      },
+    };
+  } catch (err) {
+    deps.onError?.(err);
+    return { realRole, required: true, enabled: false, satisfied: false, factors: NO_FACTORS };
+  }
+}
+
 /**
  * THE DECISION: should this user be sent to the MFA setup page?
  *

@@ -1,5 +1,6 @@
 "use client";
 
+import { isDateOnly } from "@/lib/period";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarPlus, Loader2, X } from "lucide-react";
@@ -20,7 +21,7 @@ export function HolidayForm() {
       setError("Enter the holiday name.");
       return;
     }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    if (!isDateOnly(date)) {
       setError("Choose the date.");
       return;
     }

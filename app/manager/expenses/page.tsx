@@ -5,6 +5,7 @@ import { StatusDot } from "@/components/ui/status-dot";
 import { DecisionButtons } from "@/components/ui/decision-buttons";
 import { db } from "@/lib/db";
 import { getEmployeeByClerkId } from "@/lib/data/scope";
+import { ErrorPanel, UnlinkedEmployeeNotice } from "@/components/ui/notice";
 import {
   inr,
   EXPENSE_CATEGORY_LABEL,
@@ -64,19 +65,11 @@ export default async function TeamExpensesPage() {
       />
 
       {error && (
-        <Panel className="mb-5 flex items-center gap-3 px-4 py-3">
-          <StatusDot state="danger" />
-          <span className="text-sm text-danger">{error}</span>
-        </Panel>
+        <ErrorPanel>{error}</ErrorPanel>
       )}
 
       {!manager && !error && (
-        <Panel className="mb-5 flex items-center gap-3 px-4 py-3">
-          <StatusDot state="warn" />
-          <span className="text-sm text-text-muted">
-            No employee record is linked to your account yet.
-          </span>
-        </Panel>
+        <UnlinkedEmployeeNotice />
       )}
 
       {manager && (

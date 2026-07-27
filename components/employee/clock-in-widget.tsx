@@ -130,7 +130,7 @@ export function ClockInWidget({
                 ? `Completed today · in ${fmtTime(checkIn)} · out ${fmtTime(checkOut)}`
                 : clockedIn
                   ? `Clocked in at ${fmtTime(checkIn)} — clock out when you finish.`
-                  : "Camera-verified web punch. A comment is required to clock in."}
+                  : "Location-tagged web punch. A comment is required to clock in."}
             </p>
           </div>
 

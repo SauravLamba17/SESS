@@ -5,13 +5,10 @@ import { db } from "@/lib/db";
 import { isPeriod } from "@/lib/period";
 import { periodLabel } from "@/lib/payroll/format";
 import { withPrivilegedRoute } from "@/lib/mfa-guard";
+import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function fail(code: string, error: string, status: number) {
-  return NextResponse.json({ error, code }, { status });
-}
 
 /**
  * SUBMITTED → FINALIZED. The permanent lock, Super Admin only.

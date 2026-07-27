@@ -1,16 +1,22 @@
 /**
  * Shared date-range parsing for every report.
  *
- * lib/period.ts was checked first and deliberately NOT extended: everything in
- * it is built around a FIXED "YYYY-MM" month (currentPeriod, financialYearOf,
- * financialYearMonths) because payroll and Form 16 are month-shaped documents.
- * Reports are range-shaped — an arbitrary start/end — so bending period.ts to
- * cover both would have made the month helpers lie about what they return.
- * The two coexist; nothing here duplicates period.ts's month arithmetic.
+ * RANGE logic lives here; single-DATE and month arithmetic live in
+ * lib/period.ts. That split is deliberate: period.ts's month helpers
+ * (currentPeriod, financialYearOf, financialYearMonths) are built around a
+ * FIXED "YYYY-MM" because payroll and Form 16 are month-shaped documents,
+ * whereas a report covers an arbitrary start/end. Nothing here duplicates
+ * period.ts's month arithmetic.
+ *
+ * The one thing that DID belong in period.ts is parsing a single "YYYY-MM-DD",
+ * which this file used to define privately — and which turned out to be
+ * copy-pasted into a dozen other files, most of them missing the rollover
+ * check. That parser now lives in period.ts and is imported below.
  *
  * Pure — no DB, no I/O. Used by the API route to validate query params before
  * a single row is fetched.
  */
+import { parseDateOnly } from "../period.ts";
 
 /** Two years. A report over a longer span is almost certainly a mistyped year,
  *  and an unbounded range is an unbounded query. */
@@ -33,19 +39,6 @@ export interface DateRange {
 export type RangeResult =
   | { ok: true; range: DateRange }
   | { ok: false; code: "BAD_DATE" | "REVERSED" | "TOO_LONG"; message: string };
-
-/** "YYYY-MM-DD" → local-midnight Date, rejecting rolled-over dates (2026-02-30). */
-function parseDateOnly(value: unknown): Date | null {
-  if (typeof value !== "string") return null;
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
-  if (!m) return null;
-  const y = Number(m[1]);
-  const mo = Number(m[2]);
-  const d = Number(m[3]);
-  const dt = new Date(y, mo - 1, d);
-  if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null;
-  return dt;
-}
 
 export function ymd(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(

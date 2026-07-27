@@ -48,7 +48,3 @@ export async function idleThresholdSeconds(): Promise<number> {
     return fromEnv();
   }
 }
-
-export function clampThreshold(n: number): number {
-  return Math.min(MAX_IDLE_THRESHOLD_SECONDS, Math.max(MIN_IDLE_THRESHOLD_SECONDS, Math.trunc(n)));
-}

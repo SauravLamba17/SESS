@@ -1,26 +1,16 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getEffectiveUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { parseDateOnly } from "@/lib/period";
 import { getCurrentRole } from "@/lib/auth";
 import { withPrivilegedRoute } from "@/lib/mfa-guard";
+import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // Phase 11: FACE_VERIFICATION removed with the feature (never had any rows).
 const CONSENT_TYPES = ["IDLE_TRACKING"] as const;
-
-function fail(code: string, error: string, status: number) {
-  return NextResponse.json({ error, code }, { status });
-}
-
-function parseDateOnly(value: unknown): Date | null {
-  if (typeof value !== "string") return null;
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
-  if (!m) return null;
-  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-  return Number.isNaN(d.getTime()) ? null : d;
-}
 
 async function POSTHandler(req: NextRequest) {
   const userId = await getEffectiveUserId();

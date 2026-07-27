@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { Prisma, type ExpenseCategory } from "@prisma/client";
 import { getEffectiveUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { parseDateOnly } from "@/lib/period";
 import { getEmployeeByClerkId } from "@/lib/data/scope";
 
 export const EXPENSE_CATEGORIES = [
@@ -20,14 +21,6 @@ export interface ExpenseFormState {
   ok: boolean;
   error?: string;
   fieldErrors?: Partial<Record<Field, string>>;
-}
-
-function parseDateOnly(value: unknown): Date | null {
-  if (typeof value !== "string") return null;
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
-  if (!m) return null;
-  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-  return Number.isNaN(d.getTime()) ? null : d;
 }
 
 function todayMidnight(): Date {

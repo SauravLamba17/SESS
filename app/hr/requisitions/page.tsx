@@ -6,6 +6,7 @@ import { StatusDot } from "@/components/ui/status-dot";
 import { RequisitionForm } from "@/components/hr/requisition-form";
 import { RequisitionStatusButton } from "@/components/hr/requisition-status-button";
 import { db } from "@/lib/db";
+import { ErrorPanel } from "@/components/ui/notice";
 
 export const dynamic = "force-dynamic";
 
@@ -47,10 +48,7 @@ export default async function RequisitionsPage() {
       />
 
       {error && (
-        <Panel className="mb-5 flex items-center gap-3 px-4 py-3">
-          <StatusDot state="danger" />
-          <span className="text-sm text-danger">{error}</span>
-        </Panel>
+        <ErrorPanel>{error}</ErrorPanel>
       )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">

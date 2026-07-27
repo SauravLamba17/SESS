@@ -3,26 +3,29 @@ import { Prisma } from "@prisma/client";
 import { getEffectiveUserId, getCurrentRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { computeGrossNet } from "@/lib/payroll/compute";
+import { parseMoney } from "@/lib/payroll/money";
 import { withPrivilegedRoute } from "@/lib/mfa-guard";
+import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function fail(code: string, error: string, status: number) {
-  return NextResponse.json({ error, code }, { status });
-}
-
 /**
- * Parse a money string to Decimal.
+ * The SIGNED money parser — deliberately local to this file.
  *
- * `signed` is enabled ONLY for adjustment rows, where a negative figure is the
- * legitimate way to record an overpayment recovery. On a regular row a
- * negative salary component is always an input error, so it stays rejected.
+ * An adjustment row carries DELTAS against an already-finalized payroll run, so
+ * a negative amount is meaningful there and nowhere else. The unsigned parser
+ * every other money route uses lives in lib/payroll/money.ts and stays
+ * unsigned; this one is not exported, so the ability to accept a negative
+ * cannot spread to a salary structure, an advance, or a normal payroll row.
+ *
+ * Callers below pass `signed` only when the row being edited is genuinely an
+ * adjustment (`row.adjustmentForPayrollId !== null`).
  */
-function parseMoney(v: unknown, signed = false): Prisma.Decimal | null {
+function parseSignedMoney(v: unknown, signed: boolean): Prisma.Decimal | null {
+  if (!signed) return parseMoney(v);
   const s = typeof v === "number" ? String(v) : typeof v === "string" ? v.trim() : "";
-  const re = signed ? /^-?\d{1,10}(\.\d{1,2})?$/ : /^\d{1,10}(\.\d{1,2})?$/;
-  if (!re.test(s)) return null;
+  if (!/^-?\d{1,10}(\.\d{1,2})?$/.test(s)) return null;
   try {
     return new Prisma.Decimal(s);
   } catch {
@@ -108,7 +111,7 @@ async function POSTHandler(req: NextRequest) {
 
     const values: Record<string, Prisma.Decimal> = {};
     for (const f of MONEY_FIELDS) {
-      const parsed = parseMoney(body[f], isAdjustment);
+      const parsed = parseSignedMoney(body[f], isAdjustment);
       if (!parsed)
         return fail(
           "BAD_INPUT",
@@ -128,7 +131,7 @@ async function POSTHandler(req: NextRequest) {
     };
     if (isAdjustment) {
       for (const f of ADJUSTMENT_EARNING_FIELDS) {
-        const parsed = parseMoney(body[f], true);
+        const parsed = parseSignedMoney(body[f], true);
         if (!parsed)
           return fail(
             "BAD_INPUT",

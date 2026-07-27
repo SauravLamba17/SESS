@@ -9,6 +9,7 @@ import { getEmployeeByClerkId } from "@/lib/data/scope";
 import { answeredSurveyIds } from "@/lib/engagement/pulse";
 import { ModulePaused } from "@/components/engagement/module-paused";
 import { engagementEnabled } from "@/lib/system-settings";
+import { ErrorPanel, UnlinkedEmployeeNotice } from "@/components/ui/notice";
 
 export const dynamic = "force-dynamic";
 
@@ -66,10 +67,7 @@ export default async function PulsePage() {
       />
 
       {error && (
-        <Panel className="mb-5 flex items-center gap-3 px-4 py-3">
-          <StatusDot state="danger" />
-          <span className="text-sm text-danger">{error}</span>
-        </Panel>
+        <ErrorPanel>{error}</ErrorPanel>
       )}
 
       <Panel className="mb-5 px-4 py-3">
@@ -89,13 +87,8 @@ export default async function PulsePage() {
       </Panel>
 
       {!me && (
-        <Panel className="mb-5 flex items-center gap-3 px-4 py-3">
-          <StatusDot state="warn" />
-          <span className="text-sm text-text-muted">
-            No employee record is linked to your account yet, so you can&apos;t
-            respond.
-          </span>
-        </Panel>
+        <UnlinkedEmployeeNotice>No employee record is linked to your account yet, so you can&apos;t
+            respond.</UnlinkedEmployeeNotice>
       )}
 
       {surveys.length === 0 ? (

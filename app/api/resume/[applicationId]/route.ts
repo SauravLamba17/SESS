@@ -2,13 +2,11 @@ import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { readResume } from "@/lib/recruitment/storage";
 import { resolveRecruitmentScope, canAccessApplication } from "@/lib/recruitment/access";
+import { withPrivilegedRoute } from "@/lib/mfa-guard";
+import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function fail(code: string, error: string, status: number) {
-  return NextResponse.json({ error, code }, { status });
-}
 
 /**
  * Serve a candidate's resume PDF — HR/Super Admin org-wide, Manager for their
@@ -20,8 +18,12 @@ function fail(code: string, error: string, status: number) {
  *
  * Keyed on applicationId rather than candidateId: access is granted by the
  * ROLE this candidate applied for, which is what carries the department.
+ *
+ * MFA-gated: a resume is candidate personal data and HR/Super Admin can read
+ * every one org-wide. The wrapper only blocks a role that requires MFA, so a
+ * Manager reading their own department's resumes is unaffected.
  */
-export async function GET(
+async function GETHandler(
   _req: NextRequest,
   { params }: { params: { applicationId: string } },
 ) {
@@ -68,3 +70,5 @@ export async function GET(
     return fail("SERVER_ERROR", "Could not load the resume", 503);
   }
 }
+
+export const GET = withPrivilegedRoute(GETHandler);

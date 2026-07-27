@@ -1,13 +1,20 @@
 import "server-only";
 import { cache } from "react";
 import { currentUser } from "@clerk/nextjs/server";
-import type { Role } from "@/lib/auth-types";
 import { getRealIdentity } from "@/lib/auth";
-import { ROLES_REQUIRING_MFA, roleRequiresMfa, mfaRedirectRequired } from "@/lib/mfa-policy";
+import { mfaEnforcementEnabled } from "@/lib/system-settings";
+import {
+  ROLES_REQUIRING_MFA,
+  roleRequiresMfa,
+  mfaRedirectRequired,
+  resolveMfaStatus,
+  type MfaStatus,
+} from "@/lib/mfa-policy";
 
 // Re-exported so callers have one import for the whole concern; the rule
 // itself lives in lib/mfa-policy.ts, which has no Clerk dependency.
 export { ROLES_REQUIRING_MFA, roleRequiresMfa, mfaRedirectRequired };
+export type { MfaStatus };
 
 /**
  * Role-conditional MFA enforcement.
@@ -41,60 +48,38 @@ export { ROLES_REQUIRING_MFA, roleRequiresMfa, mfaRedirectRequired };
  * lib/auth.ts uses for resolveIdentity().
  */
 
-export interface MfaStatus {
-  /** The REAL signed-in user's role — never the impersonated one. */
-  realRole: Role | null;
-  required: boolean;
-  enabled: boolean;
-  /** True when the user may proceed: either MFA isn't required, or it is on. */
-  satisfied: boolean;
-  /** Which factors are on, for the setup page's status display. */
-  factors: { totp: boolean; backupCode: boolean };
-}
-
-export const mfaStatus = cache(async (): Promise<MfaStatus> => {
-  // The REAL identity, deliberately: a Super Admin impersonating an Employee
-  // still holds Super Admin credentials, so the requirement follows the real
-  // account, not the role currently being viewed.
-  const { realRole } = await getRealIdentity();
-  const required = roleRequiresMfa(realRole);
-
-  if (!required) {
-    return {
-      realRole,
-      required: false,
-      enabled: false,
-      satisfied: true,
-      factors: { totp: false, backupCode: false },
-    };
-  }
-
-  try {
-    const user = await currentUser();
-    const enabled = user?.twoFactorEnabled === true;
-    return {
-      realRole,
-      required: true,
-      enabled,
-      satisfied: enabled,
-      factors: {
-        totp: user?.totpEnabled === true,
-        backupCode: user?.backupCodeEnabled === true,
+/**
+ * The one MFA check in the app. Both portal layout gates, the
+ * withPrivilegedRoute wrapper and the reports route call THIS — the
+ * enforcement toggle is honoured in exactly one place (the resolver in
+ * lib/mfa-policy.ts) and is deliberately not re-checked by any caller.
+ *
+ * Memoized per request with React cache(), so a layout render and a route
+ * handler in the same request share one toggle read and at most one Clerk call.
+ */
+export const mfaStatus = cache(
+  (): Promise<MfaStatus> =>
+    resolveMfaStatus({
+      // FIRST. When this is false nothing below runs — see lib/mfa-policy.ts.
+      enforcementEnabled: mfaEnforcementEnabled,
+      // The REAL identity, deliberately: a Super Admin impersonating an
+      // Employee still holds Super Admin credentials, so the requirement
+      // follows the real account, not the role currently being viewed.
+      realRole: async () => (await getRealIdentity()).realRole,
+      // The only Clerk Backend API call in this feature. Unreached whenever
+      // enforcement is off or the role does not require a second factor.
+      fetchUserFacts: async () => {
+        const user = await currentUser();
+        return user
+          ? {
+              twoFactorEnabled: user.twoFactorEnabled === true,
+              totpEnabled: user.totpEnabled === true,
+              backupCodeEnabled: user.backupCodeEnabled === true,
+            }
+          : null;
       },
-    };
-  } catch (err) {
-    // FAIL CLOSED. If Clerk cannot be reached we cannot prove MFA is on, and
-    // this gate protects payroll and personal data — the safe answer to "is
-    // this privileged account protected?" is no. The user sees the setup page
-    // with a "could not verify" note rather than being silently let through.
-    console.error("[mfa] could not read MFA status from Clerk:", err);
-    return {
-      realRole,
-      required: true,
-      enabled: false,
-      satisfied: false,
-      factors: { totp: false, backupCode: false },
-    };
-  }
-});
+      onError: (err) =>
+        console.error("[mfa] could not read MFA status from Clerk:", err),
+    }),
+);
 

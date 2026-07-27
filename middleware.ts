@@ -1,6 +1,6 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { ROUTE_ACCESS, portalForPath, type Role } from "@/lib/auth-types";
+import { canAccessPath, coerceRole, portalForPath } from "@/lib/auth-types";
 import { IMP_COOKIE, verifyImpersonation } from "@/lib/impersonation";
 
 const isPortalRoute = createRouteMatcher([
@@ -53,18 +53,6 @@ const isSharedAuthedRoute = createRouteMatcher([
   "/mfa-required(.*)",
 ]);
 
-function coerceRole(value: unknown): Role | null {
-  if (
-    value === "EMPLOYEE" ||
-    value === "MANAGER" ||
-    value === "HR" ||
-    value === "SUPER_ADMIN"
-  ) {
-    return value;
-  }
-  return null;
-}
-
 export default clerkMiddleware(async (auth, req) => {
   // Public career surface: never gated, never role-checked.
   if (isPublicRoute(req)) return;
@@ -96,7 +84,14 @@ export default clerkMiddleware(async (auth, req) => {
   const portal = portalForPath(req.nextUrl.pathname);
 
   // Signed in but (effective) role not allowed for this portal → bounce.
-  if (portal && (!role || !ROUTE_ACCESS[portal].includes(role))) {
+  //
+  // The ROUTE_ACCESS lookup itself lives once, in canAccessPath(). The `portal`
+  // guard still has to be here and cannot fold into that call: canAccessPath
+  // takes a non-null Role, and a signed-in user whose token carries no
+  // recognisable role must still reach the shared non-portal routes
+  // (/community, /pulse, /account, /mfa-required) — portalForPath() returns
+  // null for those, so they fall through untouched, exactly as before.
+  if (portal && (!role || !canAccessPath(role, req.nextUrl.pathname))) {
     return NextResponse.redirect(new URL("/", req.url));
   }
 });

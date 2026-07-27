@@ -3,13 +3,10 @@ import { getEffectiveUserId, getCurrentRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { withPrivilegedRoute } from "@/lib/mfa-guard";
 import { lateMinutesForShift } from "@/lib/attendance/validation";
+import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function fail(code: string, error: string, status: number) {
-  return NextResponse.json({ error, code }, { status });
-}
 
 /** "HH:MM" applied to an existing day, preserving that day's date. */
 function timeOnDay(day: Date, hhmm: string): Date | null {

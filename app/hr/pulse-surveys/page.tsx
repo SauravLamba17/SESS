@@ -1,13 +1,13 @@
 import { ShieldCheck } from "lucide-react";
 import { PageHeader } from "@/components/portal/portal-shell";
 import { Panel, PanelHeader } from "@/components/ui/panel";
-import { StatusDot } from "@/components/ui/status-dot";
 import {
   PulseSurveyForm,
   SurveyToggleButton,
 } from "@/components/hr/pulse-survey-manager";
 import { db } from "@/lib/db";
 import { aggregateSurveys, type PulseAggregate } from "@/lib/engagement/pulse";
+import { ErrorPanel } from "@/components/ui/notice";
 
 export const dynamic = "force-dynamic";
 
@@ -53,10 +53,7 @@ export default async function PulseSurveysPage() {
       />
 
       {error && (
-        <Panel className="mb-5 flex items-center gap-3 px-4 py-3">
-          <StatusDot state="danger" />
-          <span className="text-sm text-danger">{error}</span>
-        </Panel>
+        <ErrorPanel>{error}</ErrorPanel>
       )}
 
       <Panel className="mb-5 px-4 py-3">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useFileDownload } from "./use-file-download";
 import { Download, Loader2, Sheet } from "lucide-react";
 import { Panel, PanelHeader } from "@/components/ui/panel";
 import { StatusDot } from "@/components/ui/status-dot";
@@ -39,10 +40,7 @@ export function ReportList({
 }) {
   const [start, setStart] = useState(defaultStart);
   const [end, setEnd] = useState(defaultEnd);
-  const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const rangeValid = start !== "" && end !== "" && start <= end;
+  const { busy, error, rangeValid, download: run } = useFileDownload(start, end);
 
   /**
    * One download path for both formats — same endpoint, same query, only
@@ -50,37 +48,14 @@ export function ReportList({
    * once and renders whichever format was asked for, so the CSV a user
    * downloads always matches the PDF beside it.
    */
-  async function download(report: ReportDef, format: "pdf" | "csv") {
-    setError(null);
-    if (!rangeValid) {
-      setError("Choose a start date on or before the end date.");
-      return;
-    }
-    setBusy(`${report.id}:${format}`);
-    try {
-      const res = await fetch(
-        `/api/reports/${report.id}?startDate=${start}&endDate=${end}&format=${format}`,
-      );
-      if (!res.ok) {
-        // The API always answers { error, code } on failure.
-        const data = await res.json().catch(() => ({}));
-        setError(data.error ?? `Could not generate the ${report.title} report.`);
-        return;
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${report.id}-${start}-to-${end}.${format}`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch {
-      setError("Network error while generating the report.");
-    } finally {
-      setBusy(null);
-    }
+  function download(report: ReportDef, format: "pdf" | "csv") {
+    return run({
+      key: `${report.id}:${format}`,
+      url: `/api/reports/${report.id}?startDate=${start}&endDate=${end}&format=${format}`,
+      filename: `${report.id}-${start}-to-${end}.${format}`,
+      failMessage: `Could not generate the ${report.title} report.`,
+      networkMessage: "Network error while generating the report.",
+    });
   }
 
   return (

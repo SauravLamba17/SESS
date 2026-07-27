@@ -5,6 +5,7 @@ import { StatusDot } from "@/components/ui/status-dot";
 import { OfferApproveButton } from "@/components/admin/offer-approve-button";
 import { db } from "@/lib/db";
 import { inr } from "@/lib/payroll/format";
+import { ErrorPanel } from "@/components/ui/notice";
 
 export const dynamic = "force-dynamic";
 
@@ -63,10 +64,7 @@ export default async function OfferApprovalPage() {
       />
 
       {error && (
-        <Panel className="mb-5 flex items-center gap-3 px-4 py-3">
-          <StatusDot state="danger" />
-          <span className="text-sm text-danger">{error}</span>
-        </Panel>
+        <ErrorPanel>{error}</ErrorPanel>
       )}
 
       <Panel className="mb-6">

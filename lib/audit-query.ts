@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { parseDateOnly } from "./period.ts";
 
 /**
  * Audit-log query construction — pure, so the filter/pagination logic is
@@ -23,13 +24,15 @@ export interface AuditFilters {
   pageSize?: number;
 }
 
-/** Parse a YYYY-MM-DD string to local midnight, or null. */
-export function parseDateOnly(v: string | null | undefined): Date | null {
-  if (!v || !/^\d{4}-\d{2}-\d{2}$/.test(v.trim())) return null;
-  const [y, m, d] = v.trim().split("-").map(Number);
-  const dt = new Date(y, m - 1, d);
-  return Number.isNaN(dt.getTime()) ? null : dt;
-}
+/**
+ * Re-exported so existing importers keep working. The implementation moved to
+ * lib/period.ts — the copy that used to live here checked only the SHAPE and
+ * then trusted `Number.isNaN(dt.getTime())`, which never fires for a
+ * calendar-overflow date. A filter of from=2026-02-30 silently became
+ * 2 March 2026 and quietly dropped two days of audit entries from the result
+ * instead of being rejected as the bad input it is.
+ */
+export { parseDateOnly };
 
 export interface ResolvedAuditQuery {
   where: Prisma.AuditLogWhereInput;

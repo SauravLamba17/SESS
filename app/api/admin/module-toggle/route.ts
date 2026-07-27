@@ -3,19 +3,17 @@ import { getEffectiveUserId, getCurrentRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { MODULE_KEYS, VALIDATION_MODES } from "@/lib/system-settings";
 import { withPrivilegedRoute } from "@/lib/mfa-guard";
+import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function fail(code: string, error: string, status: number) {
-  return NextResponse.json({ error, code }, { status });
-}
-
-/** key → what counts as a valid value. Only the three real toggles exist. */
+/** key → what counts as a valid value. Only the real toggles exist. */
 const ALLOWED: Record<string, (v: string) => boolean> = {
   [MODULE_KEYS.idleTracking]: (v) => v === "true" || v === "false",
   [MODULE_KEYS.engagement]: (v) => v === "true" || v === "false",
   [MODULE_KEYS.attendanceValidation]: (v) => (VALIDATION_MODES as string[]).includes(v),
+  [MODULE_KEYS.mfaEnforcement]: (v) => v === "true" || v === "false",
 };
 
 /**

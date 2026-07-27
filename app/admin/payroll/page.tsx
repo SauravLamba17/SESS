@@ -4,6 +4,7 @@ import { StatusDot } from "@/components/ui/status-dot";
 import { PayrollRunActions } from "@/components/hr/payroll-run-actions";
 import { db } from "@/lib/db";
 import { inr, periodLabel } from "@/lib/payroll/format";
+import { ErrorPanel } from "@/components/ui/notice";
 
 export const dynamic = "force-dynamic";
 
@@ -58,10 +59,7 @@ export default async function PayrollFinalizationPage() {
       />
 
       {error && (
-        <Panel className="mb-5 flex items-center gap-3 px-4 py-3">
-          <StatusDot state="danger" />
-          <span className="text-sm text-danger">{error}</span>
-        </Panel>
+        <ErrorPanel>{error}</ErrorPanel>
       )}
 
       <Panel className="mb-6">

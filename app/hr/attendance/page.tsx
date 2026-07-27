@@ -5,6 +5,7 @@ import { StatusDot, type StatusState } from "@/components/ui/status-dot";
 import { AttendanceCorrection } from "@/components/hr/attendance-correction";
 import { db } from "@/lib/db";
 import { parseRange, currentMonthRange, ymd } from "@/lib/reports/range";
+import { ErrorPanel } from "@/components/ui/notice";
 
 export const dynamic = "force-dynamic";
 
@@ -154,10 +155,7 @@ export default async function AttendanceOversight({
       />
 
       {error && (
-        <Panel className="mb-5 flex items-center gap-3 px-4 py-3">
-          <StatusDot state="danger" />
-          <span className="text-sm text-danger">{error}</span>
-        </Panel>
+        <ErrorPanel>{error}</ErrorPanel>
       )}
 
       <div className="mb-5 grid grid-cols-2 gap-4 xl:grid-cols-4">

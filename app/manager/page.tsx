@@ -7,6 +7,7 @@ import { getEmployeeByClerkId, getDirectReports } from "@/lib/data/scope";
 import { currentPeriod } from "@/lib/period";
 import { TodayWidgets } from "@/components/engagement/today-widgets";
 import { loadToday } from "@/lib/engagement/today";
+import { ErrorPanel, UnlinkedEmployeeNotice } from "@/components/ui/notice";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,14 @@ function productionState(pct: number | null): StatusState {
   return "danger";
 }
 
+/** Same thresholds as the Team Quality page, so a score reads identically in both. */
+function qualityState(score: number | null): StatusState {
+  if (score === null) return "idle";
+  if (score >= 90) return "good";
+  if (score >= 75) return "warn";
+  return "danger";
+}
+
 async function load() {
   const userId = await getEffectiveUserId();
   if (!userId) return { manager: null, error: null };
@@ -38,7 +47,7 @@ async function load() {
     const scope = { managerId: manager.id };
 
     // All set-based aggregates — independent of team size (no N+1).
-    const [totals, lates, actuals, targets, pendingApprovals] = await Promise.all([
+    const [totals, lates, actuals, targets, pendingApprovals, quality] = await Promise.all([
       db.attendance.groupBy({
         by: ["employeeId"],
         where: { employee: scope, date: inMonth },
@@ -56,12 +65,22 @@ async function load() {
       }),
       db.monthlyTarget.findMany({ where: { period, employeeId: { in: ids } } }),
       db.leaveRequest.count({ where: { status: "PENDING", employee: scope } }),
+      // Same query the Team Quality page runs for the same manager's reports:
+      // this month's rows, newest first, so the first row per employee is the
+      // latest. One query for the whole team — no N+1.
+      db.qualityReport.findMany({
+        where: { employeeId: { in: ids }, date: inMonth },
+        orderBy: { date: "desc" },
+        select: { employeeId: true, qualityScore: true, date: true },
+      }),
     ]);
 
     const totalBy = new Map(totals.map((g) => [g.employeeId, g._count._all]));
     const lateBy = new Map(lates.map((g) => [g.employeeId, g._count._all]));
     const actualBy = new Map(actuals.map((a) => [a.employeeId, a._sum.unitsProduced ?? 0]));
     const targetBy = new Map(targets.map((t) => [t.employeeId, t.targetUnits]));
+    const qualityBy = new Map<string, number>();
+    for (const q of quality) if (!qualityBy.has(q.employeeId)) qualityBy.set(q.employeeId, q.qualityScore);
 
     const rows = reports.map((r) => {
       const total = totalBy.get(r.id) ?? 0;
@@ -70,7 +89,8 @@ async function load() {
       const actual = actualBy.get(r.id) ?? 0;
       const target = targetBy.get(r.id) ?? null;
       const prodPct = target && target > 0 ? Math.round((actual / target) * 100) : null;
-      return { r, punctuality, actual, target, prodPct };
+      const quality = qualityBy.get(r.id) ?? null;
+      return { r, punctuality, actual, target, prodPct, quality };
     });
 
     const totalLate = lates.reduce((s, g) => s + g._count._all, 0);
@@ -94,19 +114,11 @@ export default async function ManagerDashboard() {
       <TodayWidgets data={today} />
 
       {data.error && (
-        <Panel className="mb-5 flex items-center gap-3 px-4 py-3">
-          <StatusDot state="danger" />
-          <span className="text-sm text-danger">{data.error}</span>
-        </Panel>
+        <ErrorPanel>{data.error}</ErrorPanel>
       )}
 
       {!data.manager && !data.error && (
-        <Panel className="mb-5 flex items-center gap-3 px-4 py-3">
-          <StatusDot state="warn" />
-          <span className="text-sm text-text-muted">
-            No employee record is linked to your account yet.
-          </span>
-        </Panel>
+        <UnlinkedEmployeeNotice />
       )}
 
       {data.manager && (
@@ -154,7 +166,7 @@ export default async function ManagerDashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {data.rows.map(({ r, punctuality, actual, target, prodPct }) => (
+                    {data.rows.map(({ r, punctuality, actual, target, prodPct, quality }) => (
                       <tr key={r.id}>
                         <td className="px-4 py-3">
                           <div className="text-text">{r.name}</div>
@@ -186,10 +198,19 @@ export default async function ManagerDashboard() {
                           </span>
                         </td>
                         <td className="px-4 py-3">
-                          {/* QualityReport data lands in Phase 3. */}
+                          {/* Latest quality score this month — same source and
+                              thresholds as the Team Quality page. */}
                           <span className="inline-flex items-center gap-2">
-                            <StatusDot state="idle" />
-                            <span className="font-mono text-text-muted">—</span>
+                            <StatusDot state={qualityState(quality)} />
+                            <span
+                              className={
+                                quality === null
+                                  ? "font-mono text-text-muted"
+                                  : "font-mono text-text"
+                              }
+                            >
+                              {quality === null ? "—" : quality}
+                            </span>
                           </span>
                         </td>
                       </tr>

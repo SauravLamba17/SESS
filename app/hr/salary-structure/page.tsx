@@ -6,6 +6,7 @@ import { SalaryAdvanceForm } from "@/components/hr/salary-advance-form";
 import { db } from "@/lib/db";
 import { inr } from "@/lib/payroll/format";
 import { buildSalaryTimeline, ymd as salaryYmd } from "@/lib/payroll/salary-history";
+import { ErrorPanel } from "@/components/ui/notice";
 
 export const dynamic = "force-dynamic";
 
@@ -61,10 +62,7 @@ export default async function SalaryStructurePage() {
       />
 
       {error && (
-        <Panel className="mb-5 flex items-center gap-3 px-4 py-3">
-          <StatusDot state="danger" />
-          <span className="text-sm text-danger">{error}</span>
-        </Panel>
+        <ErrorPanel>{error}</ErrorPanel>
       )}
 
       <Panel className="mb-5 flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 text-sm">

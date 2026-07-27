@@ -1,5 +1,6 @@
 "use client";
 
+import { isDateOnly } from "@/lib/period";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Download, Loader2, Lock } from "lucide-react";
@@ -89,7 +90,7 @@ export function OfferPanel({
       setError("Designation and department are required.");
       return;
     }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(joiningDate)) {
+    if (!isDateOnly(joiningDate)) {
       setError("Choose a joining date.");
       return;
     }

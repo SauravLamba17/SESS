@@ -1,25 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { Prisma } from "@prisma/client";
 import { getEffectiveUserId, getCurrentRole } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { parseMoney } from "@/lib/payroll/money";
 import { withPrivilegedRoute } from "@/lib/mfa-guard";
+import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function fail(code: string, error: string, status: number) {
-  return NextResponse.json({ error, code }, { status });
-}
-
-function parseMoney(v: unknown): Prisma.Decimal | null {
-  const s = typeof v === "number" ? String(v) : typeof v === "string" ? v.trim() : "";
-  if (!/^\d{1,10}(\.\d{1,2})?$/.test(s)) return null;
-  try {
-    return new Prisma.Decimal(s);
-  } catch {
-    return null;
-  }
-}
 
 /** Issue a salary advance. remainingBalance starts equal to the principal. */
 async function POSTHandler(req: NextRequest) {

@@ -60,13 +60,9 @@ export interface IdleTimeResult {
   byDepartment: IdleDepartmentRow[];
 }
 
-/** "6h 30m" from minutes — same formatting as lib/idle/aggregate.ts's hm(). */
-export function hm(minutes: number): string {
-  if (minutes <= 0) return "0m";
-  const h = Math.floor(minutes / 60);
-  const m = Math.round(minutes % 60);
-  return h > 0 ? `${h}h ${m}m` : `${m}m`;
-}
+// Re-exported so lib/reports/pdf/idle-time.tsx keeps importing it from here;
+// the implementation is shared with the idle dashboards.
+export { hm } from "../idle/format.ts";
 
 export function computeIdleTime(
   rows: IdleRow[],

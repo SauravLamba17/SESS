@@ -5,13 +5,11 @@ import { db } from "@/lib/db";
 import { getEmployeeByClerkId } from "@/lib/data/scope";
 import { financialYearMonths } from "@/lib/period";
 import { renderForm16 } from "@/lib/payroll/pdf";
+import { withPrivilegedRoute } from "@/lib/mfa-guard";
+import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function fail(code: string, error: string, status: number) {
-  return NextResponse.json({ error, code }, { status });
-}
 
 /**
  * Form 16 Part B for one employee and one financial year (April–March).
@@ -23,8 +21,12 @@ function fail(code: string, error: string, status: number) {
  *
  * FINALIZED rows only. A partial year is labelled as partial in the document;
  * missing months are never estimated or fabricated.
+ *
+ * MFA-gated: HR/Super Admin may request ANY employee's annual earnings and TDS
+ * via ?employeeId. The wrapper only blocks a role that requires MFA, so an
+ * employee fetching their own Form 16 is unaffected.
  */
-export async function GET(req: NextRequest) {
+async function GETHandler(req: NextRequest) {
   const userId = await getEffectiveUserId();
   if (!userId) return fail("UNAUTHENTICATED", "Not authenticated", 401);
 
@@ -132,3 +134,5 @@ export async function GET(req: NextRequest) {
     return fail("SERVER_ERROR", "Could not generate the Form 16 statement", 503);
   }
 }
+
+export const GET = withPrivilegedRoute(GETHandler);

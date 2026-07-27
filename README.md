@@ -117,7 +117,7 @@ components/
   brand/logo.tsx          Gauge/dial mark + wordmark
   ui/status-dot.tsx       Signature 7px glowing status dot (good/warn/danger/idle)
   ui/panel.tsx            Panel + StatCard
-  portal/                 Sidebar, PortalShell, PageHeader, ModuleStub
+  portal/                 Sidebar, PortalShell, PageHeader
 lib/
   auth-types.ts           Client-safe: Role type, label/route maps, nav, permission scoping
   auth.ts                 Server-only: getCurrentRole() via Clerk auth()

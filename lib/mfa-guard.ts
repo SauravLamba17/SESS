@@ -1,7 +1,7 @@
 import "server-only";
-import { NextResponse } from "next/server";
 import { mfaStatus } from "@/lib/mfa";
 import { mfaGateOutcome } from "@/lib/mfa-policy";
+import { fail } from "@/lib/api/response";
 
 /**
  * MFA gate for privileged API route handlers.
@@ -33,11 +33,6 @@ import { mfaGateOutcome } from "@/lib/mfa-policy";
  * The rule for WHICH roles require MFA is not restated here — it lives once in
  * lib/mfa-policy.ts and reaches this file through lib/mfa.ts.
  */
-
-/** Same { error, code } shape every other route in this codebase returns. */
-function fail(code: string, error: string, status: number) {
-  return NextResponse.json({ error, code }, { status });
-}
 
 /**
  * Wrap a route handler so it only runs once the MFA requirement is satisfied.

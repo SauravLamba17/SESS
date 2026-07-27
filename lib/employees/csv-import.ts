@@ -9,6 +9,7 @@
  * in one transaction. Rationale in the route; the split here is that parsing
  * and validation never touch the database at all.
  */
+import { parseDateOnly } from "../period.ts";
 
 export const CSV_COLUMNS = [
   "employeeCode",
@@ -89,17 +90,6 @@ export function splitCsvLine(line: string): string[] {
   return out.map((s) => s.trim());
 }
 
-function parseDateOnly(v: string): Date | null {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v.trim());
-  if (!m) return null;
-  const y = Number(m[1]);
-  const mo = Number(m[2]);
-  const d = Number(m[3]);
-  const dt = new Date(y, mo - 1, d);
-  // Reject 2026-02-30 style dates, which Date silently rolls over.
-  if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null;
-  return dt;
-}
 
 export interface ValidationContext {
   /** employeeCodes already in the database (any status). */

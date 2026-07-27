@@ -4,13 +4,10 @@ import { getEffectiveUserId, getCurrentRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { renderOfferLetter } from "@/lib/payroll/pdf";
 import { withPrivilegedRoute } from "@/lib/mfa-guard";
+import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function fail(code: string, error: string, status: number) {
-  return NextResponse.json({ error, code }, { status });
-}
 
 /** Statuses whose figures a Super Admin has authorised, so the letter is real. */
 const DOWNLOADABLE = ["APPROVED", "SENT", "ACCEPTED", "DECLINED"];

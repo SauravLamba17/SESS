@@ -7,6 +7,7 @@ import { AgentTokenManager } from "@/components/hr/agent-token-manager";
 import { db } from "@/lib/db";
 import { getActiveEmployees } from "@/lib/data/scope";
 import { idleConsentStates, consentLabel } from "@/lib/idle/consent";
+import { ErrorPanel } from "@/components/ui/notice";
 
 export const dynamic = "force-dynamic";
 
@@ -73,10 +74,7 @@ export default async function CompliancePage() {
       />
 
       {error && (
-        <Panel className="mb-5 flex items-center gap-3 px-4 py-3">
-          <StatusDot state="danger" />
-          <span className="text-sm text-danger">{error}</span>
-        </Panel>
+        <ErrorPanel>{error}</ErrorPanel>
       )}
 
       <div className="space-y-6">

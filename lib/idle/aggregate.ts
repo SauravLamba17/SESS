@@ -141,13 +141,9 @@ export async function ownIdleTotals(
   };
 }
 
-/** "6h 30m" from minutes. */
-export function hm(minutes: number): string {
-  if (minutes <= 0) return "0m";
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return h > 0 ? `${h}h ${m}m` : `${m}m`;
-}
+// Re-exported so the three dashboards that already import { hm } from here
+// keep working; the implementation is shared with the reports module.
+export { hm } from "./format.ts";
 
 /** How stale is an agent? Used to flag a machine that has gone silent. */
 export function agentFreshness(

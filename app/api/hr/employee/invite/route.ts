@@ -5,13 +5,10 @@ import { sendEmployeeInvitation } from "@/lib/employees/invite";
 import { clerkCreateInvitation } from "@/lib/employees/invite-clerk";
 import { ROLES, type Role } from "@/lib/auth-types";
 import { withPrivilegedRoute } from "@/lib/mfa-guard";
+import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function fail(code: string, error: string, status: number) {
-  return NextResponse.json({ error, code }, { status });
-}
 
 /**
  * Send (or resend) a Clerk login invitation for an existing employee — the

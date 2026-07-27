@@ -2,14 +2,12 @@ import { NextResponse, type NextRequest } from "next/server";
 import { Prisma } from "@prisma/client";
 import { getEffectiveUserId, getCurrentRole } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { parseDateOnly } from "@/lib/period";
 import { withPrivilegedRoute } from "@/lib/mfa-guard";
+import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function fail(code: string, error: string, status: number) {
-  return NextResponse.json({ error, code }, { status });
-}
 
 function str(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
@@ -70,13 +68,9 @@ async function POSTHandler(req: NextRequest) {
     return fail("BAD_INPUT", "Basic must be greater than zero", 400);
   if (!proposedDesignation || !proposedDepartment)
     return fail("BAD_INPUT", "proposedDesignation and proposedDepartment are required", 400);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(joiningDateStr))
+  const joiningDate = parseDateOnly(joiningDateStr);
+  if (!joiningDate)
     return fail("BAD_INPUT", "joiningDate must be a valid YYYY-MM-DD date", 400);
-
-  const [y, m, d] = joiningDateStr.split("-").map(Number);
-  const joiningDate = new Date(y, m - 1, d);
-  if (Number.isNaN(joiningDate.getTime()))
-    return fail("BAD_INPUT", "joiningDate is not a valid date", 400);
 
   try {
     const application = await db.application.findUnique({

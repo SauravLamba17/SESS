@@ -11,6 +11,7 @@ import { db } from "@/lib/db";
 import { currentPeriod, isPeriod, financialYearOf } from "@/lib/period";
 import { inr, periodLabel, PAYROLL_STATUS_DOT } from "@/lib/payroll/format";
 import { linkAdjustments, adjustmentLabel } from "@/lib/payroll/adjustments";
+import { ErrorPanel } from "@/components/ui/notice";
 
 export const dynamic = "force-dynamic";
 
@@ -215,10 +216,7 @@ export default async function HRPayrollPage({
       />
 
       {error && (
-        <Panel className="mb-5 flex items-center gap-3 px-4 py-3">
-          <StatusDot state="danger" />
-          <span className="text-sm text-danger">{error}</span>
-        </Panel>
+        <ErrorPanel>{error}</ErrorPanel>
       )}
 
       {/* Native month input + GET form — no client state needed to pick a period. */}

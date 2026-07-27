@@ -29,6 +29,14 @@ const E_CONSENT = "zz-ret-consent@example.invalid";
 const E_PASTDUE = "zz-ret-pastdue@example.invalid";
 const ALL_EMAILS = [E_NOCONSENT, E_CONSENT, E_PASTDUE];
 
+// The suite's OWN Employee + linked HR User. Step 0 needs any employee to hang
+// a ClientMail row on, and step 2's notification fan-out needs an active
+// Employee whose User role is HR. Both used to borrow whatever happened to be
+// in the database — which broke as soon as the seeded demo accounts were
+// removed. Created and deleted here instead.
+const HR_CODE = "ZZ-RET-HR";
+const HR_CLERK = "test-ret-hr-user";
+
 let pass = 0;
 let fail = 0;
 
@@ -65,6 +73,20 @@ async function cleanup() {
   await db.jobRequisition.deleteMany({ where: { title: { startsWith: TAG } } });
   await db.notification.deleteMany({ where: { message: { contains: TAG } } });
   await db.auditLog.deleteMany({ where: { actorUserId: { in: [HR, ADMIN] } } });
+
+  // The suite's own HR employee: dependent rows, then the User that links it,
+  // then the Employee (User.employeeId → Employee).
+  const fixtures = await db.employee.findMany({
+    where: { employeeCode: HR_CODE },
+    select: { id: true },
+  });
+  const fIds = fixtures.map((e) => e.id);
+  if (fIds.length > 0) {
+    await db.clientMail.deleteMany({ where: { employeeId: { in: fIds } } });
+    await db.notification.deleteMany({ where: { employeeId: { in: fIds } } });
+  }
+  await db.user.deleteMany({ where: { clerkId: HR_CLERK } });
+  await db.employee.deleteMany({ where: { employeeCode: HR_CODE } });
 }
 
 async function main() {
@@ -74,26 +96,34 @@ async function main() {
 
     // ── STEP 0: RENAME ──────────────────────────────────────────────
     step("0", "ClientMail.summary rename");
-    const emp = await db.employee.findFirst({ select: { id: true } });
-    if (emp) {
-      const mail = await db.clientMail.create({
-        data: {
-          employeeId: emp.id,
-          subject: `${TAG} subject`,
-          summary: "Manager-typed text, no AI involved.",
-          date: new Date(),
-        },
-      });
-      check("0a ClientMail.summary accepts and stores text",
-        mail.summary === "Manager-typed text, no AI involved.", `summary="${mail.summary}"`);
-      check("0b field is named `summary` on the Prisma client",
-        Object.prototype.hasOwnProperty.call(mail, "summary") &&
-          !Object.prototype.hasOwnProperty.call(mail, "summaryViaClaude"),
-        `keys include summary=${"summary" in mail}, summaryViaClaude=${"summaryViaClaude" in mail}`);
-      await db.clientMail.delete({ where: { id: mail.id } });
-    } else {
-      check("0a ClientMail rename", false, "no employee available to test against");
-    }
+    // This suite's own employee, created here rather than borrowed from
+    // whatever rows happen to exist — see HR_CODE above.
+    const emp = await db.employee.create({
+      data: {
+        employeeCode: HR_CODE,
+        name: `${TAG} HR Recipient`,
+        department: "People Ops",
+        designation: "HR Generalist",
+        joiningDate: new Date("2020-01-01"),
+      },
+    });
+    await db.user.create({ data: { clerkId: HR_CLERK, role: "HR", employeeId: emp.id } });
+
+    const mail = await db.clientMail.create({
+      data: {
+        employeeId: emp.id,
+        subject: `${TAG} subject`,
+        summary: "Manager-typed text, no AI involved.",
+        date: new Date(),
+      },
+    });
+    check("0a ClientMail.summary accepts and stores text",
+      mail.summary === "Manager-typed text, no AI involved.", `summary="${mail.summary}"`);
+    check("0b field is named `summary` on the Prisma client",
+      Object.prototype.hasOwnProperty.call(mail, "summary") &&
+        !Object.prototype.hasOwnProperty.call(mail, "summaryViaClaude"),
+      `keys include summary=${"summary" in mail}, summaryViaClaude=${"summaryViaClaude" in mail}`);
+    await db.clientMail.delete({ where: { id: mail.id } });
 
     // ── SETUP ───────────────────────────────────────────────────────
     step("SETUP", "requisition + three candidates");

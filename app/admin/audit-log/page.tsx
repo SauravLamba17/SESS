@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/portal/portal-shell";
 import { Panel, PanelHeader } from "@/components/ui/panel";
-import { StatusDot } from "@/components/ui/status-dot";
 import { PrintButton } from "@/components/ui/print-button";
 import { db } from "@/lib/db";
+import { ErrorPanel } from "@/components/ui/notice";
 import {
   buildAuditQuery,
   totalPages,
@@ -93,10 +93,7 @@ export default async function AuditLogPage({
       />
 
       {error && (
-        <Panel className="mb-5 flex items-center gap-3 px-4 py-3">
-          <StatusDot state="danger" />
-          <span className="text-sm text-danger">{error}</span>
-        </Panel>
+        <ErrorPanel>{error}</ErrorPanel>
       )}
 
       {/* GET form → filters live in the URL, so a filtered view is shareable

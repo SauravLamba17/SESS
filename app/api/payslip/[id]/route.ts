@@ -4,13 +4,11 @@ import { db } from "@/lib/db";
 import { getEmployeeByClerkId } from "@/lib/data/scope";
 import { renderPayslip } from "@/lib/payroll/pdf";
 import { periodLabel } from "@/lib/payroll/format";
+import { withPrivilegedRoute } from "@/lib/mfa-guard";
+import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function fail(code: string, error: string, status: number) {
-  return NextResponse.json({ error, code }, { status });
-}
 
 /**
  * Download one payslip as a PDF.
@@ -18,8 +16,12 @@ function fail(code: string, error: string, status: number) {
  * FINALIZED rows only — for EVERYONE, HR included. A DRAFT or SUBMITTED figure
  * is provisional; rendering it as "your payslip" would put a number in an
  * employee's hands that the Super Admin has not approved and may still change.
+ *
+ * MFA-gated: this serves salary figures, and HR/Super Admin can pull ANY
+ * employee's. The wrapper only blocks a role that requires MFA, so an employee
+ * fetching their own payslip is unaffected.
  */
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+async function GETHandler(_req: NextRequest, { params }: { params: { id: string } }) {
   const userId = await getEffectiveUserId();
   if (!userId) return fail("UNAUTHENTICATED", "Not authenticated", 401);
 
@@ -114,3 +116,5 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     return fail("SERVER_ERROR", "Could not generate the payslip", 503);
   }
 }
+
+export const GET = withPrivilegedRoute(GETHandler);

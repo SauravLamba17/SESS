@@ -10,6 +10,7 @@ import { BulkImport } from "@/components/hr/bulk-import";
 import { InviteButton } from "@/components/hr/invite-button";
 import { ShiftAssignSelect } from "@/components/shifts/shift-assign-select";
 import { getAllEmployees, getActiveEmployees, getActiveShifts } from "@/lib/data/scope";
+import { ErrorPanel } from "@/components/ui/notice";
 
 export const dynamic = "force-dynamic";
 
@@ -58,10 +59,7 @@ export default async function EmployeeMaster() {
       />
 
       {error && (
-        <Panel className="mb-5 flex items-center gap-3 px-4 py-3">
-          <StatusDot state="danger" />
-          <span className="text-sm text-danger">{error}</span>
-        </Panel>
+        <ErrorPanel>{error}</ErrorPanel>
       )}
 
       <div className="space-y-6">

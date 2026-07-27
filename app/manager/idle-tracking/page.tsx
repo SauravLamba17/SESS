@@ -5,6 +5,7 @@ import { StatusDot } from "@/components/ui/status-dot";
 import { getEmployeeByClerkId, getDirectReports } from "@/lib/data/scope";
 import { idleRowsFor, hm } from "@/lib/idle/aggregate";
 import { consentLabel } from "@/lib/idle/consent";
+import { ErrorPanel, UnlinkedEmployeeNotice } from "@/components/ui/notice";
 
 export const dynamic = "force-dynamic";
 
@@ -43,19 +44,11 @@ export default async function ManagerIdleTrackingPage() {
       />
 
       {error && (
-        <Panel className="mb-5 flex items-center gap-3 px-4 py-3">
-          <StatusDot state="danger" />
-          <span className="text-sm text-danger">{error}</span>
-        </Panel>
+        <ErrorPanel>{error}</ErrorPanel>
       )}
 
       {!manager && !error && (
-        <Panel className="mb-5 flex items-center gap-3 px-4 py-3">
-          <StatusDot state="warn" />
-          <span className="text-sm text-text-muted">
-            No employee record is linked to your account yet.
-          </span>
-        </Panel>
+        <UnlinkedEmployeeNotice />
       )}
 
       {manager && (

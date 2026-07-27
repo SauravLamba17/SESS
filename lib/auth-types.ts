@@ -7,6 +7,20 @@ export type Role = "EMPLOYEE" | "MANAGER" | "HR" | "SUPER_ADMIN";
 
 export const ROLES: Role[] = ["EMPLOYEE", "MANAGER", "HR", "SUPER_ADMIN"];
 
+/**
+ * Narrow an untrusted value (a Clerk session claim, a webhook payload's
+ * public_metadata) to a Role, or null.
+ *
+ * Lives here rather than in lib/auth.ts because all three callers need it and
+ * only one of them may import a server-only module: lib/auth.ts (server),
+ * middleware.ts (edge runtime) and the Clerk webhook route. Three private
+ * copies is how one of them silently stops recognising a role the other two
+ * accept.
+ */
+export function coerceRole(value: unknown): Role | null {
+  return ROLES.includes(value as Role) ? (value as Role) : null;
+}
+
 /** Strict hierarchy: SUPER_ADMIN > HR > MANAGER > EMPLOYEE. */
 export const ROLE_RANK: Record<Role, number> = {
   EMPLOYEE: 0,
@@ -65,12 +79,18 @@ export const ROUTE_ACCESS: Record<PortalKey, Role[]> = {
   admin: ["SUPER_ADMIN"],
 };
 
-/** Resolve a pathname to its owning portal, if any. */
+/**
+ * Resolve a pathname to its owning portal, if any.
+ *
+ * Driven off PORTAL_PREFIX rather than repeating the four prefix literals —
+ * they were previously written twice, so adding a portal meant remembering to
+ * edit both. Prefix order is PORTAL_PREFIX's insertion order, and the match is
+ * a plain startsWith, exactly as before.
+ */
 export function portalForPath(pathname: string): PortalKey | null {
-  if (pathname.startsWith("/employee")) return "employee";
-  if (pathname.startsWith("/manager")) return "manager";
-  if (pathname.startsWith("/hr")) return "hr";
-  if (pathname.startsWith("/admin")) return "admin";
+  for (const [key, prefix] of Object.entries(PORTAL_PREFIX)) {
+    if (pathname.startsWith(prefix)) return key as PortalKey;
+  }
   return null;
 }
 

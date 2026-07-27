@@ -2,6 +2,7 @@ import { UserCog, LogIn } from "lucide-react";
 import { db } from "@/lib/db";
 import { getRealIdentity, getImpersonation } from "@/lib/auth";
 import { startImpersonation, stopImpersonation } from "@/app/admin/impersonate/actions";
+import { demoModeEnabled } from "@/lib/impersonation";
 import { Panel, PanelHeader } from "@/components/ui/panel";
 import { StatusDot } from "@/components/ui/status-dot";
 import { ROLE_LABEL, ROLE_HOME } from "@/lib/auth-types";
@@ -14,8 +15,18 @@ const cardClass =
  * Admin (guarded server-side). Each card is a form whose action is a bound
  * server action — click sets the signed cookie and redirects. No dropdown,
  * no confirmation: click and go.
+ *
+ * The DEMO_MODE check is FIRST and returns null, so outside a demo deployment
+ * this renders nothing at all — no markup, no disabled buttons, and not even
+ * the user query below. Gating here rather than at the call site means any
+ * future page that mounts this component inherits the same behaviour.
+ *
+ * This is presentation only. The real authorization point is the server action
+ * in app/admin/impersonate/actions.ts, which refuses independently.
  */
 export async function ImpersonatePanel() {
+  if (!demoModeEnabled()) return null;
+
   const { realRole } = await getRealIdentity();
   if (realRole !== "SUPER_ADMIN") return null;
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { isDateOnly } from "@/lib/period";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -57,7 +58,7 @@ export function SalaryStructureForm({
       setError("Basic must be greater than zero.");
       return;
     }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(effectiveFrom)) {
+    if (!isDateOnly(effectiveFrom)) {
       setError("Choose an effective-from date.");
       return;
     }

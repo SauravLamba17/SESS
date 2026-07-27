@@ -1,28 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { Prisma } from "@prisma/client";
 import { getEffectiveUserId, getCurrentRole } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { parseMoney } from "@/lib/payroll/money";
+import { parseDateOnly } from "@/lib/period";
 import { withPrivilegedRoute } from "@/lib/mfa-guard";
 import { supersede } from "@/lib/payroll/salary-history";
+import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function fail(code: string, error: string, status: number) {
-  return NextResponse.json({ error, code }, { status });
-}
-
-/** Parse a money string to a non-negative Decimal, or null if malformed.
- *  Kept as a string all the way to Decimal — never through Number(). */
-function parseMoney(v: unknown): Prisma.Decimal | null {
-  const s = typeof v === "number" ? String(v) : typeof v === "string" ? v.trim() : "";
-  if (!/^\d{1,10}(\.\d{1,2})?$/.test(s)) return null;
-  try {
-    return new Prisma.Decimal(s);
-  } catch {
-    return null;
-  }
-}
 
 /**
  * Set an employee's salary structure.
@@ -50,10 +36,7 @@ async function POSTHandler(req: NextRequest) {
   const basic = parseMoney(body.basic);
   const hra = parseMoney(body.hra);
   const specialAllowance = parseMoney(body.specialAllowance);
-  const effectiveFrom =
-    typeof body.effectiveFrom === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.effectiveFrom)
-      ? new Date(`${body.effectiveFrom}T00:00:00`)
-      : null;
+  const effectiveFrom = parseDateOnly(body.effectiveFrom);
 
   if (!employeeId) return fail("BAD_INPUT", "employeeId is required", 400);
   if (!basic || !hra || !specialAllowance)
@@ -62,7 +45,7 @@ async function POSTHandler(req: NextRequest) {
       "basic, hra and specialAllowance must be non-negative amounts with at most 2 decimals",
       400,
     );
-  if (!effectiveFrom || Number.isNaN(effectiveFrom.getTime()))
+  if (!effectiveFrom)
     return fail("BAD_INPUT", "effectiveFrom must be a valid YYYY-MM-DD date", 400);
   if (basic.lessThanOrEqualTo(0))
     return fail("BAD_INPUT", "Basic must be greater than zero", 400);

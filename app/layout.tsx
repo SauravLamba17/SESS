@@ -27,7 +27,7 @@ const mono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: "SESS — Simplen Employee Self-Service",
   description:
-    "Camera-verified attendance, quality-linked production appraisals, and precision workforce measurement.",
+    "Attendance, quality-linked production appraisals, and precision workforce measurement.",
 };
 
 export default function RootLayout({

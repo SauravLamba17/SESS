@@ -1,15 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getEffectiveUserId, getCurrentRole } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { parseDateOnly } from "@/lib/period";
 import { aggregateSurvey } from "@/lib/engagement/pulse";
 import { withPrivilegedRoute } from "@/lib/mfa-guard";
+import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function fail(code: string, error: string, status: number) {
-  return NextResponse.json({ error, code }, { status });
-}
 
 /**
  * Create / close a pulse survey (HR + Super Admin).
@@ -76,13 +74,15 @@ async function POSTHandler(req: NextRequest) {
     let closesAt: Date | null = null;
     const closesStr = typeof body.closesAt === "string" ? body.closesAt.trim() : "";
     if (closesStr) {
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(closesStr))
+      const closesDay = parseDateOnly(closesStr);
+      if (!closesDay)
         return fail("BAD_INPUT", "closesAt must be a valid YYYY-MM-DD date", 400);
-      const [y, m, d] = closesStr.split("-").map(Number);
       // End of the chosen day, so a survey closing "today" is open all day.
-      closesAt = new Date(y, m - 1, d + 1);
-      if (Number.isNaN(closesAt.getTime()))
-        return fail("BAD_INPUT", "closesAt is not a valid date", 400);
+      closesAt = new Date(
+        closesDay.getFullYear(),
+        closesDay.getMonth(),
+        closesDay.getDate() + 1,
+      );
     }
 
     const created = await db.pulseSurvey.create({

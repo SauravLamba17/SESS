@@ -1,5 +1,6 @@
 "use client";
 
+import { isDateOnly } from "@/lib/period";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Loader2 } from "lucide-react";
@@ -48,7 +49,7 @@ export function InterviewFeedbackForm({
       setError("Interview notes are required.");
       return;
     }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(interviewDate)) {
+    if (!isDateOnly(interviewDate)) {
       setError("Choose the interview date.");
       return;
     }

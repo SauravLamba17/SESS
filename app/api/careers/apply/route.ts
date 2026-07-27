@@ -3,13 +3,10 @@ import { db } from "@/lib/db";
 import { storeResume } from "@/lib/recruitment/storage";
 import { checkRateLimit, clientIp } from "@/lib/recruitment/rate-limit";
 import { notifyHrOfApplication } from "@/lib/recruitment/notify";
+import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function fail(code: string, error: string, status: number, extra?: Record<string, unknown>) {
-  return NextResponse.json({ error, code, ...extra }, { status });
-}
 
 function str(v: FormDataEntryValue | null): string {
   return typeof v === "string" ? v.trim() : "";

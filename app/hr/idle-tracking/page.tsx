@@ -9,6 +9,7 @@ import { db } from "@/lib/db";
 import { idleRowsFor, hm, agentFreshness } from "@/lib/idle/aggregate";
 import { consentLabel } from "@/lib/idle/consent";
 import { idleThresholdSeconds } from "@/lib/idle/settings";
+import { ErrorPanel } from "@/components/ui/notice";
 
 export const dynamic = "force-dynamic";
 
@@ -49,10 +50,7 @@ export default async function HrIdleTrackingPage() {
       />
 
       {error && (
-        <Panel className="mb-5 flex items-center gap-3 px-4 py-3">
-          <StatusDot state="danger" />
-          <span className="text-sm text-danger">{error}</span>
-        </Panel>
+        <ErrorPanel>{error}</ErrorPanel>
       )}
 
       <Panel className="mb-5 px-4 py-3 print:hidden">

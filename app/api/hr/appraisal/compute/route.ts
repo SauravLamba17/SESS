@@ -11,13 +11,10 @@ import {
   type EmployeeMetrics,
 } from "@/lib/appraisal/compute";
 import { withPrivilegedRoute } from "@/lib/mfa-guard";
+import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function fail(code: string, error: string, status: number) {
-  return NextResponse.json({ error, code }, { status });
-}
 
 function parseWeights(raw: unknown): AppraisalWeights {
   const w = (raw ?? {}) as Record<string, unknown>;

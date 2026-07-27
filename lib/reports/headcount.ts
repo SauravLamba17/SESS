@@ -23,9 +23,10 @@ import { byCountDesc } from "./types.ts";
  * day after. Getting this backwards would make headcount disagree with the
  * payslip for exactly one day per leaver.
  *
- * Exported because hires-exits.ts and board-summary.ts need exactly this rule
- * for attrition denominators — a second copy of it is how two reports start
- * disagreeing about headcount.
+ * Exported to keep the rule stated exactly once — a second copy of it is how
+ * two reports start disagreeing about headcount. Callers reach it through
+ * headcountOn() rather than calling it directly (hires-exits.ts and
+ * app/admin/page.tsx both do), so it has no direct caller of its own today.
  */
 export function activeOn(e: ReportEmployee, date: Date): boolean {
   if (e.joiningDate > date) return false;

@@ -4,13 +4,10 @@ import { db } from "@/lib/db";
 import { getCurrentRole } from "@/lib/auth";
 import { notifyEmployee } from "@/lib/notify";
 import { withPrivilegedRoute } from "@/lib/mfa-guard";
+import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function fail(code: string, error: string, status: number) {
-  return NextResponse.json({ error, code }, { status });
-}
 
 async function POSTHandler(req: NextRequest) {
   const userId = await getEffectiveUserId();

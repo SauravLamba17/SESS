@@ -12,6 +12,43 @@
  * Run: (source .env for DATABASE_URL) then execute the compiled JS.
  */
 import { PrismaClient } from "@prisma/client";
+import { demoModeEnabled } from "../lib/impersonation.ts";
+
+// ─── SAFETY GUARD — runs before anything else ───────────────────────────────
+// This script creates four fake people. Running it against a production
+// database would inject demo accounts into real HR data, and each one is an
+// impersonation target. The four seeded accounts were deliberately deleted
+// before this database went live; nothing should ever put them back by accident.
+//
+// Placed above `new PrismaClient()` on purpose: when the guard fails, no client
+// is constructed, no connection is opened and no query is issued. The process
+// exits before the database is touched in any way.
+//
+// Reuses demoModeEnabled() from lib/impersonation.ts rather than re-testing the
+// env var, so "is this a demo deployment?" has exactly one definition — the
+// same one gating impersonation. Only the exact string "true" qualifies.
+if (!demoModeEnabled()) {
+  console.error(
+    [
+      "",
+      "REFUSED: prisma/seed-test-data.ts did not run.",
+      "",
+      "This script seeds four FAKE employees (EMP-0001…EMP-0004) and four fake",
+      "user accounts. It is for a demo/test environment only — never production.",
+      "",
+      `  DEMO_MODE is currently: ${process.env.DEMO_MODE === undefined ? "<unset>" : JSON.stringify(process.env.DEMO_MODE)}`,
+      "",
+      "To run it, set DEMO_MODE=true in the environment of a demo deployment",
+      "that has its own separate database:",
+      "",
+      "  DEMO_MODE=true npx tsx prisma/seed-test-data.ts",
+      "",
+      "No database connection was opened and nothing was modified.",
+      "",
+    ].join("\n"),
+  );
+  process.exit(1);
+}
 
 const db = new PrismaClient();
 

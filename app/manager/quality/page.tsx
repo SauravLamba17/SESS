@@ -6,6 +6,7 @@ import { QualityForm } from "@/components/manager/quality-form";
 import { db } from "@/lib/db";
 import { getEmployeeByClerkId, getDirectReports } from "@/lib/data/scope";
 import { currentPeriod } from "@/lib/period";
+import { ErrorPanel, UnlinkedEmployeeNotice } from "@/components/ui/notice";
 
 export const dynamic = "force-dynamic";
 
@@ -54,19 +55,11 @@ export default async function TeamQualityPage() {
       />
 
       {data.error && (
-        <Panel className="mb-5 flex items-center gap-3 px-4 py-3">
-          <StatusDot state="danger" />
-          <span className="text-sm text-danger">{data.error}</span>
-        </Panel>
+        <ErrorPanel>{data.error}</ErrorPanel>
       )}
 
       {!data.manager && !data.error && (
-        <Panel className="mb-5 flex items-center gap-3 px-4 py-3">
-          <StatusDot state="warn" />
-          <span className="text-sm text-text-muted">
-            No employee record is linked to your account yet.
-          </span>
-        </Panel>
+        <UnlinkedEmployeeNotice />
       )}
 
       {data.manager && (

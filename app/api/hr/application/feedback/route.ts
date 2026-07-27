@@ -1,14 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/lib/db";
+import { parseDateOnly } from "@/lib/period";
 import { resolveRecruitmentScope, canAccessApplication } from "@/lib/recruitment/access";
 import { withPrivilegedRoute } from "@/lib/mfa-guard";
+import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function fail(code: string, error: string, status: number) {
-  return NextResponse.json({ error, code }, { status });
-}
 
 /**
  * Add interview feedback, or save human-written review notes.
@@ -82,13 +80,9 @@ async function POSTHandler(req: NextRequest) {
     if (!Number.isFinite(roundNumber) || roundNumber < 1 || roundNumber > 20)
       return fail("BAD_INPUT", "roundNumber must be a whole number from 1 to 20", 400);
     if (!notes) return fail("BAD_INPUT", "Interview notes are required", 400);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr))
+    const interviewDate = parseDateOnly(dateStr);
+    if (!interviewDate)
       return fail("BAD_INPUT", "interviewDate must be a valid YYYY-MM-DD date", 400);
-
-    const [y, m, d] = dateStr.split("-").map(Number);
-    const interviewDate = new Date(y, m - 1, d);
-    if (Number.isNaN(interviewDate.getTime()))
-      return fail("BAD_INPUT", "interviewDate is not a valid date", 400);
 
     const created = await db.$transaction(async (tx) => {
       const fb = await tx.interviewFeedback.create({

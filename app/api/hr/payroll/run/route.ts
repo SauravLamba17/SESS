@@ -5,13 +5,10 @@ import { db } from "@/lib/db";
 import { isPeriod } from "@/lib/period";
 import { assemblePayrollRow } from "@/lib/payroll/assemble";
 import { withPrivilegedRoute } from "@/lib/mfa-guard";
+import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function fail(code: string, error: string, status: number) {
-  return NextResponse.json({ error, code }, { status });
-}
 
 /** Exclusive upper bound of a "YYYY-MM" period. */
 function monthEnd(period: string): Date {

@@ -1,14 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getEffectiveUserId, getCurrentRole } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { parseDateOnly } from "@/lib/period";
 import { withPrivilegedRoute } from "@/lib/mfa-guard";
+import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function fail(code: string, error: string, status: number) {
-  return NextResponse.json({ error, code }, { status });
-}
 
 /**
  * Add or remove a holiday.
@@ -62,16 +60,12 @@ async function POSTHandler(req: NextRequest) {
     const dateStr = typeof body.date === "string" ? body.date.trim() : "";
     if (!name || name.length > 120)
       return fail("BAD_INPUT", "A holiday name is required (under 120 characters)", 400);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr))
-      return fail("BAD_INPUT", "date must be a valid YYYY-MM-DD date", 400);
-
-    const [y, m, d] = dateStr.split("-").map(Number);
-    const date = new Date(y, m - 1, d);
-    if (Number.isNaN(date.getTime()))
-      return fail("BAD_INPUT", "date is not a valid calendar date", 400);
+    const date = parseDateOnly(dateStr);
+    if (!date)
+      return fail("BAD_INPUT", "date must be a valid YYYY-MM-DD calendar date", 400);
 
     // Same name on the same day is a duplicate entry, not a second holiday.
-    const dayEnd = new Date(y, m - 1, d + 1);
+    const dayEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
     const dupe = await db.holiday.findFirst({
       where: { name, date: { gte: date, lt: dayEnd } },
       select: { id: true },

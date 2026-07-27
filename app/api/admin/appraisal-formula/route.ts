@@ -3,33 +3,11 @@ import { getEffectiveUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getCurrentRole } from "@/lib/auth";
 import { withPrivilegedRoute } from "@/lib/mfa-guard";
+import { fail } from "@/lib/api/response";
+import { normalizeDepartment, resolveFormula } from "@/lib/appraisal/formula-config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function fail(code: string, error: string, status: number) {
-  return NextResponse.json({ error, code }, { status });
-}
-
-const ZERO_WEIGHTS = {
-  punctuality: 0,
-  production: 0,
-  quality: 0,
-  feedback: 0,
-  warningPenaltyPoints: 0,
-  // Phase 8: punctuality frequency/severity split — the 4 main weights start at
-  // 0 (must be set), but these get sensible suggested defaults since 0/0 is
-  // never valid (they must sum to 100).
-  punctualityFrequencyWeight: 70,
-  punctualitySeverityWeight: 30,
-  punctualitySeverityCapMinutes: 60,
-};
-
-function normalizeDepartment(raw: string | null): string | null {
-  if (raw === null) return null;
-  const t = raw.trim();
-  return t === "" || t.toLowerCase() === "global" ? null : t;
-}
 
 async function GETHandler(req: NextRequest) {
   const userId = await getEffectiveUserId();
@@ -41,20 +19,7 @@ async function GETHandler(req: NextRequest) {
   const dept = normalizeDepartment(req.nextUrl.searchParams.get("department"));
 
   try {
-    // Exact department match first; fall back to the global (null) formula.
-    const own = await db.appraisalFormula.findFirst({ where: { department: dept } });
-    const globalOne =
-      dept === null ? own : await db.appraisalFormula.findFirst({ where: { department: null } });
-    const resolved = own ?? globalOne;
-
-    return NextResponse.json({
-      ok: true,
-      department: dept,
-      // If nothing has ever been saved, return explicit zeros (never invent weights).
-      weights: resolved?.weightsJson ?? ZERO_WEIGHTS,
-      source: own ? "department" : globalOne ? "global" : "none",
-      configured: !!resolved,
-    });
+    return NextResponse.json({ ok: true, ...(await resolveFormula(db, dept)) });
   } catch (err) {
     console.error("[admin/appraisal-formula GET] failed:", err);
     return fail("SERVER_ERROR", "Could not load the formula", 503);

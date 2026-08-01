@@ -31,7 +31,7 @@ function str(v: FormDataEntryValue | null): string {
 export async function POST(req: NextRequest) {
   // ── Rate limit before any parsing, so a flood costs us as little as possible.
   const ip = clientIp(req.headers);
-  const rate = checkRateLimit(ip);
+  const rate = await checkRateLimit(ip);
   if (!rate.allowed) {
     return NextResponse.json(
       {

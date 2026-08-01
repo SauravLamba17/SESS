@@ -247,6 +247,31 @@ model SystemSetting {
   updatedAt DateTime @updatedAt
 }
 
+// One row per accepted attempt against a rate-limited action.
+//
+// WHY A TABLE AND NOT A Map: the public careers form runs on serverless, where
+// every request may land on a different short-lived instance. A per-process
+// Map therefore counts a fraction of the real traffic and resets constantly —
+// it does not rate-limit anything in that environment. Postgres is the only
+// state all instances already share, so the counter lives here.
+//
+// Rows are disposable: they exist only to be counted inside a rolling window
+// and are swept opportunistically once past RETENTION (see
+// lib/recruitment/rate-limit.ts). Nothing joins to this table and nothing reads
+// an individual row, so it carries no foreign keys and no relations.
+model RateLimitAttempt {
+  id        String   @id @default(cuid())
+  /// The bucket — currently the requesting IP.
+  key       String
+  /// Which limit this counts against, so the table can serve more than one.
+  action    String
+  createdAt DateTime @default(now())
+
+  // Serves both the windowed COUNT (key+action+createdAt) and, by prefix, the
+  // retention sweep's range scan on createdAt.
+  @@index([key, action, createdAt])
+}
+
 model ClientMail {
   id                String   @id @default(cuid())
   employeeId        String

@@ -4,6 +4,7 @@ import { idleConsentState } from "@/lib/idle/consent";
 import { idleThresholdSeconds } from "@/lib/idle/settings";
 import { idleTrackingEnabled } from "@/lib/system-settings";
 import { fail } from "@/lib/api/response";
+import { ymd } from "@/lib/reports/range";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -118,7 +119,7 @@ export async function POST(req: NextRequest) {
         "PAUSE_TRACKING",
         consent.reason === "NEVER_GIVEN"
           ? "Idle-tracking consent is not recorded for this employee. Tracking is paused — this batch was not stored."
-          : `Idle-tracking consent expired on ${consent.expiredOn?.toISOString().slice(0, 10)}. Tracking is paused — this batch was not stored.`,
+          : `Idle-tracking consent expired on ${consent.expiredOn ? ymd(consent.expiredOn) : "an unknown date"}. Tracking is paused — this batch was not stored.`,
         403,
         {
           // Explicit instruction to the agent: stop, don't retry.
@@ -187,7 +188,7 @@ export async function POST(req: NextRequest) {
     // agent on its next beat — no reinstall, no redeploy.
     return NextResponse.json({
       ok: true,
-      date: day.toISOString().slice(0, 10),
+      date: ymd(day),
       dayTotals: { idleMinutes: row.idleMinutes, activeMinutes: row.activeMinutes },
       idleThresholdSeconds: await idleThresholdSeconds(),
     });

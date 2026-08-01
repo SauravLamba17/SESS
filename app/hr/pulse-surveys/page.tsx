@@ -8,6 +8,7 @@ import {
 import { db } from "@/lib/db";
 import { aggregateSurveys, type PulseAggregate } from "@/lib/engagement/pulse";
 import { ErrorPanel } from "@/components/ui/notice";
+import { ymd } from "@/lib/reports/range";
 
 export const dynamic = "force-dynamic";
 
@@ -148,7 +149,7 @@ export default async function PulseSurveysPage() {
                     <p className="mt-3 font-mono text-[10px] text-text-muted">
                       scale {s.scaleMin}–{s.scaleMax} · created{" "}
                       {s.createdAt.toISOString().slice(0, 10)}
-                      {s.closesAt && ` · closes ${s.closesAt.toISOString().slice(0, 10)}`}
+                      {s.closesAt && ` · closes ${ymd(s.closesAt)}`}
                     </p>
                   </div>
                 </Panel>

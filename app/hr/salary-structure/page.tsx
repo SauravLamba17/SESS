@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { inr } from "@/lib/payroll/format";
 import { buildSalaryTimeline, ymd as salaryYmd } from "@/lib/payroll/salary-history";
 import { ErrorPanel } from "@/components/ui/notice";
+import { ymd } from "@/lib/reports/range";
 
 export const dynamic = "force-dynamic";
 
@@ -150,9 +151,7 @@ export default async function SalaryStructurePage() {
                                 basic: s.basic.toFixed(2),
                                 hra: s.hra.toFixed(2),
                                 specialAllowance: s.specialAllowance.toFixed(2),
-                                effectiveFrom: s.effectiveFrom
-                                  .toISOString()
-                                  .slice(0, 10),
+                                effectiveFrom: ymd(s.effectiveFrom),
                               }
                             : null
                         }

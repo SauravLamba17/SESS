@@ -10,6 +10,7 @@ import { answeredSurveyIds } from "@/lib/engagement/pulse";
 import { ModulePaused } from "@/components/engagement/module-paused";
 import { engagementEnabled } from "@/lib/system-settings";
 import { ErrorPanel, UnlinkedEmployeeNotice } from "@/components/ui/notice";
+import { ymd } from "@/lib/reports/range";
 
 export const dynamic = "force-dynamic";
 
@@ -109,7 +110,7 @@ export default async function PulsePage() {
                   action={
                     s.closesAt ? (
                       <span className="font-mono text-[11px] text-text-muted">
-                        closes {s.closesAt.toISOString().slice(0, 10)}
+                        closes {ymd(s.closesAt)}
                       </span>
                     ) : undefined
                   }

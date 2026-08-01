@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { getCurrentRole } from "@/lib/auth";
 import { withPrivilegedRoute } from "@/lib/mfa-guard";
 import { fail } from "@/lib/api/response";
+import { lockCycleForWrite } from "@/lib/appraisal/cycle-lock";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,16 +29,25 @@ async function POSTHandler(req: NextRequest) {
     return fail("BAD_INPUT", "cycleId and employeeId are required", 400);
 
   try {
-    const cycle = await db.appraisalCycle.findUnique({ where: { id: cycleId } });
-    if (!cycle) return fail("NOT_FOUND", "Cycle not found", 404);
-    if (cycle.published)
-      return fail("PUBLISHED", "Cycle is published; scope is immutable", 409);
+    // Lock-then-write: the published check and the upsert are one transaction,
+    // so a concurrent Publish cannot land between them. See lib/appraisal/
+    // cycle-lock.ts for why a plain re-read is not sufficient.
+    const outcome = await db.$transaction(async (tx) => {
+      const gate = await lockCycleForWrite(tx, cycleId);
+      if (!gate.ok) return gate;
 
-    await db.appraisalScore.upsert({
-      where: { employeeId_cycleId: { employeeId, cycleId } },
-      create: { employeeId, cycleId, excluded },
-      update: { excluded },
+      await tx.appraisalScore.upsert({
+        where: { employeeId_cycleId: { employeeId, cycleId } },
+        create: { employeeId, cycleId, excluded },
+        update: { excluded },
+      });
+      return { ok: true as const };
     });
+
+    if (!outcome.ok)
+      return outcome.reason === "NOT_FOUND"
+        ? fail("NOT_FOUND", "Cycle not found", 404)
+        : fail("PUBLISHED", "Cycle is published; scope is immutable", 409);
 
     return NextResponse.json({ ok: true, cycleId, employeeId, excluded });
   } catch (err) {

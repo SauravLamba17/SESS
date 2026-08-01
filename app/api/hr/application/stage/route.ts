@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { scheduleRetentionOnRejection } from "@/lib/recruitment/retention";
 import { withPrivilegedRoute } from "@/lib/mfa-guard";
 import { fail } from "@/lib/api/response";
+import { ymd } from "@/lib/reports/range";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -124,7 +125,7 @@ async function POSTHandler(req: NextRequest) {
       ...(result.retention
         ? {
             retention: {
-              scheduledDeletionAt: result.retention.scheduledFor.toISOString().slice(0, 10),
+              scheduledDeletionAt: ymd(result.retention.scheduledFor),
               talentPoolConsent: result.retention.consented,
             },
           }

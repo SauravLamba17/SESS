@@ -4,12 +4,10 @@ import { StatusDot } from "@/components/ui/status-dot";
 import { OnboardingChecklist } from "@/components/hr/onboarding-checklist";
 import { db } from "@/lib/db";
 import { ErrorPanel } from "@/components/ui/notice";
+import { ymd } from "@/lib/reports/range";
 
 export const dynamic = "force-dynamic";
 
-function ymd(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
 
 async function load() {
   try {

@@ -5,6 +5,7 @@ import { idleConsentState } from "@/lib/idle/consent";
 import { newAgentToken, tokenFingerprint } from "@/lib/idle/token";
 import { withPrivilegedRoute } from "@/lib/mfa-guard";
 import { fail } from "@/lib/api/response";
+import { ymd } from "@/lib/reports/range";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -79,7 +80,7 @@ async function POSTHandler(req: NextRequest) {
         "NO_CONSENT",
         consent.reason === "NEVER_GIVEN"
           ? `No IDLE_TRACKING consent is recorded for ${employee.name}. Record their consent on the Compliance & Consent page before issuing an agent token.`
-          : `${employee.name}'s IDLE_TRACKING consent expired on ${consent.expiredOn?.toISOString().slice(0, 10)}. Record fresh consent on the Compliance & Consent page before issuing an agent token.`,
+          : `${employee.name}'s IDLE_TRACKING consent expired on ${consent.expiredOn ? ymd(consent.expiredOn) : "an unknown date"}. Record fresh consent on the Compliance & Consent page before issuing an agent token.`,
         409,
       );
 

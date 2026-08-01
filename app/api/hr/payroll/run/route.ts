@@ -43,10 +43,29 @@ async function POSTHandler(req: NextRequest) {
       ? body.department.trim()
       : null;
 
+  // First local day of the period being run. Used to decide who was employed
+  // DURING it, which is not the same question as who is employed NOW.
+  const [periodYear, periodMonth] = period.split("-").map(Number);
+  const periodStart = new Date(periodYear, periodMonth - 1, 1);
+
   try {
-    // ── 1 of 4: active employees + salary structure, one query. ──
+    // ── 1 of 4: employees in scope + salary structure, one query. ──
+    //
+    // NOT `active: true`. Payroll is run in arrears — HR runs July in early
+    // August — so filtering on "active right now" silently drops anyone who
+    // left between the end of the period and the day the run happens. They
+    // worked the whole month and would never be paid for it: the offboarding
+    // settlement only ever covers the month containing their LAST WORKING DAY,
+    // and the adjustment route can only correct a row that already exists.
+    //
+    // So: still employed, OR left on/after this period began. Anyone who left
+    // before it began is excluded here; anyone who left DURING it is included
+    // and payableDays() clamps them to their last working day.
     const employees = await db.employee.findMany({
-      where: { active: true, ...(department ? { department } : {}) },
+      where: {
+        ...(department ? { department } : {}),
+        OR: [{ active: true }, { offboardedAt: { gte: periodStart } }],
+      },
       select: {
         id: true,
         name: true,
@@ -80,14 +99,20 @@ async function POSTHandler(req: NextRequest) {
     }
     const payableIds = payable.map((e) => e.id);
 
-    // ── 2 of 4: REGULAR rows that already exist for this period. ──
-    // Settlement and adjustment rows are excluded: they legitimately share the
-    // month with a regular run and must not block it.
+    // ── 2 of 4: rows that already PAY this period. ──
+    // A regular row OR a final settlement both count: the settlement raised at
+    // offboarding IS that employee's pay for the month containing their last
+    // working day, so a regular row on top of it would pay them twice. (Before
+    // the selection above was widened, a settlement could never collide with a
+    // run because the employee was already inactive and thus excluded — it can
+    // now, so it has to block.)
+    //
+    // Adjustment rows are still excluded: they are deltas against an
+    // already-finalized row and legitimately share the month with it.
     const existing = await db.payroll.findMany({
       where: {
         month: period,
         employeeId: { in: payableIds },
-        isFinalSettlement: false,
         adjustmentForPayrollId: null,
       },
       select: { employeeId: true },
@@ -221,6 +246,26 @@ async function POSTHandler(req: NextRequest) {
       missingStructure,
     });
   } catch (err) {
+    // P2002 on the partial unique index means a concurrent run for this exact
+    // period beat us to it — the pre-flight check above read an empty set and
+    // another request inserted between that read and our write. The database
+    // is the real guard (see the migration named below); this turns its
+    // rejection into the same 409 a serial repeat-run would have produced,
+    // rather than a 503 that would invite the operator to retry.
+    //
+    // The whole createMany is one statement, so a violation on ANY employee
+    // rolls the entire run back: no partial roster is ever left behind.
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === "P2002"
+    ) {
+      console.warn(`[hr/payroll/run] concurrent run rejected for ${period}`);
+      return fail(
+        "RUN_EXISTS",
+        `Payroll for ${period} was already created by another request. Reload to see it.`,
+        409,
+      );
+    }
     console.error("[hr/payroll/run] failed:", err);
     return fail("SERVER_ERROR", "Could not create the payroll run", 503);
   }

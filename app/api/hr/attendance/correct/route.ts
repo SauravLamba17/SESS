@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { withPrivilegedRoute } from "@/lib/mfa-guard";
 import { lateMinutesForShift } from "@/lib/attendance/validation";
 import { fail } from "@/lib/api/response";
+import { ymd } from "@/lib/reports/range";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -172,7 +173,7 @@ async function POSTHandler(req: NextRequest) {
           // the previous values, so this line is the only record of them.
           targetEntity:
             `attendance=${attendanceId} employee=${row.employee.employeeCode} ` +
-            `date=${row.date.toISOString().slice(0, 10)} ` +
+            `date=${ymd(row.date)} ` +
             `checkIn: ${iso(row.checkIn)} → ${iso(newCheckIn)} | ` +
             `checkOut: ${iso(row.checkOut)} → ${iso(newCheckOut)} | ` +
             `lateMinutes: ${row.lateMinutes ?? "none"} → ${lateMinutes ?? "none"} | ` +

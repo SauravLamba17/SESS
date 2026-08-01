@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getEffectiveUserId } from "@/lib/auth";
+import { getEffectiveUserId, hasAtLeastRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getEmployeeByClerkId } from "@/lib/data/scope";
 import { fail } from "@/lib/api/response";
@@ -10,6 +10,16 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest) {
   const userId = await getEffectiveUserId();
   if (!userId) return fail("UNAUTHENTICATED", "Not authenticated", 401);
+
+  // ROLE gate, IN ADDITION TO the direct-report scope check further down —
+  // not instead of it. Org-chart position and role are decoupled in this
+  // schema: an Employee.managerId can point at someone whose Clerk role is
+  // still EMPLOYEE (a shift lead onboarded without a role bump). middleware.ts
+  // deliberately does not gate /api/**, so without this an EMPLOYEE-role user
+  // in a manager position could drive their reports' records through the API
+  // even though the UI never offers them the page.
+  if (!(await hasAtLeastRole("MANAGER")))
+    return fail("FORBIDDEN", "Only a Manager or above may use this endpoint", 403);
 
   let body: { employeeId?: unknown; reason?: unknown; fileUrl?: unknown };
   try {

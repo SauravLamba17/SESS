@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { ymd } from "@/lib/reports/range";
 
 /**
  * IDLE_TRACKING consent resolution — the single gate for the whole subsystem.
@@ -97,6 +98,3 @@ export function consentLabel(s: ConsentState): string {
     : `Tracking paused — consent expired ${s.expiredOn ? ymd(s.expiredOn) : ""}`.trim();
 }
 
-function ymd(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}

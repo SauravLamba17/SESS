@@ -24,6 +24,7 @@ import {
 const COMPANY_NAME = "Simplen";
 
 import { inr, periodLabel } from "./format";
+import { ymd as toYmd } from "@/lib/reports/range";
 
 const s = StyleSheet.create({
   page: { padding: 36, fontSize: 9, color: "#1a1a1a", fontFamily: "Helvetica" },
@@ -204,9 +205,7 @@ function Payslip({ d }: { d: PayslipData }) {
               label="Corrects"
               value={
                 d.adjustmentFor.finalizedAt
-                  ? `${d.adjustmentFor.period} payslip, finalized ${d.adjustmentFor.finalizedAt
-                      .toISOString()
-                      .slice(0, 10)}`
+                  ? `${d.adjustmentFor.period} payslip, finalized ${toYmd(d.adjustmentFor.finalizedAt)}`
                   : `${d.adjustmentFor.period} payslip`
               }
             />
@@ -215,7 +214,7 @@ function Payslip({ d }: { d: PayslipData }) {
           )}
           <Meta
             label="Finalized on"
-            value={d.finalizedAt ? d.finalizedAt.toISOString().slice(0, 10) : "—"}
+            value={ymd(d.finalizedAt)}
           />
         </View>
 
@@ -225,7 +224,7 @@ function Payslip({ d }: { d: PayslipData }) {
               CORRECTED PAYSLIP — this document does NOT replace your original{" "}
               {d.adjustmentFor.period} payslip
               {d.adjustmentFor.finalizedAt
-                ? `, dated ${d.adjustmentFor.finalizedAt.toISOString().slice(0, 10)}`
+                ? `, dated ${toYmd(d.adjustmentFor.finalizedAt)}`
                 : ""}
               , which stands exactly as issued. Every figure below is the
               ADDITIONAL amount arising from the correction. A negative figure
@@ -380,7 +379,7 @@ function Form16({ d }: { d: Form16Data }) {
           <Meta label="Department" value={d.department} />
           <Meta label="Financial year" value={d.financialYear} />
           <Meta label="Months included" value={`${d.monthsCovered} of 12`} />
-          <Meta label="Generated on" value={d.generatedAt.toISOString().slice(0, 10)} />
+          <Meta label="Generated on" value={toYmd(d.generatedAt)} />
         </View>
 
         {d.partial && (
@@ -478,8 +477,10 @@ export interface OfferLetterData {
   generatedAt: Date;
 }
 
+/** Local-date formatter with a dash for null. Delegates to the shared ymd()
+ *  — toISOString() here rendered a day early for any IST-local midnight. */
 function ymd(d: Date | null): string {
-  return d ? d.toISOString().slice(0, 10) : "—";
+  return d ? toYmd(d) : "—";
 }
 
 function OfferLetter({ d }: { d: OfferLetterData }) {

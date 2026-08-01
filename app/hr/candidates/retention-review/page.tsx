@@ -6,6 +6,7 @@ import { StatusDot } from "@/components/ui/status-dot";
 import { RetentionActions } from "@/components/hr/retention-actions";
 import { db } from "@/lib/db";
 import { ErrorPanel } from "@/components/ui/notice";
+import { ymd as toYmd } from "@/lib/reports/range";
 import {
   RETENTION_DAYS_NO_CONSENT,
   RETENTION_DAYS_WITH_CONSENT,
@@ -13,8 +14,10 @@ import {
 
 export const dynamic = "force-dynamic";
 
+/** Local-date formatter with a dash for null. Delegates to the shared ymd()
+ *  — toISOString() here rendered a day early for any IST-local midnight. */
 function ymd(d: Date | null): string {
-  return d ? d.toISOString().slice(0, 10) : "—";
+  return d ? toYmd(d) : "—";
 }
 
 function daysAgo(d: Date, now: Date): number {

@@ -258,9 +258,11 @@ async function main() {
     "app/api/manager/shift/route.ts": "manager scope, MANAGER does not require MFA",
     "app/api/manager/target/route.ts": "manager scope, MANAGER does not require MFA",
     "app/api/manager/warning/route.ts": "manager scope, MANAGER does not require MFA",
-    // Role-scoped in-route: every branch narrows the result set to what the
-    // caller may already see elsewhere in the UI.
-    "app/api/search/route.ts": "results scoped per role in-route",
+    // NOTE: app/api/search/route.ts was exempt here until the self-audit found
+    // the justification ("results scoped per role in-route") was true only for
+    // EMPLOYEE and MANAGER. The HR/SUPER_ADMIN branch reads org-wide across
+    // Employee (incl. email), Candidate and JobRequisition, so it is now
+    // wrapped like every other privileged route and is deliberately NOT listed.
     // Has its own equivalent MFA check inline — asserted separately below.
     "app/api/reports/[report]/route.ts": "own in-route mfaStatus() check, not double-wrapped",
   };
@@ -297,8 +299,8 @@ async function main() {
   //   41/43 after the walk widened to all of app/api and picked up the three
   //         privileged routes it had never been looking at
   eq("59 route files under app/api in total", files.length, 59);
-  eq("18 documented exemptions", Object.keys(EXEMPT).length, 18);
-  eq("41 route files REQUIRE the wrapper", required.length, 41);
+  eq("17 documented exemptions", Object.keys(EXEMPT).length, 17);
+  eq("42 route files REQUIRE the wrapper", required.length, 42);
 
   let unwrapped = 0;
   let handlerCount = 0;
@@ -332,7 +334,7 @@ async function main() {
       console.log(`        MISSING IMPORT: ${r}`);
     }
   }
-  eq("43 handlers wrapped (2 files export two methods each)", handlerCount, 43);
+  eq("44 handlers wrapped (2 files export two methods each)", handlerCount, 44);
   check("NO route exports an unwrapped handler", unwrapped === 0, `${unwrapped} problem(s)`);
 
   // ── 2b: the three routes the old directory-scoped walk missed ───

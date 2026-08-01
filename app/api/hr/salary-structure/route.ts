@@ -6,6 +6,7 @@ import { parseDateOnly } from "@/lib/period";
 import { withPrivilegedRoute } from "@/lib/mfa-guard";
 import { supersede } from "@/lib/payroll/salary-history";
 import { fail } from "@/lib/api/response";
+import { ymd } from "@/lib/reports/range";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -130,8 +131,8 @@ async function POSTHandler(req: NextRequest) {
           action: "SALARY_STRUCTURE_SET",
           targetEntity: plan.historyRow
             ? `${employeeId} v${plan.historyRow.versionNumber}→v${plan.historyRow.versionNumber + 1} ` +
-              `(previous ${plan.historyRow.effectiveFrom.toISOString().slice(0, 10)}` +
-              `–${plan.historyRow.effectiveTo.toISOString().slice(0, 10)} archived)`
+              `(previous ${ymd(plan.historyRow.effectiveFrom)}` +
+              `–${ymd(plan.historyRow.effectiveTo)} archived)`
             : `${employeeId} v1 (first structure)`,
         },
       });

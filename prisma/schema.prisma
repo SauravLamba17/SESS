@@ -391,11 +391,19 @@ model Payroll {
 
   expenseClaims ExpenseClaim[]
 
-  // NOT unique on [employeeId, month]: a final-settlement row and an
+  // NOT plainly unique on [employeeId, month]: a final-settlement row and an
   // adjustment row both legitimately share an employee's month with the
-  // regular run. Duplicate-run protection therefore lives in
-  // app/api/hr/payroll/run/route.ts, which counts only regular rows
-  // (isFinalSettlement=false, adjustmentForPayrollId=null) before creating.
+  // regular run.
+  //
+  // Duplicate REGULAR runs are blocked by a PARTIAL unique index that Prisma's
+  // DSL cannot express, so it lives in raw SQL:
+  //   prisma/migrations/20260727120000_payroll_unique_regular_run
+  //   UNIQUE (employeeId, month) WHERE adjustmentForPayrollId IS NULL
+  //                                AND isFinalSettlement = false
+  // Do not assume this file shows every constraint on this table — that index
+  // is the real guarantee, and app/api/hr/payroll/run/route.ts translates its
+  // P2002 into a 409. The pre-flight check in that route is now an optimisation
+  // and a friendlier error, not the protection itself.
   @@index([employeeId, month])
   @@index([status, month])
 }

@@ -28,7 +28,11 @@ export type CreateInvitationFn = (params: {
 
 export type InviteResult =
   | { ok: true; invitationId: string }
-  | { ok: false; code: "NOT_FOUND" | "ALREADY_LINKED" | "NO_EMAIL" | "CLERK_ERROR"; message: string };
+  | {
+      ok: false;
+      code: "NOT_FOUND" | "ALREADY_LINKED" | "NO_EMAIL" | "CLERK_ERROR" | "INACTIVE" | "REDACTED";
+      message: string;
+    };
 
 /** Best-effort extraction of Clerk's human-readable error message. */
 function clerkErrorMessage(err: unknown): string {
@@ -45,11 +49,45 @@ export async function sendEmployeeInvitation(
 ): Promise<InviteResult> {
   const emp = await db.employee.findUnique({
     where: { id: args.employeeId },
-    select: { id: true, email: true, user: { select: { id: true } } },
+    select: {
+      id: true,
+      email: true,
+      active: true,
+      redactedAt: true,
+      user: { select: { id: true } },
+    },
   });
   if (!emp) return { ok: false, code: "NOT_FOUND", message: "Employee not found" };
   if (emp.user)
     return { ok: false, code: "ALREADY_LINKED", message: "This employee already has an active account" };
+
+  // ─── OFFBOARDED / REDACTED GUARD ───────────────────────────────────────
+  // This function ENDS by writing `email` and `pendingInvitationId` onto the
+  // Employee row. For a redacted ex-employee those are exactly the two fields
+  // Phase 13's retention policy deliberately erased (lib/employees/retention.ts
+  // redactionPatch sets email: null, pendingInvitationId: null), so inviting
+  // one would silently UN-REDACT the record — writing a fresh personal email
+  // back onto data that was erased under a statutory retention rule — and hand
+  // login access back to someone who has left.
+  //
+  // The Employee Master already hides the Invite button behind `e.active`, but
+  // that is presentation. This route is reachable directly, so the rule belongs
+  // here, in the shared function all three invite paths call: manual onboarding
+  // and hire-conversion invite freshly-created employees and are unaffected.
+  if (emp.redactedAt)
+    return {
+      ok: false,
+      code: "REDACTED",
+      message:
+        "This former employee's personal data was redacted under the retention policy. Inviting them would rewrite erased fields — onboard them as a new employee instead.",
+    };
+  if (!emp.active)
+    return {
+      ok: false,
+      code: "INACTIVE",
+      message:
+        "This employee is offboarded. Re-onboard them before sending an invitation.",
+    };
 
   const email = (args.email?.trim() || emp.email || "").toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))

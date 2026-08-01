@@ -12,12 +12,10 @@ import {
 import { OfferPanel } from "@/components/hr/offer-panel";
 import { db } from "@/lib/db";
 import { resolveRecruitmentScope, canAccessApplication } from "@/lib/recruitment/access";
+import { ymd } from "@/lib/reports/range";
 
 export const dynamic = "force-dynamic";
 
-function ymd(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
 
 export default async function CandidateDetailPage({
   params,

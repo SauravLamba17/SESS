@@ -110,8 +110,16 @@ async function main() {
 
     // ── STEP 5 (guard, checked first — it gates everything else) ─────
     step("STEP 5", "only a FINALIZED row can be adjusted");
+    // A DIFFERENT month from the finalized row above, deliberately. This is
+    // only a fixture for the "can you adjust a non-FINALIZED row?" guard, and
+    // it used to reuse PERIOD out of convenience — which meant the employee
+    // held TWO regular rows for one month, the exact double-payment state the
+    // partial unique index now forbids
+    // (prisma/migrations/20260727120000_payroll_unique_regular_run). The guard
+    // being tested does not care which month the row belongs to.
+    const GUARD_PERIOD = "2019-06";
     const draftRow = await db.payroll.create({
-      data: { employeeId, month: PERIOD, status: "DRAFT", processedBy: HR },
+      data: { employeeId, month: GUARD_PERIOD, status: "DRAFT", processedBy: HR },
     });
     const draftGuard = await canAdjust(draftRow.id);
     check("5a cannot adjust a DRAFT row (→ 409 NOT_FINALIZED)",

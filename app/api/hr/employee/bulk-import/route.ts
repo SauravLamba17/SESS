@@ -5,6 +5,7 @@ import { onboardEmployee } from "@/lib/employees/onboard";
 import { validateCsv, type ValidationContext } from "@/lib/employees/csv-import";
 import { withPrivilegedRoute } from "@/lib/mfa-guard";
 import { fail } from "@/lib/api/response";
+import { ymd } from "@/lib/reports/range";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -101,7 +102,7 @@ async function POSTHandler(req: NextRequest) {
         department: r.department,
         designation: r.designation,
         managerEmployeeCode: r.managerEmployeeCode,
-        joiningDate: r.joiningDate!.toISOString().slice(0, 10),
+        joiningDate: ymd(r.joiningDate!),
         machineId: r.machineId,
         email: r.email,
       })),

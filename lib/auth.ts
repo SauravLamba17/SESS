@@ -36,6 +36,14 @@ export interface Identity {
  * For everyone else the cookie is ignored entirely and the effective identity
  * is just the real identity — so no downstream check can be fooled by a
  * forged/copied cookie. Memoized per request via React cache().
+ *
+ * ─── ON OFFBOARDED EMPLOYEES ─────────────────────────────────────────────
+ * This resolves identity from the Clerk session alone and deliberately does
+ * NOT check Employee.active. Offboarded employees intentionally retain login
+ * access so they can view/download their own historical payslips and data
+ * after leaving — this is a deliberate design decision, not an oversight. See
+ * lib/employees/invite.ts and app/employee/profile/actions.ts for the
+ * corresponding write-protection guards that still apply to them.
  */
 export const resolveIdentity = cache(async (): Promise<Identity> => {
   const { userId: realUserId, sessionClaims } = await auth();

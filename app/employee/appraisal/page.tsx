@@ -8,6 +8,7 @@ import { ErrorPanel, UnlinkedEmployeeNotice } from "@/components/ui/notice";
 import {
   formatScoreOutOfFive,
   formatComponentOutOf5,
+  SCALE_DIVISOR,
 } from "@/lib/appraisal/display";
 
 export const dynamic = "force-dynamic";
@@ -165,15 +166,26 @@ export default async function MyAppraisalPage() {
                     );
                   })}
                   <div className="flex items-center justify-between border-t border-border pt-2">
+                    {/* Shown on the /5 scale like everything else in this
+                        panel. A penalty is a deduction from the same 0-100
+                        engine scale as the components, so it converts with the
+                        same divisor — which is what makes the panel's
+                        arithmetic reconcile: the weighted average minus this
+                        deduction equals the headline score. Left in raw engine
+                        points it read as "4.0/5" above and "−10" below, a
+                        deduction twice the size of the maximum score. */}
                     <span className="text-text-muted">
                       Warning penalty{" "}
                       <span className="font-mono text-xs">
                         ({cs.warningPenalty?.releasedWarnings ?? 0} ×{" "}
-                        {cs.warningPenalty?.pointsEach ?? 0})
+                        {(
+                          (cs.warningPenalty?.pointsEach ?? 0) / SCALE_DIVISOR
+                        ).toFixed(2)}
+                        )
                       </span>
                     </span>
                     <span className="font-mono text-danger">
-                      −{cs.warningPenalty?.total ?? 0}
+                      −{((cs.warningPenalty?.total ?? 0) / SCALE_DIVISOR).toFixed(1)}
                     </span>
                   </div>
                 </div>

@@ -6,11 +6,14 @@ import { OfferApproveButton } from "@/components/admin/offer-approve-button";
 import { db } from "@/lib/db";
 import { inr } from "@/lib/payroll/format";
 import { ErrorPanel } from "@/components/ui/notice";
+import { ymd as toYmd } from "@/lib/reports/range";
 
 export const dynamic = "force-dynamic";
 
+/** Local-date formatter with a dash for null. Delegates to the shared ymd()
+ *  — toISOString() here rendered a day early for any IST-local midnight. */
 function ymd(d: Date | null): string {
-  return d ? d.toISOString().slice(0, 10) : "—";
+  return d ? toYmd(d) : "—";
 }
 
 async function load() {

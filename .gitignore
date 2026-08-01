@@ -26,8 +26,11 @@ yarn-debug.log*
 yarn-error.log*
 
 # local env files
-.env
-.env*.local
+# `.env*` deliberately, not `.env` + `.env*.local`: the narrower pair left
+# .env.production, .env.development and .env.test TRACKABLE — a real filename
+# for real secrets that would have been committed silently. The negation below
+# keeps the placeholder-only example file in the repo.
+.env*
 !.env.example
 
 # vercel

@@ -92,6 +92,13 @@ async function POSTHandler(req: NextRequest) {
         // Phase 13 adds the retention clock to this SAME update rather than a
         // second offboarding path: an employee can never become inactive
         // without their redaction date being set at the same instant.
+        //
+        // NOTE: this does NOT delete the User row or revoke the Clerk account.
+        // Offboarded employees intentionally retain login access so they can
+        // view/download their own historical payslips and data after leaving —
+        // this is a deliberate design decision, not an oversight. See
+        // lib/employees/invite.ts and app/employee/profile/actions.ts for the
+        // corresponding write-protection guards that still apply to them.
         await tx.employee.update({
           where: { id: employeeId },
           data: {

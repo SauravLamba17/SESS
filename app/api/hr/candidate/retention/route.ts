@@ -9,6 +9,7 @@ import {
 } from "@/lib/recruitment/retention";
 import { withPrivilegedRoute } from "@/lib/mfa-guard";
 import { fail } from "@/lib/api/response";
+import { ymd } from "@/lib/reports/range";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -78,7 +79,7 @@ async function POSTHandler(req: NextRequest) {
           data: {
             actorUserId: userId,
             action: "CANDIDATE_RETENTION_EXTENDED",
-            targetEntity: `${candidateId} until ${newDate.toISOString().slice(0, 10)} (${reason})`,
+            targetEntity: `${candidateId} until ${ymd(newDate)} (${reason})`,
           },
         });
       });
@@ -86,7 +87,7 @@ async function POSTHandler(req: NextRequest) {
       return NextResponse.json({
         ok: true,
         candidateId,
-        scheduledDeletionAt: newDate.toISOString().slice(0, 10),
+        scheduledDeletionAt: ymd(newDate),
       });
     }
 
@@ -106,7 +107,7 @@ async function POSTHandler(req: NextRequest) {
       return fail(
         "NOT_DUE",
         candidate.scheduledDeletionAt
-          ? `This candidate is not due for review until ${candidate.scheduledDeletionAt.toISOString().slice(0, 10)}.`
+          ? `This candidate is not due for review until ${ymd(candidate.scheduledDeletionAt)}.`
           : "This candidate has no scheduled deletion date — they are still in an active process.",
         409,
       );

@@ -58,8 +58,17 @@ async function POSTHandler(req: NextRequest) {
       clerkCreateInvitation,
     );
     if (!result.ok) {
+      // INACTIVE/REDACTED are 409: the request is well-formed, it conflicts
+      // with the employee's current state (offboarded, or personal data erased
+      // under the retention policy).
       const status =
-        result.code === "NOT_FOUND" ? 404 : result.code === "CLERK_ERROR" ? 502 : 400;
+        result.code === "NOT_FOUND"
+          ? 404
+          : result.code === "CLERK_ERROR"
+            ? 502
+            : result.code === "INACTIVE" || result.code === "REDACTED"
+              ? 409
+              : 400;
       return fail(result.code, result.message, status);
     }
     return NextResponse.json({ ok: true, invitationId: result.invitationId });

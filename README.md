@@ -3,10 +3,21 @@
 A production / quality / attendance / payroll HRMS. Competitor-grade
 alternative to Keka HR, with differentiators Keka doesn't have:
 
-- **Camera-verified attendance** (face match on punch)
-- **System idle-time tracking** (active vs idle minutes)
-- **Per-machine performance averages** (uptime, output, avg rate)
+- **System idle-time tracking** (active vs idle minutes, consent-gated)
 - **Quality-linked production appraisal formula** (Super-Admin-owned weights)
+- **Shift-aware attendance** including an overnight shift that spans midnight
+- **Versioned salary structures** with an immutable finalized-payroll trail
+
+### Cut from scope
+
+Two features were removed during development and are **not** part of this
+system. They are listed here because earlier drafts of this README advertised
+them, and the schema still carries removal notes where their tables used to be:
+
+- **Face-verification / camera punch** — cut in Phase 11. `ConsentRecord`
+  now only ever holds `IDLE_TRACKING`.
+- **Per-machine performance averages** — cut in Phase 13 with the `MachineLog`
+  table. `Employee.machineId` survives only as a free-text workstation label.
 
 One app, one database, four role-scoped portals:
 `/employee`, `/manager`, `/hr`, `/admin`.

@@ -12,6 +12,7 @@ import {
 } from "@/lib/appraisal/compute";
 import { withPrivilegedRoute } from "@/lib/mfa-guard";
 import { fail } from "@/lib/api/response";
+import { lockCycleForWrite } from "@/lib/appraisal/cycle-lock";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -141,6 +142,17 @@ async function POSTHandler(req: NextRequest) {
     }[] = [];
     let complete = 0;
 
+    // Computed first, written second. The scoring below is pure; collecting the
+    // payloads lets every write happen together inside ONE locked transaction,
+    // which is what stops a concurrent Publish from interleaving and stops a
+    // mid-run failure from leaving a half-computed cycle behind.
+    const pending: {
+      employeeId: string;
+      finalScore: number | null;
+      componentScores: Prisma.InputJsonValue;
+      componentMeta: Prisma.InputJsonValue;
+    }[] = [];
+
     await Promise.all(
       employees.map(async (emp) => {
         const metrics: EmployeeMetrics = {
@@ -187,24 +199,55 @@ async function POSTHandler(req: NextRequest) {
           incomplete.push({ employeeId: emp.id, name: emp.name, missing: result.missingComponents });
         }
 
-        // Upsert preserves manager feedback (update touches only compute fields).
-        await db.appraisalScore.upsert({
-          where: { employeeId_cycleId: { employeeId: emp.id, cycleId } },
-          create: {
-            employeeId: emp.id,
-            cycleId,
-            finalScore,
-            componentScoresJson: componentScores,
-            componentDataJson: componentMeta,
-          },
-          update: {
-            finalScore,
-            componentScoresJson: componentScores,
-            componentDataJson: componentMeta,
-          },
+        pending.push({
+          employeeId: emp.id,
+          finalScore,
+          componentScores,
+          componentMeta,
         });
       }),
     );
+
+    // The cycle is locked FIRST, then every score is written. A Publish that
+    // arrives mid-compute waits for this transaction; one that already
+    // committed makes the lock report PUBLISHED and rolls the whole compute
+    // back, so a published score can never be silently overwritten after the
+    // employee was told it was final. See lib/appraisal/cycle-lock.ts.
+    //
+    // Timeout raised from Prisma's 5s default: this is one upsert per employee
+    // (a known N+1, flagged separately for batching) and a large org would
+    // otherwise abort a legitimate run.
+    const writeOutcome = await db.$transaction(
+      async (tx) => {
+        const gate = await lockCycleForWrite(tx, cycleId);
+        if (!gate.ok) return gate.reason;
+
+        for (const p of pending) {
+          // Upsert preserves manager feedback (update touches only compute fields).
+          await tx.appraisalScore.upsert({
+            where: { employeeId_cycleId: { employeeId: p.employeeId, cycleId } },
+            create: {
+              employeeId: p.employeeId,
+              cycleId,
+              finalScore: p.finalScore,
+              componentScoresJson: p.componentScores,
+              componentDataJson: p.componentMeta,
+            },
+            update: {
+              finalScore: p.finalScore,
+              componentScoresJson: p.componentScores,
+              componentDataJson: p.componentMeta,
+            },
+          });
+        }
+        return null;
+      },
+      { timeout: 60_000 },
+    );
+
+    if (writeOutcome === "NOT_FOUND") return fail("NOT_FOUND", "Cycle not found", 404);
+    if (writeOutcome === "PUBLISHED")
+      return fail("PUBLISHED", "Cycle is published; scores are immutable", 409);
 
     return NextResponse.json({
       ok: true,

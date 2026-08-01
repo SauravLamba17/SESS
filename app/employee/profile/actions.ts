@@ -38,6 +38,30 @@ export async function updateProfile(input: {
       };
     }
 
+    // ─── OFFBOARDED / REDACTED GUARD ───────────────────────────────────────
+    // Offboarding does NOT delete the User row or revoke the Clerk account, so
+    // a former employee can still sign in. Without this, they could overwrite
+    // `emergencyContact` — which for a redacted record holds the "[REDACTED]"
+    // marker written by lib/employees/retention.ts — putting live third-party
+    // personal data back onto a record whose identifiers were erased under the
+    // statutory retention policy, and silently reversing that erasure.
+    //
+    // Read access is deliberately left alone: a former employee may still need
+    // their own payslips. This blocks only the WRITE.
+    if (employee.redactedAt) {
+      return {
+        ok: false,
+        error:
+          "Your personal data has been redacted under the data-retention policy and can no longer be edited. Contact HR if you believe this is wrong.",
+      };
+    }
+    if (!employee.active) {
+      return {
+        ok: false,
+        error: "Your employment record is closed, so profile details can no longer be changed.",
+      };
+    }
+
     await db.employee.update({
       where: { id: employee.id },
       data: {

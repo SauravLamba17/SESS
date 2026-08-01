@@ -67,7 +67,21 @@ async function POSTHandler(req: NextRequest) {
       .map((s) => s.employeeId);
 
     const notified = await db.$transaction(async (tx) => {
-      await tx.appraisalCycle.update({ where: { id: cycleId }, data: { published: true } });
+      // ATOMIC CLAIM. `published: false` lives in the WHERE, so exactly one
+      // request can flip the flag — the same updateMany-with-guard pattern
+      // payroll/finalize, warning/release and offer/status all use.
+      //
+      // The findUnique check above is now an early, friendlier 409; it is NOT
+      // the guard. Two HR users clicking Publish together both passed it, both
+      // updated, and both ran notifyEmployees — every employee in the cycle
+      // received the "your appraisal is published" notification twice, and two
+      // audit rows each claimed to be the first publication.
+      const claimed = await tx.appraisalCycle.updateMany({
+        where: { id: cycleId, published: false },
+        data: { published: true },
+      });
+      if (claimed.count === 0) return null;
+
       await tx.auditLog.create({
         data: { actorUserId: userId, action: "APPRAISAL_CYCLE_PUBLISHED", targetEntity: cycleId },
       });
@@ -78,6 +92,12 @@ async function POSTHandler(req: NextRequest) {
         `Your appraisal score for ${cycle.period} has been published and is available on My Appraisal.`,
       );
     });
+
+    // Lost the race: another request published between our read and our write.
+    // Same 409 the serial case returns, so the caller cannot tell the
+    // difference — and crucially, nobody was notified twice.
+    if (notified === null)
+      return fail("PUBLISHED", "Cycle is already published", 409);
 
     return NextResponse.json({ ok: true, cycleId, published: true, notified });
   } catch (err) {

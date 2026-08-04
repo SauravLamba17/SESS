@@ -89,6 +89,52 @@ export default function RootLayout({
           userPreviewSecondaryIdentifier: "text-text-muted",
           // Clerk's "Secured by" strip sits on the same card.
           userButtonPopoverFooter: "bg-surface border-t border-border",
+
+          // ─── SIGN-IN / SIGN-UP CARD ────────────────────────────────────
+          // The block above was scoped to the UserButton popover only, so the
+          // auth card kept Clerk's defaults and hit the same bug: grey-on-dark
+          // "Continue with Google", divider and footer text.
+          //
+          // These live on the PROVIDER rather than on <SignIn>/<SignUp>
+          // because the card renders from three places — /sign-in, /sign-up,
+          // and <SignInButton mode="modal"> on the landing page. Styling it
+          // here covers the modal too, which a per-page appearance prop would
+          // have missed entirely.
+          card: "bg-surface border border-border shadow-panel",
+          headerTitle: "text-text",
+          headerSubtitle: "text-text-muted",
+
+          // "Continue with Google" — the reported one. Clerk renders the label
+          // in a nested span, so the button alone is not enough; the *Text key
+          // is what actually colours the words.
+          socialButtonsBlockButton:
+            "bg-surface-raised border border-border text-text hover:bg-surface-raised hover:border-accent",
+          socialButtonsBlockButtonText: "text-text",
+
+          // The "or" separator between social and email sign-in.
+          dividerLine: "bg-border",
+          dividerText: "text-text-muted",
+
+          // Email/password fields.
+          formFieldLabel: "text-text",
+          formFieldInput:
+            "bg-surface-raised border border-border text-text placeholder:text-text-muted",
+          formFieldInputShowPasswordButton: "text-text-muted hover:text-text",
+          formFieldHintText: "text-text-muted",
+          formFieldErrorText: "text-danger",
+          formButtonPrimary: "bg-accent text-background hover:opacity-90",
+
+          // The verification-code screen and the "signing in as …" line.
+          otpCodeFieldInput: "bg-surface-raised border border-border text-text",
+          identityPreviewText: "text-text",
+          identityPreviewEditButton: "text-accent hover:opacity-80",
+
+          // "Don't have an account? Sign up" and the "Secured by Clerk /
+          // Development mode" strip.
+          footer: "bg-surface",
+          footerActionText: "text-text-muted",
+          footerActionLink: "text-accent hover:opacity-80",
+          footerPagesLink: "text-text-muted hover:text-text",
         },
       }}
     >

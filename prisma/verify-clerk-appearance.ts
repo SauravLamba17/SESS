@@ -89,8 +89,17 @@ function main() {
 
   // Every element key must be REAL — Clerk types `elements` permissively, so a
   // typo compiles and then silently does nothing.
-  const usedKeys = Array.from(layout.matchAll(/^\s{10}(user[A-Za-z]+):/gm)).map((m) => m[1]);
-  check("element keys were found in the config", usedKeys.length >= 6, usedKeys.join(", "));
+  //
+  // The elements block is sliced out first: `variables` keys sit at the same
+  // indent, and validating those against the element list would fail wrongly.
+  const elementsBlock = layout.slice(
+    layout.indexOf("elements: {"),
+    layout.lastIndexOf("},\n      }}"),
+  );
+  const usedKeys = Array.from(elementsBlock.matchAll(/^\s{10}([a-z][A-Za-z]+):/gm)).map(
+    (m) => m[1],
+  );
+  check("element keys were found in the config", usedKeys.length >= 20, `${usedKeys.length} keys`);
   for (const k of usedKeys) {
     check(`element key "${k}" exists in @clerk/shared`, new RegExp(`\\b${k}\\b`).test(clerkTypes));
   }
@@ -119,6 +128,65 @@ function main() {
       ["menu item text on the card", text, surface],
       ["menu item text on HOVER", text, surfaceRaised],
       ["muted text (email, icons) on the card", muted, surface],
+    ];
+    for (const [label, fg, bg] of pairs) {
+      const r = contrast(fg, bg);
+      check(`${name} — ${label}`, r >= AA_SMALL, `measured ${r.toFixed(2)}:1`);
+    }
+  }
+
+  // ── 2c: the SIGN-IN / SIGN-UP card ────────────────────────────
+  // Same class of bug, different component: the elements block was scoped to
+  // the UserButton popover, so the auth card kept Clerk's defaults — grey
+  // "Continue with Google", divider and footer text on a dark card.
+  step("2c", "sign-in / sign-up card clears AA 4.5:1 in every theme");
+
+  // Every key the card actually needs, and where it renders.
+  for (const [key, note] of [
+    ["card", "the card itself"],
+    ["headerTitle", "Sign in to SESS"],
+    ["headerSubtitle", "Welcome back…"],
+    ["socialButtonsBlockButton", "the Continue with Google button"],
+    ["socialButtonsBlockButtonText", "its LABEL — the reported bug"],
+    ["dividerText", "the 'or' separator"],
+    ["formFieldLabel", "Email address / Password"],
+    ["formFieldInput", "the input itself"],
+    ["footerActionText", "Don't have an account?"],
+    ["footerActionLink", "the Sign up link"],
+    ["footerPagesLink", "Secured by Clerk / Development mode"],
+  ] as const) {
+    check(`${key} is themed — ${note}`, new RegExp(`\\b${key}:`).test(elementsBlock));
+  }
+  check(
+    "the Google button's LABEL is coloured, not just the button",
+    /socialButtonsBlockButtonText:\s*"[^"]*text-text/.test(elementsBlock),
+  );
+
+  for (const [name, selector] of THEMES) {
+    const block = themeBlock(selector);
+    const surface = token(block, "--color-surface");
+    const raised = token(block, "--color-surface-raised");
+    const base = token(block, "--color-base");
+    const text = token(block, "--color-text");
+    const muted = token(block, "--color-text-muted");
+    const accent = token(block, "--color-accent");
+    const danger = token(block, "--color-danger");
+
+    const pairs: [string, [number, number, number], [number, number, number]][] = [
+      ["header title on the card", text, surface],
+      ["header subtitle on the card", muted, surface],
+      ['"Continue with Google" label on its button', text, raised],
+      ['the "or" divider text', muted, surface],
+      ["form field label", text, surface],
+      ["typed input text", text, raised],
+      ["input placeholder", muted, raised],
+      ["field error text", danger, surface],
+      ["primary button label on accent", base, accent],
+      ['"Don\'t have an account?"', muted, surface],
+      ['the "Sign up" link', accent, surface],
+      ["Secured by Clerk / Development mode", muted, surface],
+      ["identity preview text", text, surface],
+      ["OTP code input text", text, raised],
     ];
     for (const [label, fg, bg] of pairs) {
       const r = contrast(fg, bg);

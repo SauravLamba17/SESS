@@ -23,7 +23,10 @@ import path from "node:path";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const css = fs.readFileSync(path.join(ROOT, "app/globals.css"), "utf8");
-const layout = fs.readFileSync(path.join(ROOT, "app/layout.tsx"), "utf8");
+// The appearance moved out of layout.tsx into one shared module so every
+// Clerk surface inherits it. layout.tsx is still read, to prove it is wired.
+const layout = fs.readFileSync(path.join(ROOT, "lib/clerk-appearance.ts"), "utf8");
+const rootLayout = fs.readFileSync(path.join(ROOT, "app/layout.tsx"), "utf8");
 const clerkTypes = fs.readFileSync(
   path.join(ROOT, "node_modules/@clerk/shared/dist/types/index.d.ts"),
   "utf8",
@@ -92,11 +95,8 @@ function main() {
   //
   // The elements block is sliced out first: `variables` keys sit at the same
   // indent, and validating those against the element list would fail wrongly.
-  const elementsBlock = layout.slice(
-    layout.indexOf("elements: {"),
-    layout.lastIndexOf("},\n      }}"),
-  );
-  const usedKeys = Array.from(elementsBlock.matchAll(/^\s{10}([a-z][A-Za-z]+):/gm)).map(
+  const elementsBlock = layout.slice(layout.indexOf("elements: {"));
+  const usedKeys = Array.from(elementsBlock.matchAll(/^\s{4}([a-z][A-Za-z]+):/gm)).map(
     (m) => m[1],
   );
   check("element keys were found in the config", usedKeys.length >= 20, `${usedKeys.length} keys`);
@@ -193,6 +193,91 @@ function main() {
       check(`${name} — ${label}`, r >= AA_SMALL, `measured ${r.toFixed(2)}:1`);
     }
   }
+
+  // ── 2d: the ACCOUNT PAGE (UserProfile — Profile + Security) ────
+  // The third component reported for the same bug. The "Primary" chip beside
+  // an email rendered near-black on the dark card.
+  step("2d", "account page + the Primary badge clear AA in every theme");
+
+  // `badge` is the REAL key — not `identificationBadge`. Clerk types it as
+  // WithOptions<'primary' | 'actionRequired'>, and the localization key
+  // badge__primary is what renders the word "Primary".
+  check("badge is a real Clerk element key", /\bbadge:/.test(clerkTypes));
+  check("the badge is themed", /\bbadge:\s*"/.test(elementsBlock));
+  check(
+    "…with BOTH a background and a foreground (a text colour alone would inherit Clerk's chip)",
+    /\bbadge:\s*"[^"]*bg-surface-raised[^"]*text-text/.test(elementsBlock),
+  );
+
+  for (const [key, note] of [
+    ["navbar", "the Profile/Security sidebar"],
+    ["navbarButton", "its tab buttons"],
+    ["profileSectionTitleText", "section headings"],
+    ["profileSectionSubtitleText", "section descriptions"],
+    ["profileSectionPrimaryButton", "Add / Update actions"],
+    ["pageScrollBox", "the page body behind it all"],
+    ["table", "Security: passkeys / devices / MFA rows"],
+    ["tableHeaderCell", "…their column headers"],
+    ["menuList", "the row overflow menu"],
+    ["menuItem", "…its items"],
+    ["alertText", "inline warnings on the Security tab"],
+    ["formButtonReset", "secondary/cancel buttons"],
+  ] as const) {
+    check(`${key} is themed — ${note}`, new RegExp(`\\b${key}:`).test(elementsBlock));
+  }
+
+  for (const [name, selector] of THEMES) {
+    const block = themeBlock(selector);
+    const surface = token(block, "--color-surface");
+    const raised = token(block, "--color-surface-raised");
+    const text = token(block, "--color-text");
+    const muted = token(block, "--color-text-muted");
+    const accent = token(block, "--color-accent");
+
+    const pairs: [string, [number, number, number], [number, number, number]][] = [
+      ['the "Primary" BADGE label on its chip', text, raised],
+      ["navbar tab (resting)", muted, surface],
+      ["navbar tab (active/hover)", text, surface],
+      ["profile section heading", text, surface],
+      ["profile section description", muted, surface],
+      ["Add / Update action link", accent, surface],
+      ["Security table cell text", text, surface],
+      ["Security table column header", muted, surface],
+      ["overflow menu item", text, surface],
+      ["overflow menu item on hover", text, raised],
+      ["inline alert text", text, raised],
+      ["secondary button (resting)", muted, surface],
+    ];
+    for (const [label, fg, bg] of pairs) {
+      const r = contrast(fg, bg);
+      check(`${name} — ${label}`, r >= AA_SMALL, `measured ${r.toFixed(2)}:1`);
+    }
+  }
+
+  // ── 2e: the consolidation itself ──────────────────────────────
+  step("2e", "one shared appearance, applied globally");
+  check(
+    "the appearance lives in its own module, not inline in layout.tsx",
+    fs.existsSync(path.join(ROOT, "lib/clerk-appearance.ts")),
+  );
+  check(
+    "layout.tsx passes it to ClerkProvider",
+    /<ClerkProvider appearance=\{clerkAppearance\}>/.test(rootLayout),
+  );
+  check(
+    "…and layout.tsx no longer carries an inline elements block",
+    !/elements:\s*\{/.test(rootLayout),
+  );
+  // The ONE surviving component-level appearance must be layout-only, never
+  // colour — otherwise it is a per-component patch of the kind this replaces.
+  const shell = fs.readFileSync(path.join(ROOT, "components/portal/portal-shell.tsx"), "utf8");
+  const shellAppearance = /appearance=\{\{[^}]*\{([^}]*)\}/.exec(shell)?.[1] ?? "";
+  check(
+    "the only component-level override left is sizing, not colour",
+    /h-\d+ w-\d+/.test(shellAppearance) &&
+      !/text-|bg-|border-/.test(shellAppearance),
+    shellAppearance.trim(),
+  );
 
   // "System Default" is not a fourth palette — it RESOLVES to dark or light
   // before paint, so it is covered by the two above. Assert that, rather than

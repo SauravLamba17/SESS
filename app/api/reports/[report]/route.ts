@@ -4,7 +4,6 @@ import { resolveReportScope } from "@/lib/reports/scope";
 import { parseRange } from "@/lib/reports/range";
 import { runReport } from "@/lib/reports/run";
 import { serializeCsv } from "@/lib/reports/csv";
-import { mfaStatus } from "@/lib/mfa";
 import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
@@ -41,17 +40,6 @@ export async function GET(
     // Auth + scope. Returns 403 for every no-access cell, and for any EMPLOYEE.
     const scope = await resolveReportScope(def);
     if (!scope.ok) return fail(scope.code, scope.message, scope.status);
-
-    // MFA gate, applied HERE as well as in the portal layouts: a report is a
-    // bulk export of salary and personal data, and this route is reachable
-    // directly with a session cookie without ever rendering a layout.
-    const mfa = await mfaStatus();
-    if (!mfa.satisfied)
-      return fail(
-        "MFA_REQUIRED",
-        "Two-factor authentication must be enabled on your account before you can export reports. Visit /mfa-required to set it up.",
-        403,
-      );
 
     const { searchParams } = new URL(req.url);
     const parsed = parseRange(searchParams.get("startDate"), searchParams.get("endDate"));

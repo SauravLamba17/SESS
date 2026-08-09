@@ -59,9 +59,9 @@ export interface RateResult {
  * abuse-prevention on a public job-application form, not an authorisation
  * gate: no data is exposed and no privilege is granted by letting one through.
  * Weighed against that, a real applicant being turned away during a database
- * hiccup is the worse outcome — they are unlikely to come back. Note the
- * contrast with lib/system-settings.ts's MFA toggle, which fails CLOSED for
- * exactly the opposite reason: that one does guard privileged access.
+ * hiccup is the worse outcome — they are unlikely to come back. Contrast a
+ * setting that guards privileged access, which should fail CLOSED for exactly
+ * the opposite reason.
  *
  * The failure is logged so a persistent outage is visible rather than silently
  * removing the limit forever.

@@ -86,8 +86,16 @@ async function cleanup() {
   await db.notification.deleteMany({ where: { message: { contains: TAG } } });
   await db.jobRequisition.deleteMany({ where: { title: { contains: TAG } } });
   // The suite's own rate-limit attempts, so a re-run starts from a clean budget.
+  // Every loopback spelling: Node reports the connecting address as the
+  // IPv4-mapped "::ffff:127.0.0.1" here, which an earlier version of this list
+  // missed — the suite then rate-limited ITSELF at 5 applications/hour and
+  // reported false failures. Scoped to loopback keys so running this against a
+  // real deployment could never clear a genuine visitor's budget.
   await db.rateLimitAttempt.deleteMany({
-    where: { action: CAREERS_APPLY_ACTION, key: { in: ["127.0.0.1", "::1", "unknown"] } },
+    where: {
+      action: CAREERS_APPLY_ACTION,
+      key: { in: ["127.0.0.1", "::1", "::ffff:127.0.0.1", "localhost", "unknown"] },
+    },
   });
 }
 

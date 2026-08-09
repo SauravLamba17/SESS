@@ -7,7 +7,6 @@ import { checkAttestation, attestationIp } from "@/lib/attestation";
 import { sendEmployeeInvitation } from "@/lib/employees/invite";
 import { clerkCreateInvitation } from "@/lib/employees/invite-clerk";
 import { ROLES, type Role } from "@/lib/auth-types";
-import { withPrivilegedRoute } from "@/lib/mfa-guard";
 import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
@@ -36,7 +35,7 @@ const NEXT: Record<string, string[]> = {
  * onboarding route calls — so employeeCode generation and uniqueness behave
  * the same on both paths.
  */
-async function POSTHandler(req: NextRequest) {
+export async function POST(req: NextRequest) {
   const userId = await getEffectiveUserId();
   if (!userId) return fail("UNAUTHENTICATED", "Not authenticated", 401);
   const role = await getCurrentRole();
@@ -290,8 +289,3 @@ async function POSTHandler(req: NextRequest) {
     return fail("SERVER_ERROR", "Could not update the offer", 503);
   }
 }
-
-// MFA gate — see lib/mfa-guard.ts. Rejects only when the caller's role
-// requires two-factor auth and it is not enabled; every other status this
-// route returns is produced by the handler above, unchanged.
-export const POST = withPrivilegedRoute(POSTHandler);

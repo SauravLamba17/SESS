@@ -10,8 +10,9 @@ export const dynamic = "force-dynamic";
 /**
  * Account & security, hosted by Clerk's own <UserProfile>.
  *
- * This is where HR and Super Admin enable the second factor the /mfa-required
- * gate asks for. Deliberately Clerk's component and not a hand-rolled form:
+ * This is where any user can enable a second factor on their own account if
+ * they want one. Nothing in this app requires or enforces it — MFA enforcement
+ * was removed. Deliberately Clerk's component and not a hand-rolled form:
  * TOTP secrets and backup codes must never pass through this application.
  *
  * Optional catch-all segment because UserProfile owns its own sub-routes.

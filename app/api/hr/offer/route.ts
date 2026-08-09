@@ -3,7 +3,6 @@ import { Prisma } from "@prisma/client";
 import { getEffectiveUserId, getCurrentRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { parseDateOnly } from "@/lib/period";
-import { withPrivilegedRoute } from "@/lib/mfa-guard";
 import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
@@ -34,7 +33,7 @@ function parseMoney(v: unknown): Prisma.Decimal | null {
  * has sent the offer, the figures are locked — enforced here with a status
  * guard in the where-clause, exactly as Payroll protects a FINALIZED row.
  */
-async function POSTHandler(req: NextRequest) {
+export async function POST(req: NextRequest) {
   const userId = await getEffectiveUserId();
   if (!userId) return fail("UNAUTHENTICATED", "Not authenticated", 401);
   const role = await getCurrentRole();
@@ -151,8 +150,3 @@ async function POSTHandler(req: NextRequest) {
     return fail("SERVER_ERROR", "Could not save the offer", 503);
   }
 }
-
-// MFA gate — see lib/mfa-guard.ts. Rejects only when the caller's role
-// requires two-factor auth and it is not enabled; every other status this
-// route returns is produced by the handler above, unchanged.
-export const POST = withPrivilegedRoute(POSTHandler);

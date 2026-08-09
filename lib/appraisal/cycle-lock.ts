@@ -3,9 +3,8 @@ import type { Prisma } from "@prisma/client";
 // Deliberately NOT "server-only": this takes a transaction client as an
 // argument and imports nothing but a type, so it has no server-only
 // dependency of its own. Keeping it importable lets a plain-Node verification
-// script drive the real lock against a real transaction — the same reason
-// lib/mfa-policy.ts is split out of lib/mfa.ts. Only server code calls it,
-// because only server code has a Prisma transaction to pass.
+// script drive the real lock against a real transaction. Only server code
+// calls it, because only server code has a Prisma transaction to pass.
 
 /**
  * Take a row lock on an appraisal cycle and report whether it is still open

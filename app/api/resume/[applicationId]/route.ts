@@ -2,7 +2,6 @@ import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { readResume } from "@/lib/recruitment/storage";
 import { resolveRecruitmentScope, canAccessApplication } from "@/lib/recruitment/access";
-import { withPrivilegedRoute } from "@/lib/mfa-guard";
 import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
@@ -19,11 +18,11 @@ export const dynamic = "force-dynamic";
  * Keyed on applicationId rather than candidateId: access is granted by the
  * ROLE this candidate applied for, which is what carries the department.
  *
- * MFA-gated: a resume is candidate personal data and HR/Super Admin can read
- * every one org-wide. The wrapper only blocks a role that requires MFA, so a
- * Manager reading their own department's resumes is unaffected.
+ * A resume is candidate personal data: HR/Super Admin can read every one
+ * org-wide, a Manager only their own department's. That scoping is enforced in
+ * the handler below and is the only access control on this route.
  */
-async function GETHandler(
+export async function GET(
   _req: NextRequest,
   { params }: { params: { applicationId: string } },
 ) {
@@ -70,5 +69,3 @@ async function GETHandler(
     return fail("SERVER_ERROR", "Could not load the resume", 503);
   }
 }
-
-export const GET = withPrivilegedRoute(GETHandler);

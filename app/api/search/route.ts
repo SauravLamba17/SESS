@@ -3,7 +3,6 @@ import { getEffectiveUserId, getCurrentRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getEmployeeByClerkId } from "@/lib/data/scope";
 import { fail } from "@/lib/api/response";
-import { withPrivilegedRoute } from "@/lib/mfa-guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -58,7 +57,7 @@ export interface SearchHit {
  * traceable. Their email is null after redaction, so the new email match simply
  * stops finding them by it.
  */
-async function GETHandler(req: NextRequest) {
+export async function GET(req: NextRequest) {
   const userId = await getEffectiveUserId();
   if (!userId) return fail("UNAUTHENTICATED", "Not authenticated", 401);
 
@@ -196,18 +195,3 @@ async function GETHandler(req: NextRequest) {
     return fail("SERVER_ERROR", "Search is unavailable right now", 503);
   }
 }
-
-// MFA gate — see lib/mfa-guard.ts.
-//
-// This route was previously exempt on the grounds that its results are scoped
-// per role in-route. That reasoning holds for EMPLOYEE (own record only) and
-// MANAGER (own team), but NOT for HR/SUPER_ADMIN, whose branch reads org-wide
-// across Employee — including email — plus every Candidate and JobRequisition.
-// That is exactly the "organisation-wide personal data" lib/mfa-policy.ts
-// cites as the reason those two roles need a second factor, and it left this
-// as the last org-wide read reachable with a stolen HR password alone.
-//
-// The wrapper is a no-op for EMPLOYEE and MANAGER (their roles never require
-// MFA), so gating the whole route costs those callers nothing and closes the
-// privileged branch.
-export const GET = withPrivilegedRoute(GETHandler);

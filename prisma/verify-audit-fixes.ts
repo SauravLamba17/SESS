@@ -264,13 +264,20 @@ async function main() {
   );
 
   // ── 2 & 5: static ─────────────────────────────────────────────
-  step("2+5", "search is MFA-gated; toISOString date bugs are gone");
+  step("2+5", "search keeps its own role scoping; toISOString date bugs are gone");
 
   const searchSrc = fs.readFileSync(path.join(ROOT, "app/api/search/route.ts"), "utf8");
-  check("search exports GET via withPrivilegedRoute", /export const GET = withPrivilegedRoute\(GETHandler\)/.test(searchSrc));
-  check("search no longer exports a raw GET", !/^export async function GET\s*\(/m.test(searchSrc));
-  const guardSrc = fs.readFileSync(path.join(ROOT, "prisma/verify-mfa-guard.ts"), "utf8");
-  check("search removed from the MFA exemption list", !/"app\/api\/search\/route\.ts":\s*"/.test(guardSrc));
+  // MFA enforcement was removed from the codebase, so search is a plain GET
+  // again. These checks were inverted rather than deleted: what actually
+  // protects the org-wide branch is the IN-ROUTE role scoping, and that must
+  // still be here now that the wrapper is not.
+  check("search exports a plain GET again", /^export async function GET\s*\(/m.test(searchSrc));
+  check("search has no MFA wrapper left", !/withPrivilegedRoute/.test(searchSrc));
+  check("search still authenticates in-route", /getEffectiveUserId\(\)/.test(searchSrc));
+  check("search still resolves the caller's role in-route", /getCurrentRole\(\)/.test(searchSrc));
+  check("search still branches org-wide reads on HR/SUPER_ADMIN",
+    /role === "HR" \|\| role === "SUPER_ADMIN"/.test(searchSrc));
+  check("search still has a MANAGER-scoped branch", /role === "MANAGER"/.test(searchSrc));
 
   for (const [f, needle] of [
     ["lib/payroll/pdf.tsx", "toYmd"],

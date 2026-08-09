@@ -3,7 +3,6 @@ import { getEffectiveUserId, getCurrentRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { parseDateOnly } from "@/lib/period";
 import { aggregateSurvey } from "@/lib/engagement/pulse";
-import { withPrivilegedRoute } from "@/lib/mfa-guard";
 import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
@@ -15,7 +14,7 @@ export const dynamic = "force-dynamic";
  * There is deliberately no endpoint anywhere that returns individual
  * responses — see GET below, which returns aggregates only.
  */
-async function POSTHandler(req: NextRequest) {
+export async function POST(req: NextRequest) {
   const userId = await getEffectiveUserId();
   if (!userId) return fail("UNAUTHENTICATED", "Not authenticated", 401);
   const role = await getCurrentRole();
@@ -104,7 +103,7 @@ async function POSTHandler(req: NextRequest) {
  * individual response row is loaded into memory, and none could be serialised
  * into this response even by accident.
  */
-async function GETHandler(req: NextRequest) {
+export async function GET(req: NextRequest) {
   const userId = await getEffectiveUserId();
   if (!userId) return fail("UNAUTHENTICATED", "Not authenticated", 401);
   const role = await getCurrentRole();
@@ -136,9 +135,3 @@ async function GETHandler(req: NextRequest) {
     return fail("SERVER_ERROR", "Could not load results", 503);
   }
 }
-
-// MFA gate — see lib/mfa-guard.ts. Rejects only when the caller's role
-// requires two-factor auth and it is not enabled; every other status this
-// route returns is produced by the handler above, unchanged.
-export const GET = withPrivilegedRoute(GETHandler);
-export const POST = withPrivilegedRoute(POSTHandler);

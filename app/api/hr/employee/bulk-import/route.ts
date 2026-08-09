@@ -3,7 +3,6 @@ import { getEffectiveUserId, getCurrentRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { onboardEmployee } from "@/lib/employees/onboard";
 import { validateCsv, type ValidationContext } from "@/lib/employees/csv-import";
-import { withPrivilegedRoute } from "@/lib/mfa-guard";
 import { fail } from "@/lib/api/response";
 import { ymd } from "@/lib/reports/range";
 
@@ -50,7 +49,7 @@ const MAX_ROWS = 1000;
  * the shared onboardEmployee(), plus one BULK_EMPLOYEE_IMPORT row summarising
  * the batch.
  */
-async function POSTHandler(req: NextRequest) {
+export async function POST(req: NextRequest) {
   const userId = await getEffectiveUserId();
   if (!userId) return fail("UNAUTHENTICATED", "Not authenticated", 401);
   const role = await getCurrentRole();
@@ -206,8 +205,3 @@ async function POSTHandler(req: NextRequest) {
     return fail("SERVER_ERROR", "Could not import employees", 503);
   }
 }
-
-// MFA gate — see lib/mfa-guard.ts. Rejects only when the caller's role
-// requires two-factor auth and it is not enabled; every other status this
-// route returns is produced by the handler above, unchanged.
-export const POST = withPrivilegedRoute(POSTHandler);

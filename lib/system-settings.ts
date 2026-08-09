@@ -20,8 +20,6 @@ export const MODULE_KEYS = {
   attendanceValidation: "ATTENDANCE_VALIDATION_MODE",
   /** Social wall + pulse surveys visibility. */
   engagement: "ENGAGEMENT_ENABLED",
-  /** Require a second factor for HR/Super Admin. Defaults OFF — see below. */
-  mfaEnforcement: "MFA_ENFORCEMENT_ENABLED",
 } as const;
 
 export const VALIDATION_MODES: ValidationMode[] = ["NONE", "IP_LOCK", "GEOFENCE", "BOTH"];
@@ -54,44 +52,6 @@ export function engagementEnabled(): Promise<boolean> {
 }
 
 /**
- * Is MFA enforcement switched on? Defaults OFF.
- *
- * ─── WHY THIS DOES NOT USE boolSetting() ─────────────────────────────────
- * boolSetting() leans on getSetting(), which swallows a database error and
- * returns null — indistinguishable from "no row yet". For every other toggle
- * that conflation is harmless, because their default and their failure mode
- * point the same way. Here they point in OPPOSITE directions:
- *
- *   • NO ROW  → the Super Admin has never switched enforcement on → OFF.
- *     This is the documented default and must stay off, or upgrading the app
- *     would silently lock every HR user out of their own portal.
- *
- *   • READ FAILED → we do not know what the org configured. This gate protects
- *     payroll and organisation-wide personal data, so the safe answer to "is
- *     enforcement on?" is YES. FAIL CLOSED, matching lib/mfa.ts's behaviour
- *     when Clerk itself is unreachable.
- *
- * Collapsing those two into one null is exactly how a database blip would
- * disable a security control without anyone noticing, so this reads the row
- * itself rather than going through the shared helper.
- */
-export async function mfaEnforcementEnabled(): Promise<boolean> {
-  try {
-    const row = await db.systemSetting.findUnique({
-      where: { key: MODULE_KEYS.mfaEnforcement },
-    });
-    // Absent row, or any value other than the literal "true", means off.
-    return row?.value === "true";
-  } catch (err) {
-    console.error(
-      "[system-settings] could not read MFA_ENFORCEMENT_ENABLED; failing CLOSED (treating enforcement as ON):",
-      err,
-    );
-    return true;
-  }
-}
-
-/**
  * Attendance validation mode: DB setting → env var → NONE. The env var keeps
  * working as the deploy-time default; the DB value only overrides once a
  * Super Admin deliberately sets it from the UI.
@@ -109,18 +69,15 @@ export async function moduleToggleValues(): Promise<{
   idleTracking: boolean;
   engagement: boolean;
   attendanceValidation: ValidationMode;
-  mfaEnforcement: boolean;
 }> {
-  const [idle, engagement, mode, mfa] = await Promise.all([
+  const [idle, engagement, mode] = await Promise.all([
     idleTrackingEnabled(),
     engagementEnabled(),
     attendanceValidationMode(),
-    mfaEnforcementEnabled(),
   ]);
   return {
     idleTracking: idle,
     engagement,
     attendanceValidation: mode,
-    mfaEnforcement: mfa,
   };
 }

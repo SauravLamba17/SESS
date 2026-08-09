@@ -45,12 +45,11 @@ const isPublicRoute = createRouteMatcher([
 const isSharedAuthedRoute = createRouteMatcher([
   "/community(.*)",
   "/pulse(.*)",
-  // Account/security (where MFA is enabled) and the MFA gate itself: both must
-  // require a signed-in user but NO particular role — an HR user who has not
-  // set up MFA yet must still be able to reach them, which is exactly why the
-  // MFA check lives in the portal layouts and not here.
+  // Clerk's account/security page: signed-in, but NO particular role, so a
+  // user of any role can manage their own account. (/mfa-required used to sit
+  // alongside it; that page and the whole MFA enforcement feature were
+  // removed.)
   "/account(.*)",
-  "/mfa-required(.*)",
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
@@ -89,7 +88,7 @@ export default clerkMiddleware(async (auth, req) => {
   // guard still has to be here and cannot fold into that call: canAccessPath
   // takes a non-null Role, and a signed-in user whose token carries no
   // recognisable role must still reach the shared non-portal routes
-  // (/community, /pulse, /account, /mfa-required) — portalForPath() returns
+  // (/community, /pulse, /account) — portalForPath() returns
   // null for those, so they fall through untouched, exactly as before.
   if (portal && (!role || !canAccessPath(role, req.nextUrl.pathname))) {
     return NextResponse.redirect(new URL("/", req.url));

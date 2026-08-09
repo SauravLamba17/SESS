@@ -1,5 +1,8 @@
 /**
- * Phase 12b verification — CSV export, My Data self-scope, and MFA enforcement.
+ * Phase 12b verification — CSV export and My Data self-scope.
+ *
+ * The MFA enforcement section was removed with the feature itself; the CSV and
+ * My Data coverage below is unchanged.
  *
  * Runs the REAL pure functions and the REAL serializer against a seeded,
  * hand-checkable dataset. Creates its own throwaway data and deletes
@@ -22,9 +25,6 @@ import {
   payrollCostCsv,
 } from "../lib/reports/csv.ts";
 import { REPORTS, REPORT_BY_ID, scopeFor, reportsForRole, canCsv } from "../lib/reports/registry.ts";
-// The PURE policy module — lib/mfa.ts is this same rule wired to Clerk, and
-// pulls in next/headers, which plain Node cannot load.
-import { mfaRedirectRequired, roleRequiresMfa, ROLES_REQUIRING_MFA } from "../lib/mfa-policy.ts";
 
 const db = new PrismaClient();
 
@@ -357,25 +357,6 @@ async function main() {
     "computeMyData takes no employee identifier at all",
     computeMyData.length === 2, // (input, range) — nothing else to hijack
   );
-
-  // ── 4: MFA ENFORCEMENT RULE ─────────────────────────────────────
-  step("4", "MFA required for HR / Super Admin only");
-  eq("roles requiring MFA", ROLES_REQUIRING_MFA, ["HR", "SUPER_ADMIN"]);
-  check("HR requires MFA", roleRequiresMfa("HR"));
-  check("SUPER_ADMIN requires MFA", roleRequiresMfa("SUPER_ADMIN"));
-  check("MANAGER does not", !roleRequiresMfa("MANAGER"));
-  check("EMPLOYEE does not", !roleRequiresMfa("EMPLOYEE"));
-
-  // The redirect decision, every combination.
-  check("HR without MFA → redirected", mfaRedirectRequired("HR", false) === true);
-  check("HR with MFA → allowed", mfaRedirectRequired("HR", true) === false);
-  check("SUPER_ADMIN without MFA → redirected", mfaRedirectRequired("SUPER_ADMIN", false) === true);
-  check("SUPER_ADMIN with MFA → allowed", mfaRedirectRequired("SUPER_ADMIN", true) === false);
-  check("MANAGER without MFA → NOT redirected", mfaRedirectRequired("MANAGER", false) === false);
-  check("MANAGER with MFA → allowed", mfaRedirectRequired("MANAGER", true) === false);
-  check("EMPLOYEE without MFA → NOT redirected", mfaRedirectRequired("EMPLOYEE", false) === false);
-  check("EMPLOYEE with MFA → allowed", mfaRedirectRequired("EMPLOYEE", true) === false);
-  check("null role → not gated (sign-in handles it)", mfaRedirectRequired(null, false) === false);
 
   // ── 5: HTTP surface ─────────────────────────────────────────────
   step("5", "HTTP — CSV format and the unauthenticated gate");

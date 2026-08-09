@@ -4,7 +4,6 @@ import { getEffectiveUserId, getCurrentRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { isPeriod } from "@/lib/period";
 import { periodLabel } from "@/lib/payroll/format";
-import { withPrivilegedRoute } from "@/lib/mfa-guard";
 import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
@@ -29,7 +28,7 @@ export const maxDuration = 45;
  *   2. salary-advance balances reduced by each row's loanDeduction,
  *   3. a PAYSLIP_READY notification per employee.
  */
-async function POSTHandler(req: NextRequest) {
+export async function POST(req: NextRequest) {
   const userId = await getEffectiveUserId();
   if (!userId) return fail("UNAUTHENTICATED", "Not authenticated", 401);
   const role = await getCurrentRole();
@@ -151,8 +150,3 @@ async function POSTHandler(req: NextRequest) {
     return fail("SERVER_ERROR", "Could not finalize the payroll run", 503);
   }
 }
-
-// MFA gate — see lib/mfa-guard.ts. Rejects only when the caller's role
-// requires two-factor auth and it is not enabled; every other status this
-// route returns is produced by the handler above, unchanged.
-export const POST = withPrivilegedRoute(POSTHandler);

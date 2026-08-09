@@ -1,17 +1,13 @@
-import { redirect } from "next/navigation";
 import { PortalShell } from "@/components/portal/portal-shell";
 import { getCurrentRole } from "@/lib/auth";
-import { mfaStatus } from "@/lib/mfa";
 
 export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  // MANDATORY MFA GATE — see app/hr/layout.tsx and lib/mfa.ts.
-  const mfa = await mfaStatus();
-  if (!mfa.satisfied) redirect("/mfa-required");
-
+  // Role gating for /admin lives in middleware.ts (canAccessPath) — see
+  // app/hr/layout.tsx. No second-factor check: MFA enforcement was removed.
   const role = await getCurrentRole();
   return (
     <PortalShell portal="admin" role={role}>

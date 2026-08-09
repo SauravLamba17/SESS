@@ -2,7 +2,6 @@ import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { parseDateOnly } from "@/lib/period";
 import { resolveRecruitmentScope, canAccessApplication } from "@/lib/recruitment/access";
-import { withPrivilegedRoute } from "@/lib/mfa-guard";
 import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
@@ -19,7 +18,7 @@ export const dynamic = "force-dynamic";
  * Notes are free text typed by a person. Nothing here is generated, scored or
  * summarised by a machine.
  */
-async function POSTHandler(req: NextRequest) {
+export async function POST(req: NextRequest) {
   const scope = await resolveRecruitmentScope();
   if (!scope.ok)
     return fail(
@@ -111,8 +110,3 @@ async function POSTHandler(req: NextRequest) {
     return fail("SERVER_ERROR", "Could not save the feedback", 503);
   }
 }
-
-// MFA gate — see lib/mfa-guard.ts. Rejects only when the caller's role
-// requires two-factor auth and it is not enabled; every other status this
-// route returns is produced by the handler above, unchanged.
-export const POST = withPrivilegedRoute(POSTHandler);

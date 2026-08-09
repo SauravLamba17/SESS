@@ -3,7 +3,6 @@ import { Prisma } from "@prisma/client";
 import { getEffectiveUserId, getCurrentRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { renderOfferLetter } from "@/lib/payroll/pdf";
-import { withPrivilegedRoute } from "@/lib/mfa-guard";
 import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
@@ -22,7 +21,7 @@ const DOWNLOADABLE = ["APPROVED", "SENT", "ACCEPTED", "DECLINED"];
  *
  * WITHDRAWN is also refused: there is no offer to letter-ise any more.
  */
-async function GETHandler(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const userId = await getEffectiveUserId();
   if (!userId) return fail("UNAUTHENTICATED", "Not authenticated", 401);
   const role = await getCurrentRole();
@@ -101,8 +100,3 @@ async function GETHandler(_req: NextRequest, { params }: { params: { id: string 
     return fail("SERVER_ERROR", "Could not generate the offer letter", 503);
   }
 }
-
-// MFA gate — see lib/mfa-guard.ts. Rejects only when the caller's role
-// requires two-factor auth and it is not enabled; every other status this
-// route returns is produced by the handler above, unchanged.
-export const GET = withPrivilegedRoute(GETHandler);

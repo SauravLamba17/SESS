@@ -1,7 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getEffectiveUserId, getCurrentRole } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { withPrivilegedRoute } from "@/lib/mfa-guard";
 import { lateMinutesForShift } from "@/lib/attendance/validation";
 import { fail } from "@/lib/api/response";
 import { ymd } from "@/lib/reports/range";
@@ -39,7 +38,7 @@ function iso(d: Date | null): string {
  * rather than rejected — the same "a shift belongs to the day it started" rule
  * the punch route follows.
  */
-async function POSTHandler(req: NextRequest) {
+export async function POST(req: NextRequest) {
   const userId = await getEffectiveUserId();
   if (!userId) return fail("UNAUTHENTICATED", "Not authenticated", 401);
   const role = await getCurrentRole();
@@ -199,8 +198,3 @@ async function POSTHandler(req: NextRequest) {
     return fail("SERVER_ERROR", "Could not correct the attendance record", 503);
   }
 }
-
-// MFA gate — see lib/mfa-guard.ts. Rejects only when the caller's role
-// requires two-factor auth and it is not enabled; every other status this
-// route returns is produced by the handler above, unchanged.
-export const POST = withPrivilegedRoute(POSTHandler);

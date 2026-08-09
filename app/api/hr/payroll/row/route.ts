@@ -4,7 +4,6 @@ import { getEffectiveUserId, getCurrentRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { computeGrossNet } from "@/lib/payroll/compute";
 import { parseMoney } from "@/lib/payroll/money";
-import { withPrivilegedRoute } from "@/lib/mfa-guard";
 import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
@@ -60,7 +59,7 @@ const ADJUSTMENT_EARNING_FIELDS = ["basic", "hra", "specialAllowance"] as const;
  * app/api/hr/payroll/adjustment/route.ts for why), so signed amounts are
  * accepted and the three earning components become editable.
  */
-async function POSTHandler(req: NextRequest) {
+export async function POST(req: NextRequest) {
   const userId = await getEffectiveUserId();
   if (!userId) return fail("UNAUTHENTICATED", "Not authenticated", 401);
   const role = await getCurrentRole();
@@ -217,8 +216,3 @@ async function POSTHandler(req: NextRequest) {
     return fail("SERVER_ERROR", "Could not update the payroll row", 503);
   }
 }
-
-// MFA gate — see lib/mfa-guard.ts. Rejects only when the caller's role
-// requires two-factor auth and it is not enabled; every other status this
-// route returns is produced by the handler above, unchanged.
-export const POST = withPrivilegedRoute(POSTHandler);

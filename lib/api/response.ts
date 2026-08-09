@@ -14,8 +14,6 @@ import { NextResponse } from "next/server";
  * the 53 routes that never pass it get exactly the two-key body they always
  * had. That is why one function can serve both former variants rather than two.
  *
- * lib/mfa-guard.ts uses this too, so the gate's 403 is built by the same
- * function as the handler's own errors and cannot drift into a different shape.
  */
 export function fail(
   code: string,

@@ -5,7 +5,6 @@ import { db } from "@/lib/db";
 import { getEmployeeByClerkId } from "@/lib/data/scope";
 import { financialYearMonths } from "@/lib/period";
 import { renderForm16 } from "@/lib/payroll/pdf";
-import { withPrivilegedRoute } from "@/lib/mfa-guard";
 import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
@@ -22,11 +21,11 @@ export const dynamic = "force-dynamic";
  * FINALIZED rows only. A partial year is labelled as partial in the document;
  * missing months are never estimated or fabricated.
  *
- * MFA-gated: HR/Super Admin may request ANY employee's annual earnings and TDS
- * via ?employeeId. The wrapper only blocks a role that requires MFA, so an
- * employee fetching their own Form 16 is unaffected.
+ * HR/Super Admin may request ANY employee's annual earnings and TDS via
+ * ?employeeId; an employee may fetch only their own. That scoping is enforced
+ * in the handler below and is the only access control on this route.
  */
-async function GETHandler(req: NextRequest) {
+export async function GET(req: NextRequest) {
   const userId = await getEffectiveUserId();
   if (!userId) return fail("UNAUTHENTICATED", "Not authenticated", 401);
 
@@ -134,5 +133,3 @@ async function GETHandler(req: NextRequest) {
     return fail("SERVER_ERROR", "Could not generate the Form 16 statement", 503);
   }
 }
-
-export const GET = withPrivilegedRoute(GETHandler);

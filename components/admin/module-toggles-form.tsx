@@ -8,7 +8,8 @@ const MODES = ["NONE", "IP_LOCK", "GEOFENCE", "BOTH"] as const;
 
 /**
  * Hover/tap guide for a toggle whose consequences aren't obvious from its
- * label — currently just the MFA switch.
+ * label. No toggle passes `hint` today (the MFA switch, its only consumer, was
+ * removed with the feature); kept as the pattern for the next one that needs it.
  *
  * Opens on hover AND on click, because a hover-only tooltip is unreachable on
  * a touch device. Focus opens it too, so it is not keyboard-invisible; Escape

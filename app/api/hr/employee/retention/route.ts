@@ -1,7 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getEffectiveUserId, getCurrentRole } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { withPrivilegedRoute } from "@/lib/mfa-guard";
 import { fail } from "@/lib/api/response";
 import {
   checkEligibility,
@@ -31,7 +30,7 @@ export const dynamic = "force-dynamic";
  * `extend` pushes the date out when there is a live legal or audit reason to
  * hold the full record longer.
  */
-async function POSTHandler(req: NextRequest) {
+export async function POST(req: NextRequest) {
   const userId = await getEffectiveUserId();
   if (!userId) return fail("UNAUTHENTICATED", "Not authenticated", 401);
   const role = await getCurrentRole();
@@ -156,8 +155,3 @@ async function POSTHandler(req: NextRequest) {
     return fail("SERVER_ERROR", "Could not complete the retention action", 503);
   }
 }
-
-// MFA gate — see lib/mfa-guard.ts. Rejects only when the caller's role
-// requires two-factor auth and it is not enabled; every other status this
-// route returns is produced by the handler above, unchanged.
-export const POST = withPrivilegedRoute(POSTHandler);

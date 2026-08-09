@@ -6,7 +6,6 @@ import {
   MIN_IDLE_THRESHOLD_SECONDS,
   MAX_IDLE_THRESHOLD_SECONDS,
 } from "@/lib/idle/settings";
-import { withPrivilegedRoute } from "@/lib/mfa-guard";
 import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
@@ -19,7 +18,7 @@ export const dynamic = "force-dynamic";
  * without a redeploy. Agents pick the new value up from the next heartbeat
  * response — no reinstall, no push mechanism needed.
  */
-async function POSTHandler(req: NextRequest) {
+export async function POST(req: NextRequest) {
   const userId = await getEffectiveUserId();
   if (!userId) return fail("UNAUTHENTICATED", "Not authenticated", 401);
   const role = await getCurrentRole();
@@ -68,8 +67,3 @@ async function POSTHandler(req: NextRequest) {
     return fail("SERVER_ERROR", "Could not update the threshold", 503);
   }
 }
-
-// MFA gate — see lib/mfa-guard.ts. Rejects only when the caller's role
-// requires two-factor auth and it is not enabled; every other status this
-// route returns is produced by the handler above, unchanged.
-export const POST = withPrivilegedRoute(POSTHandler);

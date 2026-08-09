@@ -9,6 +9,12 @@ import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// The $transaction below is capped at 30s. Bound the function just above that
+// so Prisma's own timeout wins the race and returns a real error, rather than
+// Vercel killing the invocation mid-transaction and returning a bare 504.
+// Set explicitly rather than inheriting the platform default, so the ceiling
+// stays tied to the transaction's own timeout if that default ever changes.
+export const maxDuration = 45;
 
 /** Exclusive upper bound of a "YYYY-MM" period. */
 function monthEnd(period: string): Date {

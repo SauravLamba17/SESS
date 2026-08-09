@@ -16,6 +16,13 @@ import { lockCycleForWrite } from "@/lib/appraisal/cycle-lock";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// The $transaction below is capped at 60s and upserts one row PER EMPLOYEE in a
+// loop, so its duration scales with headcount. 90 leaves Prisma's own 60s
+// timeout room to fire first and return a real error, instead of Vercel killing
+// the invocation mid-transaction and returning a bare 504.
+// Set explicitly rather than inheriting the platform default, so the ceiling
+// stays tied to the transaction's own timeout if that default ever changes.
+export const maxDuration = 90;
 
 function parseWeights(raw: unknown): AppraisalWeights {
   const w = (raw ?? {}) as Record<string, unknown>;

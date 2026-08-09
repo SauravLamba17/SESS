@@ -680,6 +680,24 @@ model Application {
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
 
+  // ── Terms & Conditions acceptance ─────────────────────────────────
+  // Recorded PER APPLICATION, not per candidate, and deliberately so: a
+  // repeat applicant reuses one Candidate row across several Applications,
+  // so storing this on Candidate would let a later submission overwrite the
+  // record of what an earlier one actually agreed to. This is a point-in-time
+  // legal act, unlike Candidate.talentPoolConsent which is a standing
+  // preference and correctly lives on the candidate.
+  //
+  // Nullable because every Application created BEFORE this column existed
+  // genuinely has no acceptance on file. Backfilling a timestamp would be
+  // inventing consent that was never given. New public submissions cannot be
+  // created without it — app/api/careers/apply rejects them with a 400.
+  termsAcceptedAt  DateTime?
+  // Which wording they agreed to (see lib/recruitment/terms.ts TERMS_VERSION).
+  // Stored as a string so a future terms update never retroactively
+  // misrepresents what an older applicant signed up to.
+  termsVersion     String?
+
   interviewFeedback InterviewFeedback[]
   offer             Offer?
 

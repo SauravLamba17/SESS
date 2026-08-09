@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { storeResume } from "@/lib/recruitment/storage";
 import { checkRateLimit, clientIp } from "@/lib/recruitment/rate-limit";
 import { notifyHrOfApplication } from "@/lib/recruitment/notify";
+import { TERMS_VERSION } from "@/lib/recruitment/terms";
 import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
@@ -70,14 +71,25 @@ export async function POST(req: NextRequest) {
   if (!/^[\d+\-() ]{6,20}$/.test(phone))
     return fail("BAD_INPUT", "Please enter a valid phone number.", 400);
 
+  // ── Terms & Conditions: REQUIRED, and enforced here rather than by the
+  // disabled submit button. An unchecked HTML checkbox submits nothing, so
+  // absence is the normal "not accepted" signal — and a hand-crafted POST that
+  // simply omits the field lands in exactly the same branch. There is no shape
+  // of request that stores an application without acceptance on file.
+  //
+  // Checked BEFORE the resume is read or stored, so a rejected submission
+  // never writes a file we would then have to clean up.
+  const termsAccepted = str(form.get("termsAccepted")) === "yes";
+  if (!termsAccepted)
+    return fail(
+      "TERMS_NOT_ACCEPTED",
+      "Please read and agree to the Terms and Conditions before submitting your application.",
+      400,
+    );
+
   const file = form.get("resume");
   if (!(file instanceof File))
     return fail("BAD_INPUT", "Please attach your resume as a PDF.", 400);
-
-  // Opt-in talent pool. An unchecked HTML checkbox submits NOTHING, so absence
-  // means "not consented" — which is the correct and safe default. Consent is
-  // only true when the applicant actively ticked the box.
-  const talentPoolConsent = str(form.get("talentPoolConsent")) === "yes";
 
   try {
     // ── The requisition must be OPEN. Enforced server-side: a stale tab or a
@@ -125,7 +137,19 @@ export async function POST(req: NextRequest) {
     if (!stored.ok) return fail(stored.code, stored.message, 400);
 
     const result = await db.$transaction(async (tx) => {
-      const consentAt = talentPoolConsent ? new Date() : null;
+      const now = new Date();
+
+      // ── Talent pool: the career-page checkbox that used to set this was
+      // removed, so a public applicant can no longer opt in and this is now
+      // always false. The FIELDS and the retention engine that reads them
+      // (lib/recruitment/retention.ts) are deliberately untouched — the
+      // 2-year consented tier still exists in code, it is simply no longer
+      // reachable from this form. Written explicitly rather than left to the
+      // schema default so the behaviour is stated, not inferred: a repeat
+      // applicant's row is cleared exactly as it was when they left the old
+      // box unticked.
+      const talentPoolConsent = false;
+      const consentAt = null;
 
       const candidate = existingCandidate
         ? await tx.candidate.update({
@@ -161,6 +185,11 @@ export async function POST(req: NextRequest) {
           candidateId: candidate.id,
           jobRequisitionId: requisitionId,
           // stage defaults to APPLIED — a human moves it from here.
+          // Acceptance is stamped in the same transaction as the application
+          // it belongs to: there is no window in which a row exists without
+          // its terms record.
+          termsAcceptedAt: now,
+          termsVersion: TERMS_VERSION,
         },
       });
 

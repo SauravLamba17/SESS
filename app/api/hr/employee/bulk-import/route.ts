@@ -9,6 +9,14 @@ import { ymd } from "@/lib/reports/range";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// The $transaction below is capped at 60s and calls onboardEmployee() once PER
+// CSV ROW in a loop, so its duration scales with the size of the import. 90
+// leaves Prisma's own 60s timeout room to fire first and return a real error,
+// instead of Vercel killing the invocation mid-transaction — which on an
+// all-or-nothing import would leave the caller unsure what was written.
+// Set explicitly rather than inheriting the platform default, so the ceiling
+// stays tied to the transaction's own timeout if that default ever changes.
+export const maxDuration = 90;
 
 const MAX_CSV_BYTES = 1024 * 1024; // 1 MB — thousands of rows, not a data dump
 const MAX_ROWS = 1000;

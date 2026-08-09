@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useRef } from "react";
+import Link from "next/link";
 import { CheckCircle2, Loader2, Upload } from "lucide-react";
+import { TERMS_PATH } from "@/lib/recruitment/terms";
 
 const inputClass =
   "w-full rounded border border-border bg-background px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:border-accent";
@@ -14,6 +16,8 @@ export function ApplicationForm({ requisitionId }: { requisitionId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
+  // Gates the submit button. Mirrored server-side — see app/api/careers/apply.
+  const [accepted, setAccepted] = useState(false);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -52,6 +56,7 @@ export function ApplicationForm({ requisitionId }: { requisitionId: string }) {
       setDone(true);
       form.reset();
       setFileName(null);
+      setAccepted(false);
     } catch {
       setError("Network error — please check your connection and try again.");
     } finally {
@@ -139,32 +144,36 @@ export function ApplicationForm({ requisitionId }: { requisitionId: string }) {
         />
       </div>
 
-      {/* Genuine opt-in: unchecked by default, never pre-ticked, and the
-          application succeeds either way. Declining costs the applicant
-          nothing for THIS role — it only affects future consideration. */}
+      {/* REQUIRED acceptance. Unchecked by default and never pre-ticked — a
+          pre-ticked box is not agreement. An unchecked checkbox submits
+          NOTHING, so the server sees the field's absence and rejects the
+          submission; the disabled button below is UX, not the control. */}
       <div className="rounded border border-border bg-surface-raised/40 p-3">
-        <label htmlFor="talentPoolConsent" className="flex cursor-pointer items-start gap-2.5">
+        <label htmlFor="termsAccepted" className="flex cursor-pointer items-start gap-2.5">
           <input
-            id="talentPoolConsent"
-            name="talentPoolConsent"
+            id="termsAccepted"
+            name="termsAccepted"
             type="checkbox"
             value="yes"
-            className="mt-0.5 h-4 w-4 shrink-0 rounded border-border bg-background accent-good"
+            required
+            checked={accepted}
+            onChange={(e) => setAccepted(e.target.checked)}
+            className="mt-0.5 h-4 w-4 shrink-0 rounded border-border bg-background accent-accent"
           />
           <span className="text-xs text-text">
-            Keep me in mind for future roles
-            <span className="mt-1 block text-text-muted">
-              I consent to my application being retained for up to 1 year for
-              consideration for future openings, even if I am not selected for
-              this role.
-            </span>
+            I have read and agree to the{" "}
+            {/* New tab on purpose: this form holds an attached file and typed
+                details that navigating away would discard. */}
+            <Link
+              href={TERMS_PATH}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-accent underline underline-offset-2 hover:opacity-80"
+            >
+              Terms and Conditions
+            </Link>
           </span>
         </label>
-        <p className="mt-2 border-t border-border pt-2 text-[10px] text-text-muted">
-          Optional — leaving this unticked will not affect your application for
-          this role. If you don&apos;t opt in and you aren&apos;t selected, your
-          details are scheduled for review and deletion after one year.
-        </p>
       </div>
 
       {error && (
@@ -175,17 +184,12 @@ export function ApplicationForm({ requisitionId }: { requisitionId: string }) {
 
       <button
         type="submit"
-        disabled={pending}
+        disabled={pending || !accepted}
         className="inline-flex items-center justify-center gap-2 rounded bg-accent px-5 py-2.5 text-sm font-medium text-background transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:opacity-50"
       >
         {pending && <Loader2 size={16} className="animate-spin" />}
         {pending ? "Submitting…" : "Submit application"}
       </button>
-
-      <p className="text-xs text-text-muted">
-        By applying you consent to us storing your contact details and resume
-        for the purpose of this recruitment process.
-      </p>
     </form>
   );
 }

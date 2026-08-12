@@ -52,7 +52,10 @@ export async function PortalShell({
           page scrolls as one document; from lg it is the original two-column
           layout with an independently scrolling main pane. */}
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
-        <Sidebar portal={portal} />
+        {/* `role` is the VIEWER's role (impersonation-aware, resolved by each
+            portal layout), not the portal's own — it drives which cross-portal
+            shortcuts are permitted. */}
+        <Sidebar portal={portal} role={role} />
 
         <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border bg-surface px-4 lg:px-6">

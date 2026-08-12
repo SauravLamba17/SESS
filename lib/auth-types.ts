@@ -169,6 +169,9 @@ export const NAV: Record<PortalKey, NavItem[]> = {
   ],
   admin: [
     { label: "System Dashboard", href: "/admin", icon: "LayoutDashboard" },
+    // NOTE: Super Admin's links INTO the HR portal are not listed here — see
+    // CROSS_PORTAL_NAV at the bottom of this file for why they are a separate,
+    // permission-filtered group rather than 16 duplicated entries.
     { label: "Roles & Permissions", href: "/admin/roles", icon: "KeyRound" },
     { label: "Organization", href: "/admin/organization", icon: "Network" },
     { label: "Payroll Finalization", href: "/admin/payroll", icon: "Lock" },
@@ -182,3 +185,57 @@ export const NAV: Record<PortalKey, NavItem[]> = {
     { label: "Pulse Surveys", href: "/pulse", icon: "Activity" },
   ],
 };
+
+/**
+ * Cross-portal shortcuts — links from one portal's sidebar into ANOTHER portal
+ * the viewer is already permitted to enter.
+ *
+ * ─── WHY THIS EXISTS, AND WHY IT IS NOT JUST MORE NAV ENTRIES ────────────
+ * ROUTE_ACCESS.hr is ["HR", "SUPER_ADMIN"], so a Super Admin may enter all 16
+ * /hr routes — but NAV.admin listed none of them, leaving Employee Master
+ * reachable only by typing a URL. That matters most when NO HR account exists
+ * yet: onboarding the first employee is a Super Admin's bootstrapping path.
+ *
+ * The fix is deliberately NOT "copy HR's 16 items into NAV.admin". app/hr/
+ * layout.tsx renders <PortalShell portal="hr">, so the moment a Super Admin
+ * lands on any /hr route they already get HR's complete 17-item sidebar.
+ * Duplicating those links would double a 12-item sidebar to ~28, and every
+ * copy would lead to a page that immediately shows the real HR nav anyway.
+ * Two entry points cost two rows and reach all sixteen.
+ *
+ * ─── VISIBILITY IS DERIVED, NOT HAND-WRITTEN ─────────────────────────────
+ * crossPortalNavFor() filters through canAccessPath() — the SAME function
+ * middleware.ts uses to allow or bounce the request. So a link can never be
+ * shown to someone the middleware would then redirect: a real HR user viewing
+ * the HR portal gets [] for the "/admin" entry because
+ * canAccessPath("HR", "/admin") is false. Adding a role to ROUTE_ACCESS
+ * automatically updates both the gate and the navigation, which is the
+ * existing one-source-of-truth pattern in this file rather than a new
+ * role-equality check invented for the sidebar.
+ */
+export const CROSS_PORTAL_NAV: Record<PortalKey, NavItem[]> = {
+  employee: [],
+  manager: [],
+  // An HR user sees nothing here (canAccessPath filters /admin out); a Super
+  // Admin working inside the HR portal gets their way home, so following the
+  // link below is not a one-way trip.
+  hr: [{ label: "Super Admin Portal", href: "/admin", icon: "ArrowRightLeft" }],
+  admin: [
+    // Named and iconed exactly as HR's own nav names it, so it is recognisably
+    // the same page. Listed FIRST and linked directly rather than via /hr,
+    // because this is the bootstrapping path and must not cost two clicks.
+    { label: "Employee Master", href: "/hr/employees", icon: "Users" },
+    // The other fifteen HR pages: one hop into the HR portal, whose own
+    // sidebar then takes over.
+    { label: "HR Portal", href: "/hr", icon: "ArrowRightLeft" },
+  ],
+};
+
+/**
+ * Cross-portal links for this portal, minus any the viewer may not enter.
+ * `role` is nullable because PortalShell's role prop is.
+ */
+export function crossPortalNavFor(portal: PortalKey, role: Role | null | undefined): NavItem[] {
+  if (!role) return [];
+  return CROSS_PORTAL_NAV[portal].filter((item) => canAccessPath(role, item.href));
+}

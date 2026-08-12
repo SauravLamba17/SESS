@@ -36,10 +36,18 @@ import {
   Plug,
   BarChart3,
   DatabaseBackup,
+  ArrowRightLeft,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { NAV, PORTAL_META, type PortalKey } from "@/lib/auth-types";
+import {
+  NAV,
+  PORTAL_META,
+  crossPortalNavFor,
+  type NavItem,
+  type PortalKey,
+  type Role,
+} from "@/lib/auth-types";
 import { Logo } from "@/components/brand/logo";
 
 const ICONS: Record<string, LucideIcon> = {
@@ -76,12 +84,48 @@ const ICONS: Record<string, LucideIcon> = {
   Plug,
   BarChart3,
   DatabaseBackup,
+  ArrowRightLeft,
 };
 
-export function Sidebar({ portal }: { portal: PortalKey }) {
+export function Sidebar({ portal, role }: { portal: PortalKey; role?: Role | null }) {
   const pathname = usePathname();
   const items = NAV[portal];
   const meta = PORTAL_META[portal];
+  // Links into another portal this viewer may enter — empty for everyone whose
+  // role the permission matrix would bounce. See CROSS_PORTAL_NAV.
+  const crossPortal = crossPortalNavFor(portal, role);
+
+  function renderItem(item: NavItem) {
+    const Icon = ICONS[item.icon] ?? LayoutDashboard;
+    // Exact match for the portal root; prefix match for sub-routes.
+    const active =
+      item.href === `/${portal}`
+        ? pathname === item.href
+        : pathname === item.href || pathname.startsWith(item.href + "/");
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        className={cn(
+          // shrink-0 + whitespace-nowrap keep each item intact inside the
+          // horizontally scrolling mobile strip.
+          "flex shrink-0 items-center gap-2 whitespace-nowrap rounded px-3 py-2 text-sm transition-colors lg:gap-3",
+          active
+            ? "bg-surface-raised text-text"
+            : "text-text-muted hover:bg-surface-raised/60 hover:text-text",
+        )}
+      >
+        <span
+          className={cn(
+            "hidden h-4 w-[2px] rounded-full lg:block",
+            active ? "bg-accent" : "bg-transparent",
+          )}
+        />
+        <Icon size={16} strokeWidth={1.75} />
+        <span>{item.label}</span>
+      </Link>
+    );
+  }
 
   return (
     /**
@@ -103,37 +147,23 @@ export function Sidebar({ portal }: { portal: PortalKey }) {
       </div>
 
       <nav className="flex gap-1 overflow-x-auto px-2 py-2 lg:flex-1 lg:flex-col lg:gap-0 lg:space-y-0.5 lg:overflow-x-visible lg:py-1">
-        {items.map((item) => {
-          const Icon = ICONS[item.icon] ?? LayoutDashboard;
-          // Exact match for the portal root; prefix match for sub-routes.
-          const active =
-            item.href === `/${portal}`
-              ? pathname === item.href
-              : pathname === item.href || pathname.startsWith(item.href + "/");
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                // shrink-0 + whitespace-nowrap keep each item intact inside the
-                // horizontally scrolling mobile strip.
-                "flex shrink-0 items-center gap-2 whitespace-nowrap rounded px-3 py-2 text-sm transition-colors lg:gap-3",
-                active
-                  ? "bg-surface-raised text-text"
-                  : "text-text-muted hover:bg-surface-raised/60 hover:text-text",
-              )}
-            >
-              <span
-                className={cn(
-                  "hidden h-4 w-[2px] rounded-full lg:block",
-                  active ? "bg-accent" : "bg-transparent",
-                )}
-              />
-              <Icon size={16} strokeWidth={1.75} />
-              <span>{item.label}</span>
-            </Link>
-          );
-        })}
+        {items.map(renderItem)}
+
+        {/* Cross-portal shortcuts, rendered by the SAME renderItem as the rest
+            so they cannot drift in styling or active-state behaviour. Only the
+            separator differs, and it is lg-only: on the mobile strip the items
+            simply continue scrolling horizontally, exactly like every other
+            entry, rather than introducing a second layout to maintain. */}
+        {crossPortal.length > 0 && (
+          <>
+            <div className="hidden px-3 pb-1 pt-4 lg:block">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-text-muted">
+                Other Portals
+              </span>
+            </div>
+            {crossPortal.map(renderItem)}
+          </>
+        )}
       </nav>
 
       <div className="border-t border-border px-4 py-3">

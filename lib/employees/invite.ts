@@ -20,6 +20,12 @@ import type { Role } from "@/lib/auth-types";
  * record must survive even when the invitation fails.
  */
 
+/**
+ * Note: the accept link's destination (`redirectUrl`) is NOT set here. It is
+ * added by the real adapter in lib/employees/invite-clerk.ts, which resolves it
+ * from lib/app-url.ts — that file explains why. Deliberately absent from this
+ * signature so this module keeps importing nothing but types.
+ */
 export type CreateInvitationFn = (params: {
   emailAddress: string;
   publicMetadata: { role: Role };

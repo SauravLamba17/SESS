@@ -1,5 +1,28 @@
 {
   "compilerOptions": {
+    // WITHOUT this, TypeScript defaults to ES5, which forbids spreading or
+    // for-of-ing any iterator — `[...str.matchAll(re)]`, `[...new Set(xs)]`,
+    // `[...map.keys()]` — with error TS2802 ("requires --downlevelIteration or
+    // a --target of es2015 or higher"). That is what broke the Vercel build.
+    //
+    // The old config was self-contradictory: `lib` below already promises the
+    // checker that ESNext runtime APIs exist, while an implicit ES5 target told
+    // it those APIs could not be iterated.
+    //
+    // SAFE TO RAISE, because `target` here is purely a TYPE-CHECKING switch and
+    // changes no output: `noEmit` is true, and Next compiles the app with SWC
+    // against browserslist, not with tsc.
+    //
+    // Verified, not assumed: built this config against a `"target": "ES5"` +
+    // `"downlevelIteration": true` control and compared the reported bundle
+    // sizes — First Load JS 87.2 kB, middleware 79.3 kB and every per-route
+    // size are byte-identical. (Compare SIZES, not chunk filenames: two builds
+    // of the SAME config already produce different chunk hashes, so a filename
+    // diff measures build non-determinism rather than a config change.)
+    //
+    // ES2017 is what create-next-app scaffolds; pinned rather than "esnext" so
+    // a TypeScript upgrade cannot silently change what the checker accepts.
+    "target": "ES2017",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,

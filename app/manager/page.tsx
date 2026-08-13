@@ -8,6 +8,17 @@ import { currentPeriod } from "@/lib/period";
 import { TodayWidgets } from "@/components/engagement/today-widgets";
 import { loadToday } from "@/lib/engagement/today";
 import { ErrorPanel, UnlinkedEmployeeNotice } from "@/components/ui/notice";
+// A manager tracks their OWN attendance exactly as an employee does. The widget
+// and these cards are the same components the Employee dashboard renders — the
+// punch route is role-agnostic and always resolves the caller's own Employee
+// record, so no API change was needed.
+import { ClockInWidget } from "@/components/employee/clock-in-widget";
+import { loadOwnAttendance } from "@/lib/attendance/own-summary";
+import {
+  ShiftBanner,
+  TodayAttendanceCard,
+  WeekAttendancePanel,
+} from "@/components/attendance/own-attendance";
 
 export const dynamic = "force-dynamic";
 
@@ -46,8 +57,10 @@ async function load() {
     const inMonth = { gte: monthStart, lt: monthEnd };
     const scope = { managerId: manager.id };
 
-    // All set-based aggregates — independent of team size (no N+1).
-    const [totals, lates, actuals, targets, pendingApprovals, quality] = await Promise.all([
+    // All set-based aggregates — independent of team size (no N+1). `own` is
+    // the manager's OWN attendance (today/week/shift), batched into the same
+    // round trip rather than fetched separately.
+    const [totals, lates, actuals, targets, pendingApprovals, quality, own] = await Promise.all([
       db.attendance.groupBy({
         by: ["employeeId"],
         where: { employee: scope, date: inMonth },
@@ -73,6 +86,8 @@ async function load() {
         orderBy: { date: "desc" },
         select: { employeeId: true, qualityScore: true, date: true },
       }),
+      // The manager's own row — scoped to manager.id, never to a report's id.
+      loadOwnAttendance(manager.id, manager.shiftId),
     ]);
 
     const totalBy = new Map(totals.map((g) => [g.employeeId, g._count._all]));
@@ -94,7 +109,7 @@ async function load() {
     });
 
     const totalLate = lates.reduce((s, g) => s + g._count._all, 0);
-    return { manager, error: null, rows, pendingApprovals, totalLate, targetsSet: targets.length };
+    return { manager, error: null, rows, pendingApprovals, totalLate, targetsSet: targets.length, own };
   } catch (err) {
     console.error("[manager/dashboard] failed:", err);
     return { manager: null, error: "Team data is unavailable right now." };
@@ -123,7 +138,21 @@ export default async function ManagerDashboard() {
 
       {data.manager && (
         <>
+          {/* ── Your own attendance ──────────────────────────────────────
+              Identical to the Employee dashboard: same ClockInWidget, same
+              cards, same punch endpoint. A manager records their own
+              attendance like anyone else. */}
+          <div className="mb-4">
+            <ClockInWidget
+              initialCheckIn={data.own.today?.checkIn ? data.own.today.checkIn.toISOString() : null}
+              initialCheckOut={data.own.today?.checkOut ? data.own.today.checkOut.toISOString() : null}
+            />
+          </div>
+
+          <ShiftBanner shift={data.own.shift} />
+
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <TodayAttendanceCard today={data.own.today} />
             <StatCard label="Direct Reports" value={data.rows.length} state="good" />
             <StatCard
               label="Pending Approvals"
@@ -141,6 +170,13 @@ export default async function ManagerDashboard() {
               value={`${data.targetsSet} / ${data.rows.length}`}
               state={data.targetsSet === data.rows.length ? "good" : "warn"}
               status="This month"
+            />
+          </div>
+
+          <div className="mt-6">
+            <WeekAttendancePanel
+              weekStart={data.own.weekStart}
+              weekByDate={data.own.weekByDate}
             />
           </div>
 

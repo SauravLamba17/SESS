@@ -11,26 +11,17 @@ import { getEmployeeByClerkId } from "@/lib/data/scope";
 import { ownIdleTotals, hm } from "@/lib/idle/aggregate";
 import { currentPeriod } from "@/lib/period";
 import { scoreOutOfFive } from "@/lib/appraisal/display";
+// Own-attendance data + the three cards around the clock-in widget. Shared with
+// the Manager dashboard, which has the same widget — see the note in
+// lib/attendance/own-summary.ts.
+import { loadOwnAttendance, ymd } from "@/lib/attendance/own-summary";
+import {
+  ShiftBanner,
+  TodayAttendanceCard,
+  WeekAttendancePanel,
+} from "@/components/attendance/own-attendance";
 
 export const dynamic = "force-dynamic";
-
-function startOfDay(d: Date): Date {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-}
-function ymd(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-function fmtTime(d: Date | null | undefined): string {
-  if (!d) return "—";
-  return new Date(d).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
-/** Monday 00:00 of the current week. */
-function weekStartMonday(now = new Date()): Date {
-  const s = startOfDay(now);
-  const diffToMon = (s.getDay() + 6) % 7; // 0=Sun..6=Sat -> days since Monday
-  s.setDate(s.getDate() - diffToMon);
-  return s;
-}
 
 async function loadMetrics() {
   const userId = await getEffectiveUserId();
@@ -40,13 +31,8 @@ async function loadMetrics() {
     if (!employee) return null;
     const { period, monthStart, monthEnd } = currentPeriod();
     const inMonth = { gte: monthStart, lt: monthEnd };
-    const now = new Date();
-    const todayStart = startOfDay(now);
-    const tomorrowStart = new Date(todayStart.getFullYear(), todayStart.getMonth(), todayStart.getDate() + 1);
-    const weekStart = weekStartMonday(now);
-    const weekEnd = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 7);
 
-    const [prod, target, qual, appraisal, todayAtt, weekAtt, consents, shift, notifications, ownIdle] = await Promise.all([
+    const [prod, target, qual, appraisal, own, consents, notifications, ownIdle] = await Promise.all([
       db.production.aggregate({
         where: { employeeId: employee.id, date: inMonth },
         _sum: { unitsProduced: true },
@@ -70,23 +56,14 @@ async function loadMetrics() {
         include: { cycle: { select: { period: true } } },
         orderBy: { cycle: { createdAt: "desc" } },
       }),
-      // Today's own attendance row.
-      db.attendance.findFirst({
-        where: { employeeId: employee.id, date: { gte: todayStart, lt: tomorrowStart } },
-      }),
-      // This week's own attendance rows.
-      db.attendance.findMany({
-        where: { employeeId: employee.id, date: { gte: weekStart, lt: weekEnd } },
-      }),
+      // Today's row, this week's rows and the assigned shift — one nested
+      // Promise.all, so this stays a single concurrent round trip.
+      loadOwnAttendance(employee.id, employee.shiftId),
       // Own consent records (latest per type derived below).
       db.consentRecord.findMany({
         where: { employeeId: employee.id },
         orderBy: { givenOn: "desc" },
       }),
-      // Assigned shift (drives what "late" means for this employee).
-      employee.shiftId
-        ? db.shift.findUnique({ where: { id: employee.shiftId } })
-        : Promise.resolve(null),
       // Phase 7: own notifications — unread first, then most recent.
       db.notification.findMany({
         where: { employeeId: employee.id },
@@ -97,7 +74,6 @@ async function loadMetrics() {
       ownIdleTotals(employee.id),
     ]);
 
-    const weekByDate = new Map(weekAtt.map((a) => [ymd(a.date), a]));
     const latestConsent = (type: string) =>
       consents.find((c) => c.consentType === type) ?? null;
 
@@ -108,11 +84,11 @@ async function loadMetrics() {
       qualityCount: qual._count._all,
       appraisalScore: appraisal?.finalScore ?? null,
       appraisalPeriod: appraisal?.cycle.period ?? null,
-      today: todayAtt,
-      weekStart,
-      weekByDate,
+      today: own.today,
+      weekStart: own.weekStart,
+      weekByDate: own.weekByDate,
       idle: latestConsent("IDLE_TRACKING"),
-      shift,
+      shift: own.shift,
       ownIdle,
       // Serialize Dates — they don't cross the RSC boundary as Date objects.
       notifications: notifications.map((n) => ({
@@ -155,52 +131,7 @@ export default async function EmployeeDashboard() {
   const aState: StatusState =
     aScore == null ? "idle" : aScore >= 80 ? "good" : aScore >= 60 ? "warn" : "danger";
 
-  // Today's Attendance card (real)
   const today = m?.today ?? null;
-  const todayState: StatusState = !today ? "idle" : today.lateFlag ? "warn" : "good";
-  // Late label handles historical rows with null lateMinutes gracefully.
-  const todayLate = today?.lateFlag
-    ? today.lateMinutes != null
-      ? `${today.lateMinutes} min late`
-      : "Late"
-    : null;
-  const todayStatus = !today
-    ? "Not punched in"
-    : today.checkOut
-      ? `Out ${fmtTime(today.checkOut)}${todayLate ? ` · ${todayLate}` : ""}`
-      : todayLate
-        ? `Checked in · ${todayLate}`
-        : "Checked in · on time";
-
-  // This Week — Attendance panel (real, Mon–Fri)
-  const nowDay = startOfDay(new Date());
-  const weekRows =
-    m?.weekStart == null
-      ? []
-      : Array.from({ length: 5 }).map((_, i) => {
-          const d = new Date(
-            m.weekStart.getFullYear(),
-            m.weekStart.getMonth(),
-            m.weekStart.getDate() + i,
-          );
-          const rec = m.weekByDate.get(ymd(d));
-          const label = d.toLocaleDateString([], { weekday: "short", day: "2-digit" });
-          const isToday = d.getTime() === nowDay.getTime();
-          const isFuture = d.getTime() > nowDay.getTime();
-          let s: StatusState = "idle";
-          let l = "—";
-          let t = "—";
-          if (rec?.checkIn) {
-            t = `${fmtTime(rec.checkIn)} – ${rec.checkOut ? fmtTime(rec.checkOut) : "—"}`;
-            if (!rec.checkOut && isToday) { s = "idle"; l = "In progress"; }
-            else if (rec.lateFlag) { s = "warn"; l = rec.lateMinutes != null ? `${rec.lateMinutes}m late` : "Late"; }
-            else { s = "good"; l = "On time"; }
-          } else if (isFuture) { s = "idle"; l = "—"; }
-          else if (isToday) { s = "idle"; l = "Not punched"; }
-          else { s = "danger"; l = "Absent"; }
-          return { key: ymd(d), label, t, s, l };
-        });
-
   const idle = m?.idle ?? null;
   const earliestRetention = idle?.retentionExpiry ?? null;
 
@@ -226,28 +157,10 @@ export default async function EmployeeDashboard() {
         />
       </div>
 
-      {/* Your shift — so "late" is unambiguous for this employee. */}
-      <div className="mb-4 flex items-center gap-2 rounded border border-border bg-surface px-4 py-2.5 text-sm">
-        <StatusDot state={m?.shift ? "good" : "warn"} />
-        <span className="text-text-muted">Your shift:</span>
-        {m?.shift ? (
-          <span className="font-mono text-text">
-            {m.shift.name} · {m.shift.startTime}–{m.shift.endTime}
-            {m.shift.gracePeriodMinutes > 0 ? ` (+${m.shift.gracePeriodMinutes}m grace)` : ""}
-          </span>
-        ) : (
-          <span className="text-text-muted">not assigned — ask HR</span>
-        )}
-      </div>
+      <ShiftBanner shift={m?.shift ?? null} />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          label="Today's Attendance"
-          value={today?.checkIn ? fmtTime(today.checkIn) : "—"}
-          state={todayState}
-          status={todayStatus}
-          hint={today?.channel ?? undefined}
-        />
+        <TodayAttendanceCard today={today} />
         {/* Real today totals from the same ownIdleTotals batch as the MTD card. */}
         <StatCard
           label="Idle Time (today)"
@@ -334,27 +247,10 @@ export default async function EmployeeDashboard() {
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Panel>
-          <PanelHeader title="This Week — Attendance" />
-          <div className="divide-y divide-border">
-            {weekRows.length === 0 ? (
-              <div className="px-4 py-6 text-sm text-text-muted">No data.</div>
-            ) : (
-              weekRows.map((r) => (
-                <div
-                  key={r.key}
-                  className="flex items-center justify-between px-4 py-2.5 text-sm"
-                >
-                  <span className="font-mono text-text-muted">{r.label}</span>
-                  <span className="font-mono text-text">{r.t}</span>
-                  <StatusLabel state={r.s} className="text-text-muted">
-                    {r.l}
-                  </StatusLabel>
-                </div>
-              ))
-            )}
-          </div>
-        </Panel>
+        <WeekAttendancePanel
+          weekStart={m?.weekStart ?? null}
+          weekByDate={m?.weekByDate ?? new Map()}
+        />
 
         <Panel>
           <PanelHeader title="Consent & Compliance" />

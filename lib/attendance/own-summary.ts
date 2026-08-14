@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "@/lib/db";
+import { formatClock } from "@/lib/time-display";
 
 /**
  * "My own attendance today / this week / my shift" — the data behind the
@@ -24,10 +25,12 @@ export function ymd(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export function fmtTime(d: Date | string | null | undefined): string {
-  if (!d) return "—";
-  return new Date(d).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
+/**
+ * Re-exported rather than reimplemented: these dashboards render on the SERVER,
+ * where an unpinned toLocaleTimeString() formats in the process timezone (UTC
+ * on Vercel) and showed every punch 5h30m early. See lib/time-display.ts.
+ */
+export const fmtTime = formatClock;
 
 /** Monday 00:00 of the current week. */
 export function weekStartMonday(now = new Date()): Date {

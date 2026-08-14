@@ -3,10 +3,17 @@ import type { MyDataResult } from "../my-data.ts";
 import { ymd } from "../range.ts";
 import { inr } from "../../payroll/format.ts";
 import { formatScoreOutOfFive } from "../../appraisal/display.ts";
+// Relative + .ts, like its neighbours: this template is rendered outside Next
+// by the verify scripts, where the "@/" alias does not resolve.
+import { clockHHMM } from "../../time-display.ts";
 
+/**
+ * Reports render on the SERVER, so getHours() read the process timezone — UTC
+ * on Vercel — and every punch in an employee's own data export was 5h30m
+ * early. Pinned to the org timezone; see lib/time-display.ts.
+ */
 function clock(d: Date | null): string {
-  if (!d) return "—";
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return clockHHMM(d) ?? "—";
 }
 
 export function MyDataPdf({ r, meta }: { r: MyDataResult; meta: ReportMeta }) {

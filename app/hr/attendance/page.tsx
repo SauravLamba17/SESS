@@ -5,6 +5,7 @@ import { StatusDot, type StatusState } from "@/components/ui/status-dot";
 import { AttendanceCorrection } from "@/components/hr/attendance-correction";
 import { db } from "@/lib/db";
 import { parseRange, currentMonthRange, ymd } from "@/lib/reports/range";
+import { clockHHMM } from "@/lib/time-display";
 import { ErrorPanel } from "@/components/ui/notice";
 
 export const dynamic = "force-dynamic";
@@ -21,10 +22,14 @@ const FORGOTTEN_CHECKOUT_HOURS = 14;
 
 type View = "all" | "exceptions";
 
-function hhmm(d: Date | null): string | null {
-  if (!d) return null;
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-}
+/**
+ * getHours()/getMinutes() read the SERVER's wall clock — IST on a laptop, UTC
+ * on Vercel, where every punch rendered 5h30m early. This value is also fed
+ * back into the correction form as `initialCheckIn`, so a UTC reading was not
+ * merely cosmetic: saving the pre-filled value would have written the wrong
+ * instant to the database. Pinned to the org timezone in lib/time-display.ts.
+ */
+const hhmm = clockHHMM;
 
 function fmt(d: Date | null): string {
   return hhmm(d) ?? "—";

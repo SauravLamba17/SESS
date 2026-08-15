@@ -341,7 +341,7 @@ export default async function AttendanceOversight({
                           lat={r.lat}
                           long={r.long}
                           accuracy={r.accuracy}
-                          className="mt-0.5 text-[10px]"
+                          className="text-[10px]"
                         />
                       </td>
                       <td className="px-4 py-3">

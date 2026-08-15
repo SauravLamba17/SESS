@@ -1,3 +1,5 @@
+import { MapPin } from "lucide-react";
+
 /**
  * Where a punch was recorded, and how precise that reading was.
  *
@@ -40,16 +42,33 @@ export function PunchLocation({
   if (lat === null || long === null) return null;
 
   return (
-    <span className={`inline-flex flex-wrap items-center gap-1.5 ${className}`}>
+    // `flex`, NOT `inline-flex`: as an inline element this ran straight on from
+    // the status text beside it ("On time" + "View location" with no gap), and
+    // the mt-0.5 both callers pass was silently inert. Block-level flex drops it
+    // onto its own line under the status, matching the reviewReason block that
+    // sits directly above it. Still a <span> so it stays valid inside the
+    // Manager page's <span> wrapper.
+    // `mt-1.5` lives HERE, not at the call sites: the separation from the
+    // status text above is a property of this component, so both pages get the
+    // same gap without either remembering to pass one.
+    <span className={`mt-1.5 flex flex-wrap items-center gap-2 ${className}`}>
       <a
         href={`https://www.google.com/maps?q=${lat},${long}`}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-accent underline underline-offset-2 hover:opacity-80"
+        // The small-pill convention already used across the app (see the late
+        // chips on this same Manager page and the role chip in the topbar):
+        // rounded + border-border + bg-surface-raised. `hover:border-accent` is
+        // the same affordance the HR correction buttons use. Accent text, since
+        // amber marks every interactive accent element in this UI.
+        className="inline-flex items-center gap-1 rounded border border-border bg-surface-raised px-2 py-0.5 text-accent transition-colors hover:border-accent"
       >
+        <MapPin size={11} strokeWidth={2} className="shrink-0" />
         View location
       </a>
       {accuracy !== null && (
+        // Subordinate on purpose: no border, no background, muted colour, so it
+        // reads as a footnote to the button rather than a second control.
         <span className="font-mono text-text-muted">
           ±{Math.round(accuracy)}m accuracy
         </span>

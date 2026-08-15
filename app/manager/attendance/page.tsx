@@ -258,7 +258,7 @@ export default async function TeamAttendancePage() {
                         lat={a.lat}
                         long={a.long}
                         accuracy={a.accuracy}
-                        className="mt-0.5 text-[10px]"
+                        className="text-[10px]"
                       />
                     </span>
                     <span className="inline-flex shrink-0 items-center gap-2">

@@ -58,6 +58,22 @@ export function formatClock(d: Date | string | null | undefined): string {
 }
 
 /**
+ * "2026-08-09 12:30:00" — date AND time in the organisation's timezone, for
+ * records where the exact moment is the point (the attestation stamp on
+ * /employee/documents).
+ *
+ * Replaces a `toISOString()` that was showing employees their own attestation
+ * 5h30m early with no "UTC" label — the same wrong-clock bug as above, just
+ * frozen at UTC instead of drifting with the process. "sv-SE" is chosen only
+ * because it is the one widely-available locale whose format is already
+ * ISO-shaped, so the rendered string keeps exactly the layout it had.
+ */
+export function formatStamp(d: Date | string | null | undefined): string {
+  if (!d) return "—";
+  return new Date(d).toLocaleString("sv-SE", { timeZone: ORG_TIME_ZONE });
+}
+
+/**
  * "17:58" — 24-hour, for dense tables and for the HR correction form, whose
  * value is parsed straight back into a Date. Locale is PINNED to en-GB here
  * (unlike formatClock) because this string is machine-read on the round trip:

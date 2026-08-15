@@ -1,5 +1,10 @@
 import type { Prisma } from "@prisma/client";
-import { ymd } from "@/lib/reports/range";
+// Relative + explicit .ts, NOT the "@/" alias: prisma/verify-idle-tracking.ts
+// loads this module under plain Node, which cannot resolve the alias. An
+// "@/lib/reports/range" here made that whole suite die at import with
+// ERR_MODULE_NOT_FOUND before running a single check — a silent loss of the
+// regression cover on a consent-gated subsystem. Same rule as instrumentation.ts.
+import { ymd } from "../reports/range.ts";
 
 /**
  * IDLE_TRACKING consent resolution — the single gate for the whole subsystem.

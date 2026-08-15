@@ -6,6 +6,7 @@ import { AcknowledgeButton } from "@/components/employee/acknowledge-button";
 import { db } from "@/lib/db";
 import { getEmployeeByClerkId } from "@/lib/data/scope";
 import { ErrorPanel, UnlinkedEmployeeNotice } from "@/components/ui/notice";
+import { formatStamp } from "@/lib/time-display";
 
 export const dynamic = "force-dynamic";
 
@@ -91,7 +92,7 @@ export default async function MyDocumentsPage() {
                             {l.attestedName}
                           </p>
                           <p className="font-mono text-[10px] text-text-muted">
-                            {l.attestedAt ? l.attestedAt.toISOString().slice(0, 19).replace("T", " ") : "—"}
+                            {formatStamp(l.attestedAt)}
                             {l.attestedIp ? ` · ${l.attestedIp}` : ""}
                           </p>
                           <p className="mt-0.5 text-[9px] text-text-muted">

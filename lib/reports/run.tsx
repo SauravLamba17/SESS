@@ -71,24 +71,6 @@ export interface ReportRun {
   csv: (() => CsvSection[]) | null;
 }
 
-/** Total queries a report issues, INCLUDING the scope query. Documentation
- *  that is checked: verify-phase12.ts counts real Prisma calls against it. */
-export const QUERY_COUNT: Record<ReportId, number> = {
-  headcount: 1,
-  attendance: 2,
-  "hires-exits": 1,
-  production: 2,
-  "appraisal-distribution": 2,
-  "payroll-cost": 2,
-  "recruitment-funnel": 2,
-  "idle-time": 2,
-  "warning-letters": 2,
-  "board-summary": 4,
-  // scope + attendance, leave, production, quality, appraisal, warnings,
-  // consents, expenses, payslips — all for ONE employee, all batched.
-  "my-data": 10,
-};
-
 function inRange(range: DateRange) {
   return { gte: range.start, lt: range.endExclusive };
 }

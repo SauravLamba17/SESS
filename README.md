@@ -80,13 +80,41 @@ npm run start   # also serves on port 3005
 
 ## Environment
 
-Copy `.env.example` → `.env` and set:
+Copy `.env.example` → `.env` and set the values below. `.env.example` carries
+the full reasoning for each one (especially the `DATABASE_URL` port choice);
+this table is the index.
 
-| Variable                            | Where to get it                                         |
-| ----------------------------------- | ------------------------------------------------------- |
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk Dashboard → API Keys                              |
-| `CLERK_SECRET_KEY`                  | Clerk Dashboard → API Keys                              |
-| `DATABASE_URL`                      | Supabase → Project Settings → Database → Connection URI |
+**Required**
+
+| Variable                            | Where to get it                                          |
+| ----------------------------------- | -------------------------------------------------------- |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk Dashboard → API Keys                               |
+| `CLERK_SECRET_KEY`                  | Clerk Dashboard → API Keys                               |
+| `CLERK_WEBHOOK_SECRET`              | Clerk Dashboard → Webhooks → Add Endpoint (`whsec_…`). Needed for the invitation → account-link flow |
+| `DATABASE_URL`                      | Supabase → Project Settings → Database → Connection URI. Use a **pooler** host, not the direct one — port 5432 locally, 6543 + `pgbouncer=true` on Vercel |
+
+**Optional — defaults work without them**
+
+| Variable                       | Default        | What it does                                                                 |
+| ------------------------------ | -------------- | ---------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_APP_URL`          | auto-detected  | Forces the base URL for links that leave the app (invitation emails). Leave unset on Vercel — see `lib/app-url.ts` |
+| `NEXT_PUBLIC_CLERK_SIGN_IN_URL`| `/sign-in`     | Clerk redirect override                                                       |
+| `NEXT_PUBLIC_CLERK_SIGN_UP_URL`| `/sign-up`     | Clerk redirect override                                                       |
+| `IDLE_THRESHOLD_SECONDS`       | `210`          | Deploy-time default for the idle agent. A Super Admin can override it at runtime; the database value wins |
+| `DEMO_MODE`                    | unset (off)    | `true` enables Super Admin impersonation. Must stay unset in production      |
+
+**Attendance punch validation — placeholders, set before relying on them**
+
+| Variable                       | Default | What it does                                                       |
+| ------------------------------ | ------- | ------------------------------------------------------------------ |
+| `ATTENDANCE_VALIDATION_MODE`   | `NONE`  | `NONE` \| `IP_LOCK` \| `GEOFENCE` \| `BOTH`                        |
+| `ALLOWED_IPS`                  | empty   | Comma-separated office egress IPs (`IP_LOCK` / `BOTH`)             |
+| `OFFICE_LAT`, `OFFICE_LONG`    | empty   | Office coordinates (`GEOFENCE` / `BOTH`)                           |
+| `GEOFENCE_RADIUS_METERS`       | empty   | Geofence radius in metres                                          |
+| `WORKDAY_START`                | empty   | `HH:MM` fallback lateness cutoff, used **only** for an employee with no assigned Shift |
+
+`VERCEL_PROJECT_PRODUCTION_URL` and `VERCEL_URL` are injected by Vercel — do
+not set them yourself.
 
 ## Clerk role configuration (required)
 

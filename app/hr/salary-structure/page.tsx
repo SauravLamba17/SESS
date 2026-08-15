@@ -5,7 +5,7 @@ import { SalaryStructureForm } from "@/components/hr/salary-structure-form";
 import { SalaryAdvanceForm } from "@/components/hr/salary-advance-form";
 import { db } from "@/lib/db";
 import { inr } from "@/lib/payroll/format";
-import { buildSalaryTimeline, ymd as salaryYmd } from "@/lib/payroll/salary-history";
+import { buildSalaryTimeline } from "@/lib/payroll/salary-history";
 import { ErrorPanel } from "@/components/ui/notice";
 import { ymd } from "@/lib/reports/range";
 
@@ -128,7 +128,7 @@ export default async function SalaryStructurePage() {
                             )}
                           </div>
                           <div className="font-mono text-[11px] text-text-muted">
-                            eff. {salaryYmd(s.effectiveFrom)}
+                            eff. {ymd(s.effectiveFrom)}
                           </div>
                         </>
                       ) : (
@@ -212,8 +212,8 @@ export default async function SalaryStructurePage() {
                                   )}
                                 </td>
                                 <td className="py-1.5 pr-3 font-mono">
-                                  {salaryYmd(v.effectiveFrom)} →{" "}
-                                  {v.effectiveTo ? salaryYmd(v.effectiveTo) : "present"}
+                                  {ymd(v.effectiveFrom)} →{" "}
+                                  {v.effectiveTo ? ymd(v.effectiveTo) : "present"}
                                 </td>
                                 <td className="py-1.5 pr-3 text-right font-mono">{inr(v.basic)}</td>
                                 <td className="py-1.5 pr-3 text-right font-mono">{inr(v.hra)}</td>

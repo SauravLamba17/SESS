@@ -4,12 +4,10 @@ import { db } from "@/lib/db";
 import { getEmployeeByClerkId } from "@/lib/data/scope";
 import { engagementEnabled } from "@/lib/system-settings";
 import { fail } from "@/lib/api/response";
+import { DELETE_WINDOW_MINUTES } from "@/lib/engagement/logic";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-/** How long an author may delete their own post. */
-const DELETE_WINDOW_MINUTES = 15;
 
 /**
  * Post a shout-out, or delete your own.

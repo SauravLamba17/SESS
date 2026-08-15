@@ -5,6 +5,7 @@ import { Panel, PanelHeader } from "@/components/ui/panel";
 import { StatusDot, type StatusState } from "@/components/ui/status-dot";
 import { LeaveForm } from "@/components/employee/leave-form";
 import { AttendanceCalendar } from "@/components/employee/attendance-calendar";
+import { ShiftBanner } from "@/components/attendance/own-attendance";
 import { db } from "@/lib/db";
 import { getEmployeeByClerkId } from "@/lib/data/scope";
 import { UnlinkedEmployeeNotice } from "@/components/ui/notice";
@@ -71,19 +72,15 @@ export default async function MyAttendancePage() {
       )}
 
       {employeeLinked && (
-        <Panel className="mb-5 flex items-center gap-2 px-4 py-2.5 text-sm">
-          <StatusDot state={shift ? "good" : "warn"} />
-          <span className="text-text-muted">Your shift:</span>
-          {shift ? (
-            <span className="font-mono text-text">
-              {shift.name} · {shift.startTime}–{shift.endTime}
-              {shift.gracePeriodMinutes > 0 ? ` (+${shift.gracePeriodMinutes}m grace)` : ""} — check in
-              after this is marked late
-            </span>
-          ) : (
-            <span className="text-text-muted">not assigned — ask HR</span>
+        <div className="mb-5">
+          <ShiftBanner shift={shift} />
+          {shift && (
+            <p className="text-xs text-text-muted">
+              Checking in after your shift start
+              {shift.gracePeriodMinutes > 0 ? " plus grace" : ""} is marked late.
+            </p>
           )}
-        </Panel>
+        </div>
       )}
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">

@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Download, Loader2, Lock } from "lucide-react";
 import { inr } from "@/lib/payroll/format";
+import { ATTESTATION_LABEL, ATTESTATION_DISCLAIMER } from "@/lib/attestation";
 
 const inputClass =
   "w-full rounded border border-border bg-background px-2.5 py-1.5 text-sm text-text focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:border-accent";
@@ -373,9 +374,9 @@ export function OfferPanel({
           this evidences HR's data entry, not the candidate's own act. */}
       {responding && (
         <div className="rounded border border-accent/40 bg-accent/5 p-3">
-          <p className="text-xs font-medium text-accent">Attestation Record</p>
+          <p className="text-xs font-medium text-accent">{ATTESTATION_LABEL}</p>
           <p className="mt-0.5 text-[10px] text-text-muted">
-            (internal record, not a legal digital signature)
+            {ATTESTATION_DISCLAIMER}
           </p>
           <p className="mt-2 text-[11px] text-text-muted">
             You are recording that <span className="text-text">{candidateName}</span>{" "}

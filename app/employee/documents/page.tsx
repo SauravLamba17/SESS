@@ -7,12 +7,10 @@ import { db } from "@/lib/db";
 import { getEmployeeByClerkId } from "@/lib/data/scope";
 import { ErrorPanel, UnlinkedEmployeeNotice } from "@/components/ui/notice";
 import { formatStamp } from "@/lib/time-display";
+import { ymd } from "@/lib/reports/range";
+import { ATTESTATION_LABEL, ATTESTATION_DISCLAIMER } from "@/lib/attestation";
 
 export const dynamic = "force-dynamic";
-
-function ymd(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
 
 async function load() {
   const userId = await getEffectiveUserId();
@@ -86,7 +84,7 @@ export default async function MyDocumentsPage() {
                       {l.attestedName && (
                         <div className="mt-1 rounded border border-border bg-surface-raised/40 px-2 py-1.5 text-left">
                           <p className="text-[10px] font-medium uppercase tracking-wide text-text-muted">
-                            Attestation Record
+                            {ATTESTATION_LABEL}
                           </p>
                           <p className="mt-0.5 font-mono text-[11px] text-text">
                             {l.attestedName}
@@ -96,7 +94,7 @@ export default async function MyDocumentsPage() {
                             {l.attestedIp ? ` · ${l.attestedIp}` : ""}
                           </p>
                           <p className="mt-0.5 text-[9px] text-text-muted">
-                            (internal record, not a legal digital signature)
+                            {ATTESTATION_DISCLAIMER}
                           </p>
                         </div>
                       )}

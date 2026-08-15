@@ -26,13 +26,14 @@ export interface ReportEmployee {
   shiftCrossesMidnight?: boolean;
 }
 
-/** A per-department roll-up row, the recurring shape across most reports. */
-export interface DepartmentRow {
-  department: string;
-  [key: string]: string | number | null;
-}
-
-/** Sort helper used by every by-department section, so ordering is consistent. */
+/**
+ * Sort helper for a by-department section: count descending, department name
+ * as the tie-break so equal counts are still stably ordered.
+ *
+ * Only lib/reports/headcount.ts uses it. The other by-department sections
+ * (attendance.ts, idle-time.ts, production.ts) sort inline because they order
+ * by their own domain keys, not by a plain count.
+ */
 export function byCountDesc<T extends { department: string; count: number }>(rows: T[]): T[] {
   return [...rows].sort(
     (a, b) => b.count - a.count || a.department.localeCompare(b.department),

@@ -12,11 +12,9 @@ import { BirthdaysToday, SpecialDayBanner } from "@/components/engagement/today-
 import { ModulePaused } from "@/components/engagement/module-paused";
 import { engagementEnabled } from "@/lib/system-settings";
 import { ErrorPanel } from "@/components/ui/notice";
+import { DELETE_WINDOW_MINUTES } from "@/lib/engagement/logic";
 
 export const dynamic = "force-dynamic";
-
-/** Minutes an author may delete their own post — mirrors the API's window. */
-const DELETE_WINDOW_MINUTES = 15;
 
 function relativeTime(d: Date, now: Date): string {
   const mins = Math.floor((now.getTime() - d.getTime()) / 60000);

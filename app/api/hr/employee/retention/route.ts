@@ -8,8 +8,8 @@ import {
   addYears,
   EXTENSION_YEARS,
   REDACTED_FIELDS,
-  ymd,
 } from "@/lib/employees/retention";
+import { ymd } from "@/lib/reports/range";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

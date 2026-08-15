@@ -14,7 +14,8 @@ import { scoreOutOfFive } from "@/lib/appraisal/display";
 // Own-attendance data + the three cards around the clock-in widget. Shared with
 // the Manager dashboard, which has the same widget — see the note in
 // lib/attendance/own-summary.ts.
-import { loadOwnAttendance, ymd } from "@/lib/attendance/own-summary";
+import { loadOwnAttendance } from "@/lib/attendance/own-summary";
+import { ymd } from "@/lib/reports/range";
 import {
   ShiftBanner,
   TodayAttendanceCard,

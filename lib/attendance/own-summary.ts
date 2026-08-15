@@ -1,6 +1,7 @@
 import "server-only";
 import { db } from "@/lib/db";
 import { formatClock } from "@/lib/time-display";
+import { ymd } from "@/lib/reports/range";
 
 /**
  * "My own attendance today / this week / my shift" — the data behind the
@@ -19,10 +20,6 @@ import { formatClock } from "@/lib/time-display";
 
 export function startOfDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-}
-
-export function ymd(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 /**

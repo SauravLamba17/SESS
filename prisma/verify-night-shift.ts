@@ -28,7 +28,7 @@ import {
   type AttendanceRow,
 } from "../lib/reports/attendance.ts";
 import type { ReportEmployee } from "../lib/reports/types.ts";
-import { parseRange } from "../lib/reports/range.ts";
+import { parseRange, ymd } from "../lib/reports/range.ts";
 
 const db = new PrismaClient();
 
@@ -51,10 +51,6 @@ function eq(label: string, actual: unknown, expected: unknown) {
 function step(n: string, title: string) {
   console.log(`\n── ${n}: ${title} ${"─".repeat(Math.max(0, 44 - title.length))}`);
 }
-function ymd(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
 async function cleanup() {
   const emps = await db.employee.findMany({
     where: { employeeCode: { startsWith: TAG } },

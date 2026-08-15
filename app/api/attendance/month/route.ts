@@ -2,16 +2,10 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getEffectiveUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getEmployeeByClerkId } from "@/lib/data/scope";
+import { ymd } from "@/lib/reports/range";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function ymd(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
 
 export async function GET(req: NextRequest) {
   const userId = await getEffectiveUserId();

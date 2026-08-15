@@ -90,8 +90,3 @@ export async function hasAtLeastRole(min: Role): Promise<boolean> {
   if (!role) return false;
   return ROLE_RANK[role] >= ROLE_RANK[min];
 }
-
-/** The REAL signed-in Clerk user id (never impersonated), or null. */
-export async function getUserId(): Promise<string | null> {
-  return (await resolveIdentity()).realUserId;
-}

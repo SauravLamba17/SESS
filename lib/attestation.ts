@@ -22,6 +22,13 @@
  *
  * Every UI surface rendering these fields must label them "Attestation Record"
  * with the note "(internal record, not a legal digital signature)".
+ *
+ * That is not left to discipline: the wording lives in ATTESTATION_LABEL and
+ * ATTESTATION_DISCLAIMER at the bottom of this file, and all three surfaces
+ * that render it — app/employee/documents/page.tsx,
+ * components/employee/acknowledge-button.tsx, components/hr/offer-panel.tsx —
+ * import them. Render the constants, never a literal, so softening the
+ * disclaimer on one screen is impossible without changing it on all of them.
  * ─────────────────────────────────────────────────────────────────────
  */
 

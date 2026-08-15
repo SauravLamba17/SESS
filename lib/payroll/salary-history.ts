@@ -14,22 +14,9 @@
 // and audit surface only.
 
 import { Prisma } from "@prisma/client";
-
-/** "YYYY-MM-DD" from LOCAL components — effective dates are local midnight, and
- *  toISOString() would render them a day early east of Greenwich. */
-export function ymd(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-    d.getDate(),
-  ).padStart(2, "0")}`;
-}
-
-export interface SalaryVersionInput {
-  basic: string;
-  hra: string;
-  specialAllowance: string;
-  effectiveFrom: Date;
-  setBy: string;
-}
+// Relative + explicit .ts, NOT the "@/" alias: prisma/verify-phase13.ts loads
+// this module under plain Node, which cannot resolve the alias.
+import { ymd } from "../reports/range.ts";
 
 export interface SalaryTimelineEntry {
   versionNumber: number;

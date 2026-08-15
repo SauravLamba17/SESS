@@ -40,6 +40,16 @@ export type RangeResult =
   | { ok: true; range: DateRange }
   | { ok: false; code: "BAD_DATE" | "REVERSED" | "TOO_LONG"; message: string };
 
+/**
+ * "YYYY-MM-DD" from a date's LOCAL components. The canonical one — every other
+ * copy in the codebase was folded into this.
+ *
+ * Deliberately NOT toISOString().slice(0, 10). The dates this formats are
+ * local-midnight Dates (retention deadlines, salary effective-from dates,
+ * attendance day keys), and converting local midnight to UTC moves it back a
+ * day anywhere east of Greenwich — an IST user would read every one of them
+ * a day early.
+ */
 export function ymd(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
     d.getDate(),

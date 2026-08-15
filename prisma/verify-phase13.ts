@@ -31,11 +31,12 @@ import {
   REDACTED_FIELDS,
   PRESERVED_FIELDS,
   REDACTION_MARKER,
-  // LOCAL-component date formatter. These are local-midnight dates, so
-  // comparing them via toISOString() would report them a day early in IST —
-  // which is exactly the display bug this helper exists to prevent.
-  ymd,
 } from "../lib/employees/retention.ts";
+// LOCAL-component date formatter. These are local-midnight dates, so comparing
+// them via toISOString() would report them a day early in IST — which is
+// exactly the display bug this helper exists to prevent. Now imported from its
+// canonical home; retention.ts used to keep its own identical copy.
+import { ymd } from "../lib/reports/range.ts";
 import {
   supersede,
   buildSalaryTimeline,

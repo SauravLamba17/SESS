@@ -7,6 +7,17 @@
  * load them; this file it can.
  */
 
+/**
+ * How long a shout-out author may delete their own post.
+ *
+ * ONE definition, imported by both sides, because they must agree: the API
+ * route (app/api/community/shoutout) is the ENFORCER and rejects a late
+ * delete, while the page only uses it to decide whether to render the button.
+ * When these were two separate literals, raising one silently produced a
+ * button that 403s.
+ */
+export const DELETE_WINDOW_MINUTES = 15;
+
 export type PresenceStatus = "IN" | "ON_LEAVE" | "NOT_MARKED";
 
 export interface PresenceRow {

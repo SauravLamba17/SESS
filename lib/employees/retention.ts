@@ -21,6 +21,11 @@
 //
 // Pure. No DB access — the route supplies rows and applies the returned patch.
 
+// Relative + explicit .ts, NOT the "@/" alias: prisma/verify-phase13.ts and
+// verify-redaction-robustness.ts load this module under plain Node, which
+// cannot resolve the alias.
+import { ymd } from "../reports/range.ts";
+
 /** Five years, in whole years, applied to the last working day. */
 export const RETENTION_YEARS = 5;
 
@@ -30,20 +35,6 @@ export const EXTENSION_YEARS = 1;
 /** The marker written into redacted string fields. Recognisable, not blank —
  *  a null would read as "was never recorded" rather than "deliberately erased". */
 export const REDACTION_MARKER = "[REDACTED]";
-
-/**
- * "YYYY-MM-DD" from a date's LOCAL components.
- *
- * Deliberately not toISOString().slice(0,10): every date in this module is a
- * local-midnight Date, and converting local midnight to UTC moves it back a
- * day in any timezone east of Greenwich — so an IST user would see every
- * retention date one day early.
- */
-export function ymd(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-    d.getDate(),
-  ).padStart(2, "0")}`;
-}
 
 /** Add whole years, clamping the day (29 Feb + 5y → 28 Feb). */
 export function addYears(from: Date, years: number): Date {

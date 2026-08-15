@@ -156,8 +156,3 @@ export function scopeFor(report: ReportDef, role: Role | null): ScopeMode {
 export function reportsForRole(role: Role | null): ReportDef[] {
   return REPORTS.filter((r) => !r.selfService && scopeFor(r, role) !== "none");
 }
-
-/** True when this role may export this report as CSV as well as PDF. */
-export function canCsv(report: ReportDef, role: Role | null): boolean {
-  return Boolean(report.csv) && scopeFor(report, role) !== "none";
-}

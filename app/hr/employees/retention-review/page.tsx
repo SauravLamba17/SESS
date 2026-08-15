@@ -10,8 +10,8 @@ import {
   RETENTION_YEARS,
   REDACTED_FIELDS,
   PRESERVED_FIELDS,
-  ymd as localYmd,
 } from "@/lib/employees/retention";
+import { ymd as localYmd } from "@/lib/reports/range";
 
 export const dynamic = "force-dynamic";
 

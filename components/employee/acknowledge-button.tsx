@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Loader2, ShieldCheck } from "lucide-react";
+import { ATTESTATION_LABEL, ATTESTATION_DISCLAIMER } from "@/lib/attestation";
 
 /**
  * Warning-letter acknowledgement via an ATTESTATION RECORD.
@@ -72,10 +73,10 @@ export function AcknowledgeButton({
     <div className="w-72 rounded border border-border bg-surface-raised/40 p-3">
       <div className="mb-2 flex items-center gap-1.5">
         <ShieldCheck size={13} className="text-accent" />
-        <span className="text-xs font-medium text-text">Attestation Record</span>
+        <span className="text-xs font-medium text-text">{ATTESTATION_LABEL}</span>
       </div>
       <p className="mb-2 text-[10px] text-text-muted">
-        (internal record, not a legal digital signature)
+        {ATTESTATION_DISCLAIMER}
       </p>
 
       <label htmlFor={`att-${id}`} className="mb-1 block text-[10px] uppercase tracking-wide text-text-muted">

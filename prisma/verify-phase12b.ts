@@ -24,7 +24,7 @@ import {
   attendanceCsv,
   payrollCostCsv,
 } from "../lib/reports/csv.ts";
-import { REPORTS, REPORT_BY_ID, scopeFor, reportsForRole, canCsv } from "../lib/reports/registry.ts";
+import { REPORTS, REPORT_BY_ID, scopeFor, reportsForRole } from "../lib/reports/registry.ts";
 
 const db = new PrismaClient();
 
@@ -255,9 +255,13 @@ async function main() {
   check("board-summary is PDF only", REPORT_BY_ID.get("board-summary")?.csv !== true);
   check("my-data is PDF only", REPORT_BY_ID.get("my-data")?.csv !== true);
   eq("exactly nine CSV-capable reports", REPORTS.filter((r) => r.csv).length, 9);
+  // Was asserted through canCsv(), which nothing in the app ever called — the
+  // UI gates its CSV button on `report.csv` within an already role-filtered
+  // list, and the API re-checks scope itself. The INVARIANT it was really
+  // protecting is this one, so it now asserts it against the live function.
   check(
-    "canCsv() still refuses a report the role cannot run at all",
-    canCsv(REPORT_BY_ID.get("payroll-cost")!, "MANAGER") === false,
+    "a role that cannot run a report at all gets no scope for it",
+    scopeFor(REPORT_BY_ID.get("payroll-cost")!, "MANAGER") === "none",
   );
 
   // ── 3: MY DATA — self scope, and the two exclusions ─────────────

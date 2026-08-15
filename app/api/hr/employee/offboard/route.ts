@@ -4,7 +4,8 @@ import { db } from "@/lib/db";
 import { parseDateOnly } from "@/lib/period";
 import { getCurrentRole } from "@/lib/auth";
 import { assemblePayrollRow } from "@/lib/payroll/assemble";
-import { scheduledRedactionFor, RETENTION_YEARS, ymd } from "@/lib/employees/retention";
+import { scheduledRedactionFor, RETENTION_YEARS } from "@/lib/employees/retention";
+import { ymd } from "@/lib/reports/range";
 import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";

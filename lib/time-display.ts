@@ -18,17 +18,27 @@
  * Anything rendered on the server therefore has to name the timezone rather
  * than inherit it. That is all these helpers do.
  *
- * ─── SCOPE, HONESTLY ─────────────────────────────────────────────────────
- * These fix DISPLAY only. The attendance ENGINE is a separate problem: it is
- * built on "server local time == business local time" and reads wall-clock
- * fields directly — lateMinutesForShift() uses at.getHours(), timeOnDay() in
- * the HR correction route builds new Date(y, m, d, h, min), and there are ~21
- * such server-local date constructions. On a UTC server those compute the
- * wrong lateFlag/lateMinutes and write back the wrong instants; no display
- * helper can repair that. The fix for those is to run the server in the
- * organisation's timezone (TZ=Asia/Kolkata) — see the report accompanying this
- * change. Naming the timezone here is still worth it: it keeps what the user
- * READS correct no matter how the process is configured.
+ * ─── SCOPE, AND WHY BOTH HALVES EXIST ────────────────────────────────────
+ * These fix DISPLAY only. The attendance ENGINE was a separate, worse problem:
+ * it is built on "server local time == business local time" and reads
+ * wall-clock fields directly — lateMinutesForShift() uses at.getHours(),
+ * timeOnDay() in the HR correction route builds new Date(y, m, d, h, min), and
+ * there are ~21 such server-local date constructions. On a UTC server those
+ * computed the wrong lateFlag/lateMinutes and WROTE them to the database; no
+ * display helper could ever repair that.
+ *
+ * That half is now FIXED: instrumentation.ts sets process.env.TZ to
+ * ORG_TIME_ZONE on every server cold start, so the engine's server-local
+ * arithmetic is business-local arithmetic again. See that file for why the
+ * instrumentation hook is the right place for it.
+ *
+ * These formatters are still the correct approach for anything rendered, and
+ * are NOT made redundant by that fix: they name the timezone explicitly rather
+ * than inheriting it, so what a user READS stays correct even if the process
+ * timezone is ever wrong — a mis-set TZ, a runtime that ignores it, or a
+ * future host that does not run instrumentation.ts. Display should not depend
+ * on the process being configured correctly. Two independent guarantees, on
+ * purpose.
  *
  * Dependency-free on purpose — imported by a React PDF template and by
  * plain-Node verify scripts, neither of which can load Next or Prisma.

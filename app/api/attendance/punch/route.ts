@@ -59,6 +59,13 @@ export async function POST(req: NextRequest) {
 
   const lat = coerceCoord(body.lat);
   const long = coerceCoord(body.long);
+  // Parsed through the SAME coercion as lat/long, so a missing, non-numeric or
+  // NaN value becomes null rather than reaching the database.
+  //
+  // Deliberately NOT passed to validatePunch below: accuracy is recorded for a
+  // human reviewer to read, never used to judge a punch. No value of it — large,
+  // small or null — can flag or reject anything.
+  const accuracy = coerceCoord(body.accuracy);
   const note = typeof body.note === "string" ? body.note.trim() : "";
   const ip = clientIp(req);
   const now = new Date();
@@ -160,6 +167,7 @@ export async function POST(req: NextRequest) {
           ipAddress: ip,
           lat,
           long,
+          accuracy,
           lateFlag,
           lateMinutes,
           checkInNote: note,
@@ -186,6 +194,9 @@ export async function POST(req: NextRequest) {
           ipAddress: existing.ipAddress ?? ip,
           lat: existing.lat ?? lat,
           long: existing.long ?? long,
+          // Same back-fill rule as lat/long: keep the check-in's reading, but
+          // adopt the check-out's if the check-in never got one.
+          accuracy: existing.accuracy ?? accuracy,
         },
       });
     } else {

@@ -28,17 +28,34 @@ const STATUS_UI: Record<string, { state: StatusState; label: string }> = {
   already_complete: { state: "idle", label: "Already complete today" },
 };
 
-function getPosition(): Promise<{ lat: number | null; long: number | null }> {
+function getPosition(): Promise<{
+  lat: number | null;
+  long: number | null;
+  /**
+   * Radius of the reading's confidence circle in metres, straight from
+   * GeolocationCoordinates.accuracy. The browser already computes it on every
+   * call — it was simply being discarded. Travels with lat/long so a reviewer
+   * knows how precise the coordinate is; it is never used to judge a punch.
+   */
+  accuracy: number | null;
+}> {
   return new Promise((resolve) => {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
-      resolve({ lat: null, long: null });
+      resolve({ lat: null, long: null, accuracy: null });
       return;
     }
     navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ lat: pos.coords.latitude, long: pos.coords.longitude }),
+      (pos) =>
+        resolve({
+          lat: pos.coords.latitude,
+          long: pos.coords.longitude,
+          // Spec-optional in practice: guard so a browser omitting it yields
+          // null rather than NaN/undefined reaching the server.
+          accuracy: Number.isFinite(pos.coords.accuracy) ? pos.coords.accuracy : null,
+        }),
       // Denied or unavailable → send nulls; server records the punch and
       // flags it if geofencing is required. Never blocks the punch.
-      () => resolve({ lat: null, long: null }),
+      () => resolve({ lat: null, long: null, accuracy: null }),
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 },
     );
   });
@@ -74,14 +91,14 @@ export function ClockInWidget({
   async function punch(noteText?: string) {
     setResult(null);
     setPhase("locating");
-    const { lat, long } = await getPosition();
+    const { lat, long, accuracy } = await getPosition();
 
     setPhase("punching");
     try {
       const res = await fetch("/api/attendance/punch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lat, long, note: noteText ?? "" }),
+        body: JSON.stringify({ lat, long, accuracy, note: noteText ?? "" }),
       });
       const data = (await res.json()) as PunchResult;
       setResult(data);

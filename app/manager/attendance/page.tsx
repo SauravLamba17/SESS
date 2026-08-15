@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/portal/portal-shell";
 import { Panel, PanelHeader } from "@/components/ui/panel";
 import { StatusDot } from "@/components/ui/status-dot";
 import { LeaveDecisionButtons } from "@/components/manager/leave-decision-buttons";
+import { PunchLocation } from "@/components/attendance/punch-location";
 import { db } from "@/lib/db";
 import { getEmployeeByClerkId, getDirectReports } from "@/lib/data/scope";
 import { currentPeriod } from "@/lib/period";
@@ -22,7 +23,7 @@ async function load() {
     if (!manager) return { manager: null, error: null };
 
     const { monthStart, monthEnd } = currentPeriod();
-    const [reports, pending, handled, lateGroups] = await Promise.all([
+    const [reports, pending, handled, attnRows] = await Promise.all([
       getDirectReports(manager.id),
       db.leaveRequest.findMany({
         where: { status: "PENDING", employee: { managerId: manager.id, active: true } },
@@ -38,25 +39,49 @@ async function load() {
         orderBy: { createdAt: "desc" },
         take: 8,
       }),
-      // Single query — the actual late occurrences this month across all
-      // reports (each with its minutes-late value), grouped in memory. No N+1.
+      // STILL ONE QUERY — the same round trip, widened rather than joined by a
+      // second. Two changes:
+      //   · OR(lateFlag, flaggedForReview): a punch can be flagged for review
+      //     without being late, and those were previously invisible to a
+      //     manager entirely. Filtering on lateFlag alone hid them.
+      //   · the extra columns, so a manager can see WHERE a punch happened
+      //     rather than only that something was wrong with it.
       db.attendance.findMany({
         where: {
-          lateFlag: true,
           date: { gte: monthStart, lt: monthEnd },
           employee: { managerId: manager.id },
+          OR: [{ lateFlag: true }, { flaggedForReview: true }],
         },
-        select: { employeeId: true, date: true, lateMinutes: true },
+        select: {
+          employeeId: true,
+          date: true,
+          lateMinutes: true,
+          lateFlag: true,
+          flaggedForReview: true,
+          reviewReason: true,
+          lat: true,
+          long: true,
+          accuracy: true,
+        },
         orderBy: { date: "desc" },
       }),
     ]);
 
+    // The late summary keeps counting ONLY genuinely late rows. Widening the
+    // query above must not inflate "N late" with flagged-but-punctual punches,
+    // so the split happens here rather than in the where clause.
     const lateByEmp = new Map<string, { date: Date; lateMinutes: number | null }[]>();
-    for (const row of lateGroups) {
+    for (const row of attnRows) {
+      if (!row.lateFlag) continue;
       const arr = lateByEmp.get(row.employeeId) ?? [];
       arr.push({ date: row.date, lateMinutes: row.lateMinutes });
       lateByEmp.set(row.employeeId, arr);
     }
+
+    // Name lookup for the detail list, off the reports already fetched above —
+    // no extra query.
+    const nameById = new Map(reports.map((r) => [r.id, r.name]));
+
     return {
       manager,
       error: null,
@@ -64,6 +89,8 @@ async function load() {
       pending,
       handled,
       lateByEmp,
+      attnRows,
+      nameById,
     };
   } catch (err) {
     console.error("[manager/attendance] failed:", err);
@@ -190,6 +217,65 @@ export default async function TeamAttendancePage() {
               </ul>
             </Panel>
           </div>
+
+          {/* ── Detail for the rows the panel above only counts ──────────
+              Additive: the Late Marks summary is unchanged. This lists each
+              late OR flagged punch individually so a manager can see the
+              reason and the location, which they previously had no access to
+              at all — the old query selected neither. Rows come from the SAME
+              fetch; nothing new is queried here. */}
+          <Panel>
+            <PanelHeader
+              title={`Late & Flagged Punches · This Month (${data.attnRows.length})`}
+              action={
+                <span className="text-xs text-text-muted">
+                  Location is shown where the device provided one
+                </span>
+              }
+            />
+            {data.attnRows.length === 0 ? (
+              <div className="flex items-center gap-2 px-4 py-8 text-sm text-text-muted">
+                <StatusDot state="good" /> No late or flagged punches this month.
+              </div>
+            ) : (
+              <ul className="divide-y divide-border">
+                {data.attnRows.map((a, i) => (
+                  <li key={i} className="flex flex-wrap items-start justify-between gap-2 px-4 py-2.5 text-sm">
+                    <span className="min-w-0">
+                      <span className="text-text">
+                        {data.nameById.get(a.employeeId) ?? "—"}
+                      </span>
+                      <span className="ml-2 font-mono text-[11px] text-text-muted">
+                        {fmtDate(a.date)}
+                      </span>
+                      {/* Reason keeps the danger colour it has on HR's page. */}
+                      {a.flaggedForReview && a.reviewReason && (
+                        <span className="mt-0.5 block max-w-[28rem] text-[10px] text-danger">
+                          {a.reviewReason}
+                        </span>
+                      )}
+                      <PunchLocation
+                        lat={a.lat}
+                        long={a.long}
+                        accuracy={a.accuracy}
+                        className="mt-0.5 text-[10px]"
+                      />
+                    </span>
+                    <span className="inline-flex shrink-0 items-center gap-2">
+                      <StatusDot state={a.flaggedForReview ? "danger" : "warn"} />
+                      <span className="font-mono text-[11px] text-text-muted">
+                        {a.flaggedForReview ? "Flagged" : null}
+                        {a.flaggedForReview && a.lateFlag ? " · " : null}
+                        {a.lateFlag
+                          ? `Late${a.lateMinutes != null ? ` ${a.lateMinutes}m` : ""}`
+                          : null}
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Panel>
         </div>
       )}
     </>

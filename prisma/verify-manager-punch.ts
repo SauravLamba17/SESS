@@ -68,7 +68,12 @@ async function main() {
     src.includes("getEffectiveUserId()") && src.includes("getEmployeeByClerkId(userId)"));
   // THE guarantee: the body is only ever read for these three keys.
   const bodyReads = [...src.matchAll(/body\.(\w+)/g)].map((m) => m[1]).sort();
-  check("body is read for lat/long/note ONLY", JSON.stringify([...new Set(bodyReads)]) === '["lat","long","note"]',
+  // An ALLOWLIST, not a count: the point is that everything the body can
+  // influence is location or free text, and nothing identity-bearing. Adding a
+  // field here is a deliberate act that should require updating this line —
+  // `accuracy` joined the list when GPS precision capture was added.
+  check("body is read for lat/long/accuracy/note ONLY",
+    JSON.stringify([...new Set(bodyReads)]) === '["accuracy","lat","long","note"]',
     JSON.stringify([...new Set(bodyReads)]));
   check("body never supplies an employee id",
     !/body\.employeeId|body\.employee\b|body\["employeeId"\]/.test(src));

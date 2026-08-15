@@ -160,6 +160,13 @@ model Attendance {
   ipAddress      String?
   lat            Float?
   long           Float?
+  /// Radius of the browser's own confidence circle for lat/long, in metres
+  /// (GeolocationCoordinates.accuracy). Recorded so a reviewer can tell a
+  /// 20 m rooftop fix from a 2 km cell-tower one instead of treating every
+  /// coordinate as equally precise. NEVER judged: no punch is blocked,
+  /// flagged or scored on this value — see app/api/attendance/punch.
+  /// Null whenever lat/long are null, i.e. the device declined or failed.
+  accuracy       Float?
   lateFlag       Boolean           @default(false)
   lateMinutes    Int? // Phase 7: minutes past (shift.startTime + grace) if late; null if not late / no shift data
   checkInNote    String? // mandatory employee comment captured at web clock-in

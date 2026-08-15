@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/portal/portal-shell";
 import { Panel, PanelHeader, StatCard } from "@/components/ui/panel";
 import { StatusDot, type StatusState } from "@/components/ui/status-dot";
 import { AttendanceCorrection } from "@/components/hr/attendance-correction";
+import { PunchLocation } from "@/components/attendance/punch-location";
 import { db } from "@/lib/db";
 import { parseRange, currentMonthRange, ymd } from "@/lib/reports/range";
 import { clockHHMM } from "@/lib/time-display";
@@ -85,6 +86,11 @@ async function load(params: {
           lateMinutes: true,
           flaggedForReview: true,
           reviewReason: true,
+          // Added to the EXISTING select — three more columns on the query
+          // that already runs, not a second round trip.
+          lat: true,
+          long: true,
+          accuracy: true,
           employee: {
             select: {
               id: true,
@@ -325,6 +331,18 @@ export default async function AttendanceOversight({
                             {r.reviewReason}
                           </div>
                         )}
+                        {/* Same placement and size as the reason above, but
+                            not its danger colour — see PunchLocation. Shown on
+                            EVERY row that has coordinates, not only flagged
+                            ones: "where was this punch" is a fair question of
+                            any punch, and restricting it to flagged rows would
+                            make the link itself read as an accusation. */}
+                        <PunchLocation
+                          lat={r.lat}
+                          long={r.long}
+                          accuracy={r.accuracy}
+                          className="mt-0.5 text-[10px]"
+                        />
                       </td>
                       <td className="px-4 py-3">
                         <AttendanceCorrection

@@ -1,0 +1,28 @@
+-- Record the GPS reading's accuracy alongside the coordinates already stored.
+--
+-- WHAT THIS COLUMN IS
+-- The radius of the browser's own confidence circle for lat/long, in metres
+-- (GeolocationCoordinates.accuracy). It exists so a reviewer can tell a 20 m
+-- rooftop fix from a 2 km cell-tower one instead of treating every coordinate
+-- as equally precise. It is never judged: no punch is blocked, flagged or
+-- scored on this value.
+--
+-- WHY THIS FILE IS WRITTEN BY HAND, AND WHY "IF NOT EXISTS"
+-- The column was added to the live database with `prisma db push` when the
+-- feature was built, and no migration ever recorded it. schema.prisma and the
+-- live database therefore agree, while the MIGRATION HISTORY does not — drift
+-- that is invisible day to day and only bites on a rebuild from migrations
+-- (a new environment, a restore, a CI database), where the column would
+-- simply be absent and every attendance write would fail.
+--
+-- `IF NOT EXISTS` makes this a safe no-op against the database that already
+-- has the column, and a real change against one that does not. That is the
+-- point: the same file has to be correct in both worlds. It also means this
+-- migration can be marked as applied on the live database without executing
+-- anything that could damage it.
+--
+-- Written by hand rather than with `prisma migrate dev` on purpose: that
+-- command would have tried to apply a plain ADD COLUMN against a database
+-- where the column already exists.
+
+ALTER TABLE "Attendance" ADD COLUMN IF NOT EXISTS "accuracy" DOUBLE PRECISION;

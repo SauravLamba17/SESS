@@ -64,5 +64,44 @@ export function useFileDownload(start: string, end: string) {
     }
   }
 
-  return { busy, error, rangeValid, download };
+  /**
+   * Same endpoint, same query, same validation and same busy/error state as
+   * download() — only the response handling differs: JSON parsed and returned
+   * instead of a blob pushed at the browser.
+   *
+   * Deliberately part of THIS hook rather than a second one. Preview and
+   * download share the range check and the single busy key, so a row can
+   * never be previewing and downloading at once, and a bad range is refused
+   * identically for both. The server does the same for its part: one scope
+   * check, one compute pass, three output formats.
+   */
+  async function preview<T>(opts: {
+    key: string;
+    url: string;
+    failMessage: string;
+    networkMessage: string;
+  }): Promise<T | null> {
+    setError(null);
+    if (!rangeValid) {
+      setError('Choose a start date on or before the end date.');
+      return null;
+    }
+    setBusy(opts.key);
+    try {
+      const res = await fetch(opts.url);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error ?? opts.failMessage);
+        return null;
+      }
+      return data as T;
+    } catch {
+      setError(opts.networkMessage);
+      return null;
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return { busy, error, rangeValid, download, preview };
 }

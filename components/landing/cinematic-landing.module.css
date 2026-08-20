@@ -1,0 +1,900 @@
+/* ─────────────────────────────────────────────────────────────
+   CINEMATIC LANDING — pre-login marketing page ONLY.
+
+   THEME ISOLATION, IN BOTH DIRECTIONS
+   ───────────────────────────────────
+   This page is deliberately fixed-dark and does NOT participate in
+   the app's dark/light/high-contrast toggle.
+
+   OUT → IN: every colour here resolves through --sess-* variables
+   declared on .root below. Nothing in this file reads a global
+   --color-* token, so changing [data-theme] on <html> cannot
+   repaint a single pixel of this page. The two rules that global
+   CSS could otherwise reach — `body { @apply bg-background }` and
+   the [data-theme="high-contrast"] border/focus overrides — are
+   neutralised: .root is position:fixed;inset:0 and paints its own
+   background over the body, and the focus/border rules below are
+   written at a specificity that outranks them (see notes there).
+
+   IN → OUT: this is a CSS Module, so every class name is hashed and
+   every selector is anchored under .root. There is not one bare
+   element or global selector in this file, so nothing here can
+   escape onto another route.
+   ───────────────────────────────────────────────────────────── */
+
+.root {
+  /* Local palette. Intentionally NOT the app's --color-* tokens. */
+  --sess-void: #05070a;
+  --sess-ink: #0b1015;
+  --sess-bone: #edf1f3;
+  --sess-slate: #78848f;
+  --sess-amber: #f5a623;
+  --sess-teal: #3fb8c4;
+
+  /* next/font families injected on <html> by app/layout.tsx — reused,
+     never re-fetched from Google Fonts. */
+  --sess-display: var(--font-display), "Space Grotesk", system-ui, sans-serif;
+  --sess-body: var(--font-body), Inter, system-ui, sans-serif;
+  --sess-mono: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background: var(--sess-void);
+  color: var(--sess-bone);
+  /* globals.css puts `color-scheme: light` on the document under the light
+     theme, and it inherits. Pinned here so form controls, scrollbars and the
+     UA's default canvas stay dark on this page whatever the app is set to. */
+  color-scheme: dark;
+  font-family: var(--sess-body);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The reference file opened with its own `*`/`a`/`button` reset. There is
+   deliberately none here: Tailwind's preflight (globals.css) already does
+   every part of it — border-box on `*`, `color:inherit` +
+   `text-decoration:inherit` on `a`, and transparent background, inherited
+   font/colour and `cursor:pointer` on `button`.
+
+   Re-stating it scoped as `.root button` would be worse than redundant: at
+   specificity (0,1,1) it would outrank every single-class rule in this file,
+   so .signin's border, .glass's background and .modBtn's mono font would all
+   silently lose to the reset. Preflight's bare selectors (0,0,1) lose to
+   those classes, which is exactly what the reference relied on. */
+
+/* ─── the two places globals.css can still reach in, and their fix ───────
+   globals.css has exactly two rules that match plain elements inside a
+   [data-theme="high-contrast"] document, both of which outrank a single
+   class. Measured, not assumed: without the two rules below, switching the
+   app to high contrast visibly thickened this page's portal cards, nav links
+   and rail ticks.
+
+   1. `[data-theme="high-contrast"] :is(button,a,input,…)
+       { border-width: var(--border-width) }` — (0,2,0), because :is() takes
+      the specificity of its widest arm ([role="switch"], an attribute
+      selector). Pinning --border-width locally makes that rule resolve to
+      this page's own hairline instead of the theme's 2px, which is cheaper
+      and less brittle than out-specifying it on every bordered class. The
+      two elements that must stay borderless are zeroed at (0,3,1) after it.
+
+   2. `[data-theme="high-contrast"] :focus-visible` — (0,2,0), out-specified
+      below by doubling .root to (0,3,0). */
+.root {
+  --border-width: 1px;
+}
+.root.root :is(.nav a, .rail button) {
+  border-width: 0;
+}
+.root.root :focus-visible {
+  outline: 2px solid var(--sess-amber);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/* ============ fixed particle stage ============ */
+.stage {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      ellipse 120% 80% at 50% 40%,
+      transparent 0%,
+      rgba(5, 7, 10, 0.55) 70%,
+      rgba(5, 7, 10, 0.9) 100%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(5, 7, 10, 0.85) 0%,
+      transparent 22%,
+      transparent 72%,
+      rgba(5, 7, 10, 0.92) 100%
+    );
+}
+.grain {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ============ chrome ============ */
+.chrome {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 26px clamp(22px, 4.5vw, 64px);
+}
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  font-family: var(--sess-display);
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.01em;
+}
+.logo .ring {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 140deg,
+    var(--sess-amber),
+    var(--sess-teal),
+    #2bb673,
+    var(--sess-amber)
+  );
+  display: grid;
+  place-items: center;
+  box-shadow: 0 0 18px rgba(245, 166, 35, 0.35);
+}
+.logo .ring::after {
+  content: "";
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--sess-void);
+}
+.logo em {
+  font-style: normal;
+  font-family: var(--sess-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  color: var(--sess-slate);
+  font-weight: 400;
+}
+.chromeRight {
+  display: flex;
+  align-items: center;
+  gap: 26px;
+}
+.nav {
+  display: flex;
+  gap: 26px;
+  font-family: var(--sess-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  color: var(--sess-slate);
+  text-transform: uppercase;
+}
+.nav a {
+  position: relative;
+  padding: 6px 0;
+  transition: color 0.25s;
+}
+.nav a::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 100%;
+  bottom: 0;
+  height: 1px;
+  background: var(--sess-amber);
+  transition: right 0.35s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+.nav a:hover,
+.nav a[aria-current] {
+  color: var(--sess-bone);
+}
+.nav a[aria-current]::after,
+.nav a:hover::after {
+  right: 0;
+}
+.signin {
+  font-family: var(--sess-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  padding: 10px 20px;
+  border: 1px solid rgba(237, 241, 243, 0.18);
+  border-radius: 3px;
+  transition: all 0.28s cubic-bezier(0.2, 0.7, 0.3, 1);
+  backdrop-filter: blur(8px);
+  background: rgba(237, 241, 243, 0.03);
+  white-space: nowrap;
+}
+.signin:hover {
+  border-color: var(--sess-amber);
+  color: var(--sess-amber);
+  background: rgba(245, 166, 35, 0.07);
+}
+@media (max-width: 880px) {
+  .nav {
+    display: none;
+  }
+}
+
+/* ============ progress rail ============ */
+.rail {
+  position: absolute;
+  right: clamp(16px, 2.2vw, 34px);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  align-items: center;
+}
+.rail button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+  font-family: var(--sess-mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: transparent;
+  transition: color 0.3s;
+}
+.rail .tick {
+  width: 22px;
+  height: 1px;
+  background: rgba(237, 241, 243, 0.22);
+  transition: all 0.4s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+.rail button[aria-current] .tick {
+  width: 38px;
+  background: var(--sess-amber);
+  box-shadow: 0 0 10px rgba(245, 166, 35, 0.6);
+}
+.rail button:hover {
+  color: var(--sess-slate);
+}
+@media (max-width: 760px) {
+  .rail {
+    display: none;
+  }
+}
+
+/* ============ scroll frame ============ */
+/* Lenis drives the actual momentum/easing, so native scroll-snap is
+   deliberately OFF — a hard CSS snap fighting an eased scroll is what
+   produces the janky "catch-up" jump. A gentle JS settle-to-nearest
+   runs after the scroll stops instead (see the component). */
+.frame {
+  position: relative;
+  z-index: 10;
+  height: 100%;
+  overflow-y: scroll;
+  overflow-x: hidden;
+  /* globals.css sets `* { scrollbar-width: thin; scrollbar-color: <theme> }`;
+     the class selector here outranks both, so the rail stays the only
+     progress indicator and no themed scrollbar can appear. */
+  scrollbar-width: none;
+  scrollbar-color: transparent transparent;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+.frame::-webkit-scrollbar {
+  display: none;
+}
+.scene {
+  position: relative;
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  padding: 120px clamp(22px, 4.5vw, 64px) 90px;
+}
+.wrap {
+  width: 100%;
+  max-width: 1300px;
+  margin: 0 auto;
+}
+
+/* ============ type ============ */
+.kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-family: var(--sess-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  color: var(--sess-amber);
+  text-transform: uppercase;
+  margin-bottom: 26px;
+}
+.kicker i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #2bb673;
+  box-shadow: 0 0 9px #2bb673;
+  font-style: normal;
+}
+.root h1 {
+  font-family: var(--sess-display);
+  font-weight: 700;
+  font-size: clamp(42px, 7.2vw, 104px);
+  line-height: 0.94;
+  letter-spacing: -0.035em;
+  margin: 0;
+}
+.root h1 .soft {
+  color: var(--sess-slate);
+}
+.root h1 .hot {
+  color: var(--sess-amber);
+  text-shadow: 0 0 60px rgba(245, 166, 35, 0.35);
+}
+.root h2 {
+  font-family: var(--sess-display);
+  font-weight: 700;
+  font-size: clamp(30px, 4.4vw, 58px);
+  line-height: 1.04;
+  letter-spacing: -0.025em;
+  margin: 0;
+}
+.lede {
+  color: var(--sess-slate);
+  font-size: clamp(14.5px, 1.15vw, 16.5px);
+  max-width: 520px;
+  margin: 24px 0 0;
+}
+.notice {
+  margin-top: 22px;
+  font-family: var(--sess-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--sess-amber);
+  max-width: 520px;
+}
+
+/* ============ glass ============ */
+.glass {
+  background: rgba(11, 16, 21, 0.55);
+  backdrop-filter: blur(22px) saturate(120%);
+  -webkit-backdrop-filter: blur(22px) saturate(120%);
+  border: 1px solid rgba(237, 241, 243, 0.09);
+  border-radius: 10px;
+}
+
+/* ============ buttons ============ */
+.acts {
+  display: flex;
+  gap: 12px;
+  margin-top: 40px;
+  flex-wrap: wrap;
+}
+.act {
+  font-family: var(--sess-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.05em;
+  padding: 14px 26px;
+  border-radius: 3px;
+  border: 1px solid rgba(237, 241, 243, 0.16);
+  transition: all 0.28s cubic-bezier(0.2, 0.7, 0.3, 1);
+  backdrop-filter: blur(10px);
+  background: rgba(237, 241, 243, 0.03);
+}
+.act:hover {
+  border-color: var(--sess-amber);
+  color: var(--sess-amber);
+  transform: translateY(-2px);
+  background: rgba(245, 166, 35, 0.07);
+}
+.act.filled {
+  background: var(--sess-amber);
+  color: var(--sess-void);
+  border-color: var(--sess-amber);
+  font-weight: 500;
+}
+.act.filled:hover {
+  background: #ffb840;
+  color: var(--sess-void);
+  box-shadow: 0 12px 34px rgba(245, 166, 35, 0.28);
+}
+
+/* ============ scene 0 · hero ============ */
+.heroLower {
+  position: absolute;
+  left: clamp(22px, 4.5vw, 64px);
+  right: clamp(22px, 4.5vw, 64px);
+  bottom: clamp(34px, 7vh, 80px);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 40px;
+  flex-wrap: wrap;
+}
+.metrics {
+  display: flex;
+  gap: clamp(24px, 3.4vw, 54px);
+  flex-wrap: wrap;
+}
+.metric b {
+  display: block;
+  font-family: var(--sess-display);
+  font-weight: 700;
+  font-size: clamp(22px, 2.3vw, 32px);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.metric span {
+  font-family: var(--sess-mono);
+  font-size: 9px;
+  color: var(--sess-slate);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-top: 8px;
+  display: block;
+}
+.scrollcue {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  font-family: var(--sess-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  color: var(--sess-slate);
+  text-transform: uppercase;
+}
+.scrollcue .line {
+  width: 46px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--sess-slate), transparent);
+  position: relative;
+  overflow: hidden;
+}
+.scrollcue .line::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 14px;
+  background: var(--sess-amber);
+  animation: slide 2.4s cubic-bezier(0.6, 0, 0.4, 1) infinite;
+}
+@keyframes slide {
+  0% {
+    transform: translateX(-14px);
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(46px);
+    opacity: 0;
+  }
+}
+
+/* ============ scene 1 · modules ============ */
+.modGrid {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 28px;
+  margin-top: 46px;
+}
+@media (max-width: 940px) {
+  .modGrid {
+    grid-template-columns: 1fr;
+  }
+}
+.modRail {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.modBtn {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 15px 18px;
+  border-radius: 6px;
+  font-family: var(--sess-mono);
+  font-size: 12px;
+  letter-spacing: 0.03em;
+  color: var(--sess-slate);
+  border: 1px solid transparent;
+  transition: all 0.26s cubic-bezier(0.2, 0.7, 0.3, 1);
+  text-align: left;
+  width: 100%;
+}
+.modBtn .no {
+  font-size: 9.5px;
+  opacity: 0.6;
+  width: 16px;
+}
+.modBtn:hover {
+  color: var(--sess-bone);
+  background: rgba(237, 241, 243, 0.04);
+}
+.modBtn[aria-current] {
+  color: var(--sess-bone);
+  background: rgba(245, 166, 35, 0.08);
+  border-color: rgba(245, 166, 35, 0.35);
+}
+.modBtn[aria-current] .no {
+  color: var(--sess-amber);
+  opacity: 1;
+}
+.modPanel {
+  padding: clamp(26px, 3vw, 44px);
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.modPanel .tag {
+  font-family: var(--sess-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  margin-bottom: 16px;
+}
+.modPanel h3 {
+  font-family: var(--sess-display);
+  font-size: clamp(22px, 2.5vw, 32px);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  margin: 0 0 16px;
+}
+.modPanel p {
+  color: var(--sess-slate);
+  font-size: 15px;
+  max-width: 560px;
+  margin: 0;
+}
+.modFacts {
+  display: flex;
+  gap: clamp(22px, 3vw, 44px);
+  margin-top: 32px;
+  padding-top: 26px;
+  border-top: 1px solid rgba(237, 241, 243, 0.08);
+  flex-wrap: wrap;
+}
+.modFacts b {
+  display: block;
+  font-family: var(--sess-display);
+  font-size: 21px;
+  letter-spacing: -0.02em;
+}
+.modFacts span {
+  font-family: var(--sess-mono);
+  font-size: 8.5px;
+  color: var(--sess-slate);
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  margin-top: 6px;
+  display: block;
+}
+.fade {
+  animation: fadeUp 0.5s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ============ scene 2 · shifts ============ */
+.shiftGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(36px, 5vw, 80px);
+  align-items: center;
+}
+@media (max-width: 940px) {
+  .shiftGrid {
+    grid-template-columns: 1fr;
+    gap: 34px;
+  }
+}
+.dialBox {
+  max-width: 400px;
+  width: 100%;
+  margin: 0 auto;
+}
+.dialBox svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.dialArc {
+  stroke: var(--sess-amber);
+  filter: drop-shadow(0 0 10px rgba(245, 166, 35, 0.5));
+}
+.dialHand {
+  stroke: var(--sess-bone);
+  transform-origin: 115px 115px;
+  transition: transform 1s cubic-bezier(0.3, 0, 0.2, 1);
+}
+.dialHub {
+  fill: var(--sess-bone);
+}
+.dialText {
+  font-family: var(--sess-mono);
+  fill: var(--sess-slate);
+}
+.shiftSwitch {
+  display: flex;
+  gap: 8px;
+  margin-top: 26px;
+  justify-content: center;
+}
+.shiftSwitch button {
+  font-family: var(--sess-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  padding: 11px 18px;
+  border-radius: 3px;
+  border: 1px solid rgba(237, 241, 243, 0.14);
+  color: var(--sess-slate);
+  transition: all 0.26s;
+  backdrop-filter: blur(10px);
+}
+.shiftSwitch button[aria-current] {
+  background: var(--sess-amber);
+  color: var(--sess-void);
+  border-color: var(--sess-amber);
+}
+.note {
+  margin-top: 28px;
+  padding: 20px 22px;
+  border-left: 2px solid var(--sess-amber);
+  font-size: 14px;
+  color: var(--sess-slate);
+  border-radius: 0 8px 8px 0;
+}
+.note b {
+  color: var(--sess-bone);
+  font-weight: 500;
+}
+
+/* ============ scene 3 · portals ============ */
+.portals {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-top: 48px;
+}
+@media (max-width: 1040px) {
+  .portals {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 560px) {
+  .portals {
+    grid-template-columns: 1fr;
+  }
+}
+.portal {
+  display: block;
+  width: 100%;
+  /* The card is a <button> here (it opens the Clerk modal) where the
+     reference had an <a>; without this every line inside it would centre. */
+  text-align: left;
+  padding: 28px 26px 26px;
+  position: relative;
+  overflow: hidden;
+  transition:
+    transform 0.38s cubic-bezier(0.2, 0.7, 0.3, 1),
+    border-color 0.38s,
+    box-shadow 0.38s;
+}
+.portal::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--rc), transparent);
+  transform: scaleX(0.28);
+  transform-origin: left;
+  transition: transform 0.45s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+.portal:hover {
+  transform: translateY(-6px);
+  border-color: color-mix(in srgb, var(--rc) 55%, transparent);
+  box-shadow: 0 22px 50px rgba(0, 0, 0, 0.5);
+}
+.portal:hover::before {
+  transform: scaleX(1);
+}
+.portal .role {
+  font-family: var(--sess-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--rc);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.portal .role i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--rc);
+  box-shadow: 0 0 8px var(--rc);
+  font-style: normal;
+}
+.portal h4 {
+  font-family: var(--sess-display);
+  font-size: 18px;
+  letter-spacing: -0.015em;
+  margin: 0 0 9px;
+}
+.portal p {
+  color: var(--sess-slate);
+  font-size: 13px;
+  margin: 0;
+}
+.portal .path {
+  font-family: var(--sess-mono);
+  font-size: 10px;
+  color: var(--sess-slate);
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(237, 241, 243, 0.08);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.portal .path .arrow {
+  transition: transform 0.3s;
+}
+.portal:hover .path .arrow {
+  transform: translateX(5px);
+  color: var(--rc);
+}
+
+/* ============ scene 4 · principles ============ */
+.prin {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-top: 48px;
+}
+@media (max-width: 900px) {
+  .prin {
+    grid-template-columns: 1fr;
+  }
+}
+.prin > div {
+  padding: 30px 28px;
+  transition:
+    border-color 0.3s,
+    transform 0.3s;
+}
+.prin > div:hover {
+  border-color: rgba(245, 166, 35, 0.34);
+  transform: translateY(-3px);
+}
+.prin .k {
+  font-family: var(--sess-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--sess-teal);
+  margin-bottom: 13px;
+}
+.prin p {
+  font-size: 14px;
+  color: var(--sess-slate);
+  margin: 0;
+}
+.prin p b {
+  color: var(--sess-bone);
+  font-weight: 500;
+}
+
+/* ============ scene 5 · close ============ */
+.close {
+  text-align: center;
+  max-width: 800px;
+  margin: 0 auto;
+}
+.close .lede {
+  margin: 24px auto 0;
+}
+.close .acts {
+  justify-content: center;
+}
+.footline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 24px clamp(22px, 4.5vw, 64px);
+  border-top: 1px solid rgba(237, 241, 243, 0.07);
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-family: var(--sess-mono);
+  font-size: 10px;
+  color: var(--sess-slate);
+  letter-spacing: 0.06em;
+}
+
+/* ============ reveal ============ */
+.rv {
+  opacity: 0;
+  transform: translateY(30px);
+  transition:
+    opacity 0.85s cubic-bezier(0.2, 0.7, 0.3, 1),
+    transform 0.85s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+.scene.live .rv {
+  opacity: 1;
+  transform: none;
+}
+.scene.live .rv:nth-of-type(2) {
+  transition-delay: 0.09s;
+}
+.scene.live .rv:nth-of-type(3) {
+  transition-delay: 0.18s;
+}
+.scene.live .rv:nth-of-type(4) {
+  transition-delay: 0.27s;
+}
+.scene.live .rv:nth-of-type(5) {
+  transition-delay: 0.36s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rv {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .frame {
+    scroll-behavior: auto;
+  }
+  .scrollcue .line::after {
+    animation: none;
+  }
+  .fade {
+    animation: none;
+  }
+  .dialHand {
+    transition: none;
+  }
+}

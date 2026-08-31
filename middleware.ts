@@ -26,11 +26,22 @@ const isPortalRoute = createRouteMatcher([
  *
  * /api/webhooks/clerk is called by Clerk's servers, not a signed-in user —
  * its trust boundary is svix signature verification in-route, not a session.
+ *
+ * Phase A health checks are listed here for the same reason: an external
+ * uptime monitor has no session and no cookie, so a health endpoint that
+ * could 302 to Clerk's sign-in would report "up" for a redirect and hide a
+ * real outage. Both are EXACT paths, not a `(.*)` prefix — /api/health is
+ * process liveness (no DB, no data) and /api/health/ready is a bare
+ * `SELECT 1`. Neither reads a session, so nothing is exposed by skipping one.
+ * Listing them exactly means a future /api/health/<something-heavier> is NOT
+ * silently public by inheritance; it would have to be added here on purpose.
  */
 const isPublicRoute = createRouteMatcher([
   "/careers(.*)",
   "/api/careers/apply",
   "/api/webhooks/clerk",
+  "/api/health",
+  "/api/health/ready",
 ]);
 
 /**

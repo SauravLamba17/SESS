@@ -11,6 +11,14 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
+ * RED TIER — never cache, see SESS_Caching_Strategy.docx Section 3.
+ *
+ * Tax values — annual gross and TDS from FINALIZED payroll rows, rendered as
+ * a statutory document. Section 3: "Tax / deduction values · authoritative
+ * source only." Summed from a fresh query on every request.
+ */
+
+/**
  * Form 16 Part B for one employee and one financial year (April–March).
  *
  * This is an AGGREGATION AND FORMATTING endpoint, nothing more: it sums the

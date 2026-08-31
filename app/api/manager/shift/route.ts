@@ -3,6 +3,7 @@ import { getEffectiveUserId, hasAtLeastRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getEmployeeByClerkId } from "@/lib/data/scope";
 import { fail } from "@/lib/api/response";
+import { onEmployeeShiftAssigned } from "@/lib/invalidation/employee";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -61,6 +62,9 @@ export async function POST(req: NextRequest) {
     });
     if (!result)
       return fail("NOT_DIRECT_REPORT", "That employee is not your direct report", 403);
+
+    // §5: this manager's own roster shows the shift that just changed.
+    onEmployeeShiftAssigned({ employeeId, managerEmployeeId: manager.id });
 
     return NextResponse.json({ ok: true, employeeId, shiftId });
   } catch (err) {

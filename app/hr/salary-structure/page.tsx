@@ -11,6 +11,14 @@ import { ymd } from "@/lib/reports/range";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * RED TIER — never cache, see SESS_Caching_Strategy.docx Section 3.
+ *
+ * Employee salary and salary-structure history. Read directly on every
+ * render — see the note in app/api/hr/salary-structure/route.ts for why no
+ * cached VIEW of this data exists to be invalidated.
+ */
+
 async function load() {
   try {
     // One query — structures come in via the relation, no per-employee lookup.

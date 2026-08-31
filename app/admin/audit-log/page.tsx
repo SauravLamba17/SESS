@@ -12,6 +12,15 @@ import {
 
 export const dynamic = "force-dynamic";
 
+/**
+ * RED TIER — never cache, see SESS_Caching_Strategy.docx Section 3.
+ *
+ * Audit logs — Section 3 "Always authoritative". The viewer below paginates
+ * against PostgreSQL on every request. A cached audit page could show an
+ * investigator a log that no longer matches the log, which is the one thing
+ * an audit trail may never do.
+ */
+
 function fmt(d: Date): string {
   return d.toISOString().replace("T", " ").slice(0, 19);
 }

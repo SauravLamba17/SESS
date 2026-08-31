@@ -8,6 +8,15 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
+ * RED TIER — never cache, see SESS_Caching_Strategy.docx Section 3.
+ *
+ * Payroll calculation inputs and the DRAFT -> SUBMITTED transition. Read and
+ * written straight from PostgreSQL inside a transaction; nothing on this path
+ * is read from or written to any cache. No import from lib/cache/ exists here
+ * and none may be added.
+ */
+
+/**
  * DRAFT → SUBMITTED for every row in a period.
  *
  * SUBMITTED is a soft lock: HR can still SEE the run, but can no longer edit

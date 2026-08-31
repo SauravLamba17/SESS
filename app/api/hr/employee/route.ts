@@ -8,6 +8,7 @@ import { sendEmployeeInvitation } from "@/lib/employees/invite";
 import { clerkCreateInvitation } from "@/lib/employees/invite-clerk";
 import { ROLES, type Role } from "@/lib/auth-types";
 import { fail } from "@/lib/api/response";
+import { onEmployeeRosterChanged } from "@/lib/invalidation/employee";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -73,6 +74,17 @@ export async function POST(req: NextRequest) {
         result.code === "DUPLICATE_CODE" || result.code === "DUPLICATE_EMAIL" ? 409 : 400;
       return fail(result.code, result.message, status);
     }
+
+    // §5 "Department changed → invalidate department cache and affected team
+    // views". In this schema `department` is a column on Employee, so a new
+    // employee IS the department-list change — as well as a roster, headcount
+    // and report-scope change. Fired after the commit, before anything that
+    // can fail (the Clerk invitation below deliberately cannot undo the
+    // onboard, and must not be able to leave a stale cache behind either).
+    onEmployeeRosterChanged({
+      employeeId: result.employee.id,
+      managerEmployeeId: managerId,
+    });
 
     // Invitation AFTER the commit — the Employee exists whatever happens here.
     // A Clerk failure is reported to HR, never allowed to undo the onboard.

@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { onboardEmployee } from "@/lib/employees/onboard";
 import { validateCsv, type ValidationContext } from "@/lib/employees/csv-import";
 import { fail } from "@/lib/api/response";
+import { onEmployeeRosterChanged } from "@/lib/invalidation/employee";
 import { ymd } from "@/lib/reports/range";
 
 export const runtime = "nodejs";
@@ -185,6 +186,10 @@ export async function POST(req: NextRequest) {
       },
       { timeout: 60_000 },
     );
+
+    // §5: the import is all-or-nothing, so one invalidation after the single
+    // commit covers every row it created.
+    onEmployeeRosterChanged();
 
     return NextResponse.json({
       ok: true,

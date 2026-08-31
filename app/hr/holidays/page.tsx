@@ -2,7 +2,8 @@ import { PageHeader } from "@/components/portal/portal-shell";
 import { Panel, PanelHeader } from "@/components/ui/panel";
 import { StatusDot } from "@/components/ui/status-dot";
 import { HolidayForm, RemoveHolidayButton } from "@/components/hr/holiday-manager";
-import { db } from "@/lib/db";
+import { getHolidayCalendar } from "@/lib/cache/shifts";
+import { parseDateOnly } from "@/lib/period";
 import { ErrorPanel } from "@/components/ui/notice";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +14,19 @@ function startOfDay(d: Date): Date {
 
 async function load() {
   try {
-    const holidays = await db.holiday.findMany({ orderBy: { date: "asc" } });
+    // GREEN TIER (SESS_Caching_Strategy.docx §2/§4) — holiday calendar, 6 hr,
+    // dropped by tag the instant HR adds or removes a date.
+    //
+    // The cached rows carry `date` as "YYYY-MM-DD", not a Date: the Data Cache
+    // serialises what it stores, so a Date would come back as a string and
+    // every .toLocaleDateString() below would throw on the second request of
+    // the window. parseDateOnly() turns it back into the same LOCAL midnight
+    // the rest of this codebase's date handling uses.
+    const holidays = (await getHolidayCalendar()).map((h) => ({
+      id: h.id,
+      name: h.name,
+      date: parseDateOnly(h.date)!,
+    }));
     return { holidays, error: null };
   } catch (err) {
     console.error("[hr/holidays] failed:", err);

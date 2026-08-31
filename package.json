@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start -p 3005",
     "lint": "next lint",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "selfcheck:cache": "node --import ./scripts/alias-loader.mjs ./scripts/caching.selfcheck.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.39.6",

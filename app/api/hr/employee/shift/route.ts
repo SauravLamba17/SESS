@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getEffectiveUserId, getCurrentRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { fail } from "@/lib/api/response";
+import { onEmployeeShiftAssigned } from "@/lib/invalidation/employee";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,6 +43,10 @@ export async function POST(req: NextRequest) {
       return emp;
     });
     if (!result) return fail("NOT_FOUND", "Employee not found", 404);
+
+    // §5: the roster prints this employee's shift name, so it is stale the
+    // instant the assignment commits.
+    onEmployeeShiftAssigned({ employeeId });
 
     return NextResponse.json({ ok: true, employeeId, shiftId });
   } catch (err) {

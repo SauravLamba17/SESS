@@ -15,6 +15,34 @@ export const dynamic = "force-dynamic";
 // stays tied to the transaction's own timeout if that default ever changes.
 export const maxDuration = 45;
 
+/**
+ * RED TIER — never cache, see SESS_Caching_Strategy.docx Section 3.
+ *
+ * PAYROLL PREVIEW. This route IS the preview: it fetches the current
+ * authoritative inputs (salary structures, attendance, approved claims,
+ * active advances) and computes a DRAFT run from what it just read.
+ *
+ *   User requests Payroll Preview
+ *         |
+ *   Fetch current authoritative data   <- direct DB read, no cache lookup
+ *         |
+ *   Calculate preview                  <- fresh, from what was just fetched
+ *         |
+ *   Return result
+ *         |
+ *   DO NOT STORE IN SHARED CACHE
+ *
+ * There is no unstable_cache, no revalidate, no fetch() with a cache option
+ * and no import from lib/cache/ anywhere in this file or in anything it
+ * calls: lib/payroll/assemble.ts and lib/payroll/compute.ts are pure
+ * arithmetic over values passed in, and lib/payroll/proration.ts likewise.
+ * The four batched queries below run on EVERY request, every time.
+ *
+ * `export const dynamic = "force-dynamic"` above additionally stops the
+ * Route Handler itself from being statically rendered or CDN-cached (Section
+ * 8: never cache authenticated responses at a shared layer).
+ */
+
 /** Exclusive upper bound of a "YYYY-MM" period. */
 function monthEnd(period: string): Date {
   const [y, m] = period.split("-").map(Number);

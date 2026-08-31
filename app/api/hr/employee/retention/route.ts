@@ -10,6 +10,7 @@ import {
   REDACTED_FIELDS,
 } from "@/lib/employees/retention";
 import { ymd } from "@/lib/reports/range";
+import { onEmployeeRosterChanged } from "@/lib/invalidation/employee";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -113,6 +114,11 @@ export async function POST(req: NextRequest) {
         });
       });
 
+      // §5 "HR dashboard source data changed → invalidate affected aggregate":
+      // the "retention expiring" card counts rows whose scheduled redaction is
+      // within 30 days, and this row just left that window.
+      onEmployeeRosterChanged({ employeeId });
+
       return NextResponse.json({
         ok: true,
         employeeId,
@@ -143,6 +149,12 @@ export async function POST(req: NextRequest) {
         },
       });
     });
+
+    // §5: redaction rewrites the employee's identifying fields, so every
+    // cached display copy of them — roster rows, this employee's own profile
+    // basics, the retention count — is wrong the instant the transaction
+    // commits.
+    onEmployeeRosterChanged({ employeeId });
 
     return NextResponse.json({
       ok: true,

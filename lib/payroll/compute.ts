@@ -1,3 +1,10 @@
+/**
+ * RED TIER — never cache, see SESS_Caching_Strategy.docx Section 3.
+ *
+ * Net salary and tax/deduction arithmetic. Pure: no DB access, no I/O, and
+ * therefore no cache of any kind — there is nothing here to memoise and
+ * nothing here that may be memoised.
+ */
 // Pure payroll arithmetic. No DB access, no I/O — callers batch-fetch and pass
 // already-resolved figures in (see app/api/hr/payroll/run/route.ts).
 //

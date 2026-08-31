@@ -9,7 +9,8 @@ import { OffboardButton } from "@/components/hr/offboard-button";
 import { BulkImport } from "@/components/hr/bulk-import";
 import { InviteButton } from "@/components/hr/invite-button";
 import { ShiftAssignSelect } from "@/components/shifts/shift-assign-select";
-import { getAllEmployees, getActiveEmployees, getActiveShifts } from "@/lib/data/scope";
+import { getAllEmployees, getActiveEmployees } from "@/lib/data/scope";
+import { getActiveShiftOptions } from "@/lib/cache/shifts";
 import { ErrorPanel } from "@/components/ui/notice";
 import { ymd } from "@/lib/reports/range";
 
@@ -23,7 +24,8 @@ async function load() {
     const [employees, managers, shifts] = await Promise.all([
       getAllEmployees(),
       getActiveEmployees(),
-      getActiveShifts(),
+      // GREEN TIER (§2/§4) — shift definitions, 1 hr, tag-invalidated.
+      getActiveShiftOptions(),
     ]);
     return { error: null, employees, managers, shifts };
   } catch (err) {

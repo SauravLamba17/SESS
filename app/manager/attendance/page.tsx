@@ -5,7 +5,8 @@ import { StatusDot } from "@/components/ui/status-dot";
 import { LeaveDecisionButtons } from "@/components/manager/leave-decision-buttons";
 import { PunchLocation } from "@/components/attendance/punch-location";
 import { db } from "@/lib/db";
-import { getEmployeeByClerkId, getDirectReports } from "@/lib/data/scope";
+import { getEmployeeByClerkId } from "@/lib/data/scope";
+import { getTeamRoster } from "@/lib/cache/employees";
 import { currentPeriod } from "@/lib/period";
 import { ErrorPanel, UnlinkedEmployeeNotice } from "@/components/ui/notice";
 
@@ -24,7 +25,10 @@ async function load() {
 
     const { monthStart, monthEnd } = currentPeriod();
     const [reports, pending, handled, attnRows] = await Promise.all([
-      getDirectReports(manager.id),
+      // ORANGE TIER (§2/§4) — team roster, 60 s. The roster is a display
+      // list. The PENDING LEAVE ROWS below it are deliberately NOT cached:
+      // they gate an action, and a stale one could be actioned twice.
+      getTeamRoster(manager.id),
       db.leaveRequest.findMany({
         where: { status: "PENDING", employee: { managerId: manager.id, active: true } },
         include: { employee: { select: { name: true, employeeCode: true } } },

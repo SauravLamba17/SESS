@@ -10,6 +10,16 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
+ * RED TIER — never cache, see SESS_Caching_Strategy.docx Section 3.
+ *
+ * Payslip financial values, plus the role scoping that decides WHOSE payslip
+ * the caller may pull. Both are resolved against the database on every
+ * request. Section 8 additionally forbids CDN-caching an authenticated
+ * response like this one; force-dynamic above keeps it out of every shared
+ * layer.
+ */
+
+/**
  * Download one payslip as a PDF.
  *
  * FINALIZED rows only — for EVERYONE, HR included. A DRAFT or SUBMITTED figure

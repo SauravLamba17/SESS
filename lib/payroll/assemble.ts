@@ -1,3 +1,11 @@
+/**
+ * RED TIER — never cache, see SESS_Caching_Strategy.docx Section 3.
+ *
+ * Payroll calculation inputs. This module is PURE — it holds no query and no
+ * cache. Everything it computes comes from arguments the caller read fresh
+ * from PostgreSQL in the same request, so the preview is always calculated
+ * from current authoritative data and never from a stored figure.
+ */
 // Assembles one Payroll row's figures from already-fetched inputs.
 //
 // Pure: no DB access. Callers batch-fetch structures, claims and advances for

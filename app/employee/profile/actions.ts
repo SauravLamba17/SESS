@@ -4,6 +4,7 @@ import { getEffectiveUserId } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { getEmployeeByClerkId } from "@/lib/data/scope";
+import { onEmployeeProfileChanged } from "@/lib/invalidation/employee";
 
 export interface ProfileFormState {
   ok: boolean;
@@ -70,6 +71,11 @@ export async function updateProfile(input: {
       },
     });
 
+    // §5: the cached display copy of this profile (ORANGE, 60 s) is stale the
+    // moment the row is written. revalidatePath refreshes the rendered route;
+    // this drops the DATA CACHE entry underneath it, which a path revalidation
+    // does not touch.
+    onEmployeeProfileChanged(employee.id);
     revalidatePath("/employee/profile");
     return { ok: true };
   } catch (err) {

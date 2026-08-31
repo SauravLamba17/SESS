@@ -10,6 +10,15 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
+ * RED TIER — never cache, see SESS_Caching_Strategy.docx Section 3.
+ *
+ * Issues an agent token. Section 8: "Never put passwords, tokens, API keys or
+ * Clerk secrets in an application cache." The plaintext token is returned
+ * once and never stored anywhere but the caller's hands; only its hash is
+ * persisted (lib/idle/token.ts). Nothing on this path touches a cache.
+ */
+
+/**
  * Issue or revoke a desktop-agent token.
  *
  * ISSUING IS CONSENT-GATED: an employee with no ACTIVE IDLE_TRACKING consent

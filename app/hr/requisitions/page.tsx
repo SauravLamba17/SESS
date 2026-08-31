@@ -5,7 +5,7 @@ import { Panel, PanelHeader } from "@/components/ui/panel";
 import { StatusDot } from "@/components/ui/status-dot";
 import { RequisitionForm } from "@/components/hr/requisition-form";
 import { RequisitionStatusButton } from "@/components/hr/requisition-status-button";
-import { db } from "@/lib/db";
+import { getRecruitmentDashboard } from "@/lib/cache/dashboard";
 import { ErrorPanel } from "@/components/ui/notice";
 
 export const dynamic = "force-dynamic";
@@ -14,12 +14,13 @@ const DOT = { OPEN: "good", ON_HOLD: "warn", CLOSED: "idle" } as const;
 
 async function load() {
   try {
-    // Application counts come from a relation _count — one query, no per-row
-    // lookups as the number of requisitions grows.
-    const requisitions = await db.jobRequisition.findMany({
-      include: { _count: { select: { applications: true } } },
-      orderBy: [{ status: "asc" }, { createdAt: "desc" }],
-    });
+    // YELLOW TIER (SESS_Caching_Strategy.docx §2/§4) — recruitment dashboard,
+    // 5 min. Requisition metadata and application COUNTS only; no candidate
+    // name, email or phone is cached anywhere (§3 sensitive HR data).
+    //
+    // Same single query with a relation _count as before — it moved into
+    // lib/cache/dashboard.ts so no page owns caching logic of its own.
+    const requisitions = await getRecruitmentDashboard();
     return { requisitions, error: null };
   } catch (err) {
     console.error("[hr/requisitions] failed:", err);
@@ -88,10 +89,12 @@ export default async function RequisitionsPage() {
                         </div>
                         <div className="mt-0.5 font-mono text-[11px] text-text-muted">
                           {r.department} · {r.openings} opening
-                          {r.openings === 1 ? "" : "s"} · {r._count.applications}{" "}
-                          application{r._count.applications === 1 ? "" : "s"}
-                          {r.closedAt &&
-                            ` · closed ${r.closedAt.toISOString().slice(0, 10)}`}
+                          {r.openings === 1 ? "" : "s"} · {r.applicationCount}{" "}
+                          application{r.applicationCount === 1 ? "" : "s"}
+                          {/* Already "YYYY-MM-DD": the cached row carries dates
+                              as strings, because a Date does not survive the
+                              Data Cache round-trip. */}
+                          {r.closedAt && ` · closed ${r.closedAt}`}
                         </div>
                       </div>
                       <RequisitionStatusButton id={r.id} status={r.status} title={r.title} />

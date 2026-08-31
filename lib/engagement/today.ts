@@ -1,5 +1,7 @@
 import "server-only";
 import { db } from "@/lib/db";
+import { getHolidaysOn } from "@/lib/cache/shifts";
+import { ymd } from "@/lib/reports/range";
 import {
   derivePresence,
   presenceCounts,
@@ -65,11 +67,18 @@ export async function loadToday(now = new Date()): Promise<TodayData> {
       select: { employeeId: true },
     }),
 
-    db.holiday.findMany({
-      where: { date: { gte: dayStart, lt: dayEnd } },
-      select: { id: true, name: true },
-      orderBy: { name: "asc" },
-    }),
+    // GREEN TIER (SESS_Caching_Strategy.docx §2/§4) — holiday calendar, 6 hr,
+    // keyed on the day so an entry can never outlive the day it describes and
+    // dropped by tag whenever HR edits the calendar.
+    //
+    // This is the highest-traffic cached read in SESS: loadToday() runs on all
+    // four dashboards and the community wall, so this one query was being
+    // issued on essentially every page view by every user, all day, to return
+    // the same (almost always empty) result.
+    //
+    // The other three queries here stay uncached on purpose — they are today's
+    // presence, which is the whole point of a "who is in today" widget.
+    getHolidaysOn(ymd(dayStart)),
   ]);
 
   const presence = derivePresence(

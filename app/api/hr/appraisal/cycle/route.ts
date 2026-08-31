@@ -3,6 +3,7 @@ import { getEffectiveUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getCurrentRole } from "@/lib/auth";
 import { fail } from "@/lib/api/response";
+import { onAppraisalChanged } from "@/lib/invalidation/employee";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -66,6 +67,10 @@ export async function POST(req: NextRequest) {
       });
       return created;
     });
+
+    // §2 "Appraisal summaries · invalidate when appraisal changed" — a new
+    // cycle is a new row on /hr/appraisal.
+    onAppraisalChanged();
 
     return NextResponse.json({ ok: true, id: cycle.id, period, department });
   } catch (err) {

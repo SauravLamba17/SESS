@@ -1,3 +1,13 @@
+/**
+ * RED TIER — never cache, see SESS_Caching_Strategy.docx Section 3.
+ *
+ * This report embeds the whole PayrollCostResult as one of its five
+ * sub-results, so caching it would cache payroll figures by the back door.
+ *
+ * No report is cached in any format (app/api/reports/[report]/route.ts).
+ * scripts/caching.selfcheck.ts scans this module's import closure and fails
+ * if any caching mechanism ever appears on it.
+ */
 // REPORT 10 — Monthly/Quarterly Board Summary.
 //
 // INPUT:  the raw datasets the five underlying reports need, plus the range.

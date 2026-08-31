@@ -15,6 +15,19 @@ import { ErrorPanel } from "@/components/ui/notice";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * RED TIER — never cache, see SESS_Caching_Strategy.docx Section 3.
+ *
+ * This page DISPLAYS the payroll preview: draft/submitted/finalized rows with
+ * their gross, deductions and net. load() below issues two direct queries on
+ * every render and imports nothing from lib/cache/.
+ *
+ * The stat cards here are computed from those same freshly-read rows — they
+ * are not the cached HR-dashboard counts. (The HR dashboard does show a
+ * payroll STAGE card, cached for 30 s, but it holds row COUNTS per status and
+ * never a rupee figure — see lib/cache/dashboard.ts.)
+ */
+
 async function load(period: string) {
   try {
     // Two queries for the whole run — rows (with employee joined) and the set

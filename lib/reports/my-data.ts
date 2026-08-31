@@ -1,3 +1,14 @@
+/**
+ * RED TIER — never cache, see SESS_Caching_Strategy.docx Section 3.
+ *
+ * One employee's complete personal manifest — attendance, leave, appraisals,
+ * warnings, consents, expense claims. Section 3 "Sensitive HR data · no
+ * shared cache".
+ *
+ * No report is cached in any format (app/api/reports/[report]/route.ts).
+ * scripts/caching.selfcheck.ts scans this module's import closure and fails
+ * if any caching mechanism ever appears on it.
+ */
 // REPORT 11 — My Data Export (self-service).
 //
 // INPUT:  one employee's own records, already fetched and already filtered by

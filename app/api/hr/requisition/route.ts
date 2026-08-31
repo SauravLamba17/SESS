@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getEffectiveUserId, getCurrentRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { fail } from "@/lib/api/response";
+import { onRecruitmentChanged } from "@/lib/invalidation/employee";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -54,6 +55,10 @@ export async function POST(req: NextRequest) {
       });
       if (count === 0)
         return fail("ALREADY_CLOSED", "This requisition is already closed.", 409);
+      // §2 recruitment dashboard + the PUBLIC /careers listing both change the
+      // moment a role closes — and the public one is the reason this cannot
+      // wait out its 5-minute TTL. Fired only when a row actually transitioned.
+      onRecruitmentChanged();
       return NextResponse.json({ ok: true, id, status: "CLOSED" });
     }
 
@@ -69,6 +74,7 @@ export async function POST(req: NextRequest) {
         data: { status, closedAt: null },
       });
       if (upd.count === 0) return fail("NOT_FOUND", "Requisition not found", 404);
+      onRecruitmentChanged();
       return NextResponse.json({ ok: true, id, status });
     }
 
@@ -107,6 +113,7 @@ export async function POST(req: NextRequest) {
         where: { id },
         data: { title, department, description, openings },
       });
+      onRecruitmentChanged();
       return NextResponse.json({ ok: true, id });
     }
 
@@ -120,6 +127,7 @@ export async function POST(req: NextRequest) {
       return r;
     });
 
+    onRecruitmentChanged();
     return NextResponse.json({ ok: true, id: created.id });
   } catch (err) {
     console.error("[hr/requisition] failed:", err);

@@ -12,6 +12,13 @@ import { ErrorPanel, UnlinkedEmployeeNotice } from "@/components/ui/notice";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * RED TIER — never cache, see SESS_Caching_Strategy.docx Section 3.
+ *
+ * An employee's own net salary and payslip history — Section 3 "Current net
+ * salary · always fetch current value". Read directly on every render.
+ */
+
 async function load() {
   const userId = await getEffectiveUserId();
   if (!userId) return { employee: null, rows: [], error: null };

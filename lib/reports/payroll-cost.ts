@@ -1,3 +1,18 @@
+/**
+ * RED TIER — never cache, see SESS_Caching_Strategy.docx Section 3.
+ *
+ * This report's RESULT is payroll financial values: gross, net, cost to
+ * company, TDS and PF per month and department.
+ *
+ * NO report of any kind is cached any more — app/api/reports/[report]/route.ts
+ * computes every format fresh on every request — so this one is safe by the
+ * same rule that covers all eleven, not by a special case. The guard that
+ * used to single it out lived in lib/cache/reports.ts, which no longer
+ * exists. What enforces it now is scripts/caching.selfcheck.ts, which scans
+ * this module's whole import closure for any caching mechanism and fails if
+ * one appears. That is a check which actually runs, rather than a function a
+ * future caller would have to remember to call.
+ */
 // REPORT 6 — Payroll Cost Summary.
 //
 // INPUT:  Payroll rows whose month falls in the range, each carrying its status,

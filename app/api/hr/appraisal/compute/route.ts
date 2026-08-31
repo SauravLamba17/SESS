@@ -12,6 +12,7 @@ import {
 } from "@/lib/appraisal/compute";
 import { fail } from "@/lib/api/response";
 import { lockCycleForWrite } from "@/lib/appraisal/cycle-lock";
+import { onAppraisalChanged } from "@/lib/invalidation/employee";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -254,6 +255,9 @@ export async function POST(req: NextRequest) {
     if (writeOutcome === "NOT_FOUND") return fail("NOT_FOUND", "Cycle not found", 404);
     if (writeOutcome === "PUBLISHED")
       return fail("PUBLISHED", "Cycle is published; scores are immutable", 409);
+
+    // §2: scoring wrote the score rows the cached summary counts.
+    onAppraisalChanged();
 
     return NextResponse.json({
       ok: true,

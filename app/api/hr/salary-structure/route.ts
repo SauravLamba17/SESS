@@ -11,6 +11,21 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
+ * RED TIER — never cache, see SESS_Caching_Strategy.docx Section 3.
+ *
+ * Employee salary. Section 3: "Always fetch current value."
+ *
+ * Section 5 maps "salary structure changed" to "invalidate salary-structure
+ * cache; fetch payroll-sensitive values fresh". There is no salary-structure
+ * cache to invalidate: no Yellow- or Orange-tier cached VIEW of a salary
+ * structure exists, because the only consumer of this data in SESS is payroll
+ * itself, which is RED. So this route imports nothing from lib/cache/ and
+ * calls no invalidation function — the "fetch fresh" half of that row is
+ * satisfied unconditionally, by there being nothing else. See the long note
+ * in lib/invalidation/payroll.ts.
+ */
+
+/**
  * Set an employee's salary structure.
  *
  * Phase 13: this no longer OVERWRITES silently. The structure being replaced is

@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { getCurrentRole } from "@/lib/auth";
 import { fail } from "@/lib/api/response";
 import { lockCycleForWrite } from "@/lib/appraisal/cycle-lock";
+import { onAppraisalChanged } from "@/lib/invalidation/employee";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,6 +48,9 @@ export async function POST(req: NextRequest) {
       return outcome.reason === "NOT_FOUND"
         ? fail("NOT_FOUND", "Cycle not found", 404)
         : fail("PUBLISHED", "Cycle is published; scope is immutable", 409);
+
+    // §2: an exclusion upserts a score row, which moves the cached count.
+    onAppraisalChanged();
 
     return NextResponse.json({ ok: true, cycleId, employeeId, excluded });
   } catch (err) {

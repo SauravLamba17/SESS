@@ -5,6 +5,7 @@ import { checkRateLimit, clientIp } from "@/lib/recruitment/rate-limit";
 import { notifyHrOfApplication } from "@/lib/recruitment/notify";
 import { TERMS_VERSION } from "@/lib/recruitment/terms";
 import { fail } from "@/lib/api/response";
+import { onRecruitmentChanged } from "@/lib/invalidation/employee";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -212,6 +213,11 @@ export async function POST(req: NextRequest) {
           `(no active Employee linked to a User with role HR). Nobody was notified.`,
       );
     }
+
+    // §2 "Recruitment dashboard · invalidate when candidate/application
+    // change" — this application just moved the count HR reads on
+    // /hr/requisitions. The candidate's own details are not cached at all.
+    onRecruitmentChanged();
 
     return NextResponse.json({ ok: true, applicationId: result.application.id });
   } catch (err) {

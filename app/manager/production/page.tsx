@@ -4,7 +4,8 @@ import { Panel } from "@/components/ui/panel";
 import { TargetInput } from "@/components/manager/target-input";
 import { ShiftAssignSelect } from "@/components/shifts/shift-assign-select";
 import { db } from "@/lib/db";
-import { getEmployeeByClerkId, getDirectReports, getActiveShifts } from "@/lib/data/scope";
+import { getEmployeeByClerkId, getDirectReports } from "@/lib/data/scope";
+import { getActiveShiftOptions } from "@/lib/cache/shifts";
 import { currentPeriod } from "@/lib/period";
 import { timeEfficiency, formatEfficiency } from "@/lib/time-efficiency";
 import { ErrorPanel, UnlinkedEmployeeNotice } from "@/components/ui/notice";
@@ -41,7 +42,8 @@ async function load() {
         where: { employeeId: { in: ids }, date: inMonth },
         select: { employeeId: true, date: true, checkIn: true, checkOut: true },
       }),
-      getActiveShifts(),
+      // GREEN TIER (§2/§4) — shift definitions, 1 hr, tag-invalidated.
+      getActiveShiftOptions(),
     ]);
 
     const actualByEmp = new Map(actuals.map((a) => [a.employeeId, a._sum.unitsProduced ?? 0]));

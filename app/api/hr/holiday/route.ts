@@ -3,6 +3,7 @@ import { getEffectiveUserId, getCurrentRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { parseDateOnly } from "@/lib/period";
 import { fail } from "@/lib/api/response";
+import { onHolidayCalendarChanged } from "@/lib/invalidation/employee";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,6 +52,10 @@ export async function POST(req: NextRequest) {
           },
         });
       });
+
+      // §5: invalidate immediately after the successful write.
+      onHolidayCalendarChanged();
+
       return NextResponse.json({ ok: true, id });
     }
 
@@ -83,6 +88,9 @@ export async function POST(req: NextRequest) {
       });
       return h;
     });
+
+    // §5: invalidate immediately after the successful write.
+    onHolidayCalendarChanged();
 
     return NextResponse.json({ ok: true, id: created.id });
   } catch (err) {

@@ -16,6 +16,20 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 45;
 
 /**
+ * RED TIER — never cache, see SESS_Caching_Strategy.docx Section 3.
+ *
+ * PAYROLL FINALIZATION — Section 3's "Never use cache as authority", and
+ * Section 5's "Payroll finalized -> commit transaction -> do not use cache as
+ * financial authority; read the authoritative DB record."
+ *
+ * The status guard that decides whether a run MAY be finalized is an atomic
+ * where-clause inside the transaction below, resolved by PostgreSQL against
+ * committed rows. No cached value gates it, and no cached value is written
+ * afterwards — see lib/invalidation/payroll.ts for why this route
+ * deliberately does not even invalidate anyone else's cache.
+ */
+
+/**
  * SUBMITTED → FINALIZED. The permanent lock, Super Admin only.
  *
  * After this, no code path may alter gross/net/deductions on these rows:

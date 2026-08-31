@@ -5,6 +5,7 @@ import { getEmployeeByClerkId } from "@/lib/data/scope";
 import { notifyEmployee } from "@/lib/notify";
 import { fail } from "@/lib/api/response";
 import { ymd } from "@/lib/reports/range";
+import { onLeaveDecided } from "@/lib/invalidation/leave";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -91,6 +92,12 @@ export async function POST(req: NextRequest) {
         409,
       );
     }
+
+    // §5 "Employee leave approved → update leave / balance → invalidate
+    // employee leave balance, manager approvals and affected dashboard."
+    // Fired only on the path where exactly one row actually transitioned —
+    // the ALREADY_PROCESSED branch above changed nothing, so it drops nothing.
+    onLeaveDecided(manager.id);
 
     return NextResponse.json({ ok: true, id, status });
   } catch (err) {

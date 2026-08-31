@@ -5,6 +5,7 @@ import { getCurrentRole } from "@/lib/auth";
 import { getActiveEmployees } from "@/lib/data/scope";
 import { notifyEmployees } from "@/lib/notify";
 import { fail } from "@/lib/api/response";
+import { onAppraisalChanged } from "@/lib/invalidation/employee";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -97,6 +98,9 @@ export async function POST(req: NextRequest) {
     // difference — and crucially, nobody was notified twice.
     if (notified === null)
       return fail("PUBLISHED", "Cycle is already published", 409);
+
+    // §2: `published` is one of the three fields the cached summary prints.
+    onAppraisalChanged();
 
     return NextResponse.json({ ok: true, cycleId, published: true, notified });
   } catch (err) {

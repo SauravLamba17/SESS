@@ -10,6 +10,32 @@ import {
   type ImpersonationPayload,
 } from "@/lib/impersonation";
 
+/**
+ * RED TIER — never cache, see SESS_Caching_Strategy.docx Section 3.
+ *
+ * PERMISSIONS / ROLE SCOPE and AUTHENTICATION / SESSION STATE. Section 3:
+ * "No shared cache" and "Do not build a custom cache"; Section 8: "Do not use
+ * cached permissions as the sole authority for security decisions."
+ *
+ * Every role and identity in SESS is resolved HERE, from the live Clerk
+ * session (and, for a Super Admin, a signed impersonation cookie verified on
+ * the spot). No role, no permission and no session value is ever read from
+ * the Next.js Data Cache, a CDN, Redis or any other shared mechanism — the
+ * shared caching layer this app added in lib/cache/ has no reader of any of
+ * them, by construction.
+ *
+ * `cache()` below is React's PER-REQUEST memo — Section 1's "React cache()"
+ * layer, whose whole scope is one server render. It is not a shared cache: it
+ * holds nothing between requests, is never keyed across users, and cannot
+ * serve one caller's identity to another. Section 1 lists it as a caching
+ * layer to USE for exactly this, deduplicating repeated work inside a single
+ * render, and it is the only "cache" permitted anywhere near an identity.
+ *
+ * DISPLAY vs AUTHORITY: nothing in this codebase caches a role for display
+ * either (there is no cached role badge). If one is ever added, it may only
+ * print a label — every real check must keep calling into this file.
+ */
+
 async function realRoleOf(
   sessionClaims: { metadata?: { role?: unknown } } | null,
 ): Promise<Role | null> {

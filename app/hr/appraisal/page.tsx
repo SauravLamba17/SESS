@@ -4,7 +4,7 @@ import { Panel, PanelHeader } from "@/components/ui/panel";
 import { StatusDot } from "@/components/ui/status-dot";
 import { CycleCreateForm } from "@/components/hr/cycle-create-form";
 import { CycleActions } from "@/components/hr/cycle-actions";
-import { db } from "@/lib/db";
+import { getAppraisalCycleSummaries } from "@/lib/cache/dashboard";
 import { PrintButton } from "@/components/ui/print-button";
 import { ErrorPanel } from "@/components/ui/notice";
 
@@ -14,10 +14,10 @@ async function load() {
   const userId = await getEffectiveUserId();
   if (!userId) return { cycles: null, error: null };
   try {
-    const cycles = await db.appraisalCycle.findMany({
-      orderBy: { createdAt: "desc" },
-      include: { _count: { select: { scores: true } } },
-    });
+    // YELLOW TIER (SESS_Caching_Strategy.docx §2/§4) — appraisal summaries,
+    // 5 min. Cycle metadata and a score-row COUNT only: no finalScore and no
+    // employee name enters the cache (§3).
+    const cycles = await getAppraisalCycleSummaries();
     return { cycles, error: null };
   } catch (err) {
     console.error("[hr/appraisal] failed:", err);
@@ -69,7 +69,7 @@ export default async function AppraisalCyclesPage() {
                         </span>
                       </div>
                       <div className="mt-0.5 font-mono text-xs text-text-muted">
-                        {c._count.scores} score rows
+                        {c.scoreCount} score rows
                       </div>
                     </div>
                     <span className="inline-flex items-center gap-2 text-xs">

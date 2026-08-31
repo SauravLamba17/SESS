@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { parseDateOnly } from "@/lib/period";
 import { getEmployeeByClerkId } from "@/lib/data/scope";
+import { onLeaveRequested } from "@/lib/invalidation/leave";
 
 export interface LeaveFormState {
   ok: boolean;
@@ -77,6 +78,8 @@ export async function submitLeaveRequest(input: {
       },
     });
 
+    // §5: the manager's cached "Pending Approvals" count just went up.
+    onLeaveRequested(employee.managerId);
     revalidatePath("/employee/attendance");
     return { ok: true };
   } catch (err) {

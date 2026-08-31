@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getEffectiveUserId, getCurrentRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { fail } from "@/lib/api/response";
+import { onShiftDefinitionChanged } from "@/lib/invalidation/employee";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,6 +38,10 @@ export async function POST(req: NextRequest) {
     if (!shift) return fail("NOT_FOUND", "Shift not found", 404);
 
     await db.shift.update({ where: { id }, data: { active } });
+
+    // §5: invalidate immediately after the successful write.
+    onShiftDefinitionChanged();
+
     return NextResponse.json({
       ok: true,
       id,

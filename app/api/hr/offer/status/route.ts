@@ -8,6 +8,10 @@ import { sendEmployeeInvitation } from "@/lib/employees/invite";
 import { clerkCreateInvitation } from "@/lib/employees/invite-clerk";
 import { ROLES, type Role } from "@/lib/auth-types";
 import { fail } from "@/lib/api/response";
+import {
+  onEmployeeRosterChanged,
+  onRecruitmentChanged,
+} from "@/lib/invalidation/employee";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -254,6 +258,21 @@ export async function POST(req: NextRequest) {
           ? 409
           : 400,
       );
+
+    // §5 "Department changed → invalidate department cache and affected team
+    // views": the hire conversion just created an Employee, so it is the same
+    // event as a manual onboard — department list, rosters, headcount and
+    // report scopes all move. The requisition board moves too (this
+    // application is now HIRED), hence both drops.
+    //
+    // Fired here, after the transaction committed and BEFORE the optional
+    // Clerk invitation below, which deliberately cannot undo the hire and must
+    // not be able to leave a stale cache behind either.
+    onEmployeeRosterChanged({
+      employeeId: result.employee.id,
+      managerEmployeeId: offer.proposedManagerId,
+    });
+    onRecruitmentChanged();
 
     // OPT-IN login invitation, AFTER the conversion committed — same shared
     // logic as manual onboarding; a Clerk failure never undoes the hire.

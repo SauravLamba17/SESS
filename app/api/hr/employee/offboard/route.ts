@@ -7,6 +7,7 @@ import { assemblePayrollRow } from "@/lib/payroll/assemble";
 import { scheduledRedactionFor, RETENTION_YEARS } from "@/lib/employees/retention";
 import { ymd } from "@/lib/reports/range";
 import { fail } from "@/lib/api/response";
+import { onEmployeeRosterChanged } from "@/lib/invalidation/employee";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -235,6 +236,9 @@ export async function POST(req: NextRequest) {
           409,
         );
       case "OK_NO_STRUCTURE":
+        // §5: the offboard committed — drop the department list, every roster,
+        // the HR aggregates and the report scopes it just changed.
+        onEmployeeRosterChanged({ employeeId });
         return NextResponse.json({
           ok: true,
           employeeId,
@@ -243,6 +247,9 @@ export async function POST(req: NextRequest) {
             "Employee offboarded, but no full & final settlement was raised — they have no salary structure set.",
         });
       default:
+        // §5: same invalidation on the settlement path — one committed
+        // offboard, one drop, whichever branch reports it.
+        onEmployeeRosterChanged({ employeeId });
         return NextResponse.json({ ok: true, employeeId, settlement: result });
     }
   } catch (err) {

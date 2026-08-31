@@ -8,6 +8,13 @@ import { ErrorPanel } from "@/components/ui/notice";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * RED TIER — never cache, see SESS_Caching_Strategy.docx Section 3.
+ *
+ * Finalized payroll records and the figures a Super Admin approves. Read
+ * directly on every render; no cached reader is used here.
+ */
+
 async function load() {
   try {
     // One grouped query per status — no per-period row scans.

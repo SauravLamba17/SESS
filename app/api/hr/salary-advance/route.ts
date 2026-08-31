@@ -7,6 +7,14 @@ import { fail } from "@/lib/api/response";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/**
+ * RED TIER — never cache, see SESS_Caching_Strategy.docx Section 3.
+ *
+ * A loan principal and its remaining balance — a payroll calculation input
+ * (it becomes loanDeduction on a payroll row). Read and written directly,
+ * never cached.
+ */
+
 /** Issue a salary advance. remainingBalance starts equal to the principal. */
 export async function POST(req: NextRequest) {
   const userId = await getEffectiveUserId();

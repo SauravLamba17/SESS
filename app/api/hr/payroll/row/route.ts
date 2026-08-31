@@ -10,6 +10,15 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
+ * RED TIER — never cache, see SESS_Caching_Strategy.docx Section 3.
+ *
+ * Payslip financial values — basic, HRA, PF, ESI, professional tax, TDS,
+ * bonus. Every read below is a direct DB read and every write is a direct DB
+ * write. Nothing here is cached, and the recomputed gross/net it returns is
+ * derived from the row it just re-read, never from a stored figure.
+ */
+
+/**
  * The SIGNED money parser — deliberately local to this file.
  *
  * An adjustment row carries DELTAS against an already-finalized payroll run, so

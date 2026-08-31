@@ -3,6 +3,8 @@ import { PageHeader } from "@/components/portal/portal-shell";
 import { Panel, PanelHeader } from "@/components/ui/panel";
 import { ProfileForm } from "@/components/employee/profile-form";
 import { getEmployeeByClerkId } from "@/lib/data/scope";
+import { getEmployeeProfileBasics } from "@/lib/cache/employees";
+import { parseDateOnly } from "@/lib/period";
 import { ErrorPanel, UnlinkedEmployeeNotice } from "@/components/ui/notice";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +21,16 @@ async function loadEmployee() {
   const userId = await getEffectiveUserId();
   if (!userId) return { employee: null, error: null };
   try {
-    const employee = await getEmployeeByClerkId(userId);
+    // getEmployeeByClerkId is the identity resolution and is NOT cached — it
+    // feeds authorization elsewhere (see the header of lib/cache/employees.ts).
+    // Only the display fields behind it are, at the ORANGE tier: 60 s,
+    // dropped by tag the moment this employee saves the form below.
+    const me = await getEmployeeByClerkId(userId);
+    if (!me) return { employee: null, error: null };
+    const basics = await getEmployeeProfileBasics(me.id);
+    const employee = basics
+      ? { ...basics, joiningDate: parseDateOnly(basics.joiningDate)! }
+      : null;
     return { employee, error: null };
   } catch (err) {
     console.error("[my-profile] load failed:", err);

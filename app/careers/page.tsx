@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, Briefcase } from "lucide-react";
 import { Panel } from "@/components/ui/panel";
-import { db } from "@/lib/db";
+import { getOpenRoles } from "@/lib/cache/dashboard";
 import { ErrorPanel } from "@/components/ui/notice";
 
 export const dynamic = "force-dynamic";
@@ -9,19 +9,13 @@ export const dynamic = "force-dynamic";
 async function load() {
   try {
     // OPEN only. ON_HOLD and CLOSED roles are never shown publicly, and the
-    // submission endpoint re-checks status server-side regardless.
-    const requisitions = await db.jobRequisition.findMany({
-      where: { status: "OPEN" },
-      select: {
-        id: true,
-        title: true,
-        department: true,
-        description: true,
-        openings: true,
-        createdAt: true,
-      },
-      orderBy: [{ department: "asc" }, { createdAt: "desc" }],
-    });
+    // submission endpoint re-checks status server-side regardless — so a
+    // cached listing can never let an application through to a closed role.
+    //
+    // YELLOW TIER (SESS_Caching_Strategy.docx §2/§4), 5 min. This is the ONE
+    // unauthenticated read in SESS, which is exactly why it is the one that
+    // may safely be cached at a shared layer at all (§8).
+    const requisitions = await getOpenRoles();
     return { requisitions, error: null };
   } catch (err) {
     console.error("[careers] failed:", err);

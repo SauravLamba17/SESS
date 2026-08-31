@@ -3,7 +3,9 @@ import { PageHeader } from "@/components/portal/portal-shell";
 import { Panel, PanelHeader, StatCard } from "@/components/ui/panel";
 import { StatusDot, type StatusState } from "@/components/ui/status-dot";
 import { db } from "@/lib/db";
-import { getEmployeeByClerkId, getDirectReports } from "@/lib/data/scope";
+import { getEmployeeByClerkId } from "@/lib/data/scope";
+import { getTeamRoster } from "@/lib/cache/employees";
+import { getPendingLeaveCount } from "@/lib/cache/dashboard";
 import { currentPeriod } from "@/lib/period";
 import { TodayWidgets } from "@/components/engagement/today-widgets";
 import { loadToday } from "@/lib/engagement/today";
@@ -52,7 +54,11 @@ async function load() {
     if (!manager) return { manager: null, error: null };
 
     const { period, monthStart, monthEnd } = currentPeriod();
-    const reports = await getDirectReports(manager.id);
+    // ORANGE TIER (SESS_Caching_Strategy.docx §2/§4) — manager/team roster,
+    // 60 s, dropped by tag on any roster or shift change. A display projection
+    // of the SAME direct-reports-only query (managerId + active, single level,
+    // no recursive descent) — not a wider one.
+    const reports = await getTeamRoster(manager.id);
     const ids = reports.map((r) => r.id);
     const inMonth = { gte: monthStart, lt: monthEnd };
     const scope = { managerId: manager.id };
@@ -77,7 +83,12 @@ async function load() {
         _sum: { unitsProduced: true },
       }),
       db.monthlyTarget.findMany({ where: { period, employeeId: { in: ids } } }),
-      db.leaveRequest.count({ where: { status: "PENDING", employee: scope } }),
+      // ORANGE TIER (§2/§4) — pending-approvals COUNT, 60 s, invalidated the
+      // moment a decision is made. Only the number is cached; the list of
+      // requests the manager acts on is read fresh on /manager/attendance, and
+      // the decision itself is gated by the atomic where-clause in
+      // app/api/manager/leave/route.ts, never by anything cached.
+      getPendingLeaveCount(manager.id),
       // Same query the Team Quality page runs for the same manager's reports:
       // this month's rows, newest first, so the first row per employee is the
       // latest. One query for the whole team — no N+1.

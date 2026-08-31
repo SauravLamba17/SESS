@@ -7,6 +7,14 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
+ * RED TIER — never cache, see SESS_Caching_Strategy.docx Section 3.
+ *
+ * A correction to a FINALIZED payroll record: a money value against an
+ * already-authoritative row. Read fresh, written in a transaction, never
+ * cached at any point.
+ */
+
+/**
  * Create a DRAFT adjustment row correcting a FINALIZED payroll row.
  *
  * DELTA SEMANTICS — this row carries the DIFFERENCE, not the corrected total.

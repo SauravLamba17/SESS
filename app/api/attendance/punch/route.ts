@@ -10,6 +10,7 @@ import {
   MAX_OPEN_SHIFT_HOURS,
 } from "@/lib/attendance/validation";
 import { attendanceValidationMode } from "@/lib/system-settings";
+import { onAttendanceRecorded } from "@/lib/invalidation/attendance";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -215,6 +216,16 @@ export async function POST(req: NextRequest) {
         reason: existing.reviewReason,
       });
     }
+
+    // §5 "Attendance punch created/edited → write attendance record →
+    // invalidate relevant attendance summary/history". After the write, on the
+    // two branches that actually wrote — the already_complete branch above
+    // returns earlier precisely because it changed nothing.
+    //
+    // This employee's OWN attendance is not cached at all and needs no drop;
+    // what this clears is the org-wide "Present Today" figure and the
+    // attendance report preview. See lib/invalidation/attendance.ts.
+    onAttendanceRecorded();
 
     // Derive the user-facing status.
     let status: PunchStatus;

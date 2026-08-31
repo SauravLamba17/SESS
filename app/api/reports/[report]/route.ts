@@ -25,9 +25,34 @@ export const dynamic = "force-dynamic";
  * enforced here on the server, never by the UI hiding a card); then the range.
  *
  * Generated synchronously, on request. There is no queue, no cache and no
- * scheduled delivery — see the note in the phase report; at this data volume a
- * report is a handful of set-based queries and a render, and adding
- * infrastructure for a scale problem that does not exist would be the mistake.
+ * scheduled delivery — at this data volume a report is a handful of set-based
+ * queries and a render.
+ *
+ * NO CACHING, ON ANY FORMAT — DELIBERATE, AND LOAD-BEARING
+ * ────────────────────────────────────────────────────────
+ * All three formats compute fresh on every request, from the SINGLE
+ * runReport() call below. A five-minute Data Cache was briefly placed on the
+ * JSON preview and has been removed, because it broke the one guarantee this
+ * route exists to make: that the figures on screen and the figures in the
+ * downloaded document are the same figures.
+ *
+ * Caching only the preview made preview/download agreement EVENTUAL rather
+ * than absolute — a user could read a preview, wait, download, and receive a
+ * PDF whose numbers differed from the ones they had just approved. For a
+ * report that can carry salary, attendance and disciplinary data, a number
+ * that silently disagrees with the number the user just read is worse than
+ * any amount of recomputation. The cache saved a handful of set-based queries
+ * and cost the property the whole feature is for.
+ *
+ * The PDF and CSV paths could never have been cached anyway: their in-memory
+ * result carries Date and Prisma.Decimal values whose methods the templates
+ * call, and a Data Cache round-trip turns both into strings — so a cached PDF
+ * path would render on the first request of a window and throw on every one
+ * after it.
+ *
+ * If report generation ever becomes slow enough to need caching, the unit to
+ * cache is the whole RESPONSE for all three formats together, keyed and
+ * invalidated identically — never one format on its own.
  */
 export async function GET(
   req: NextRequest,
@@ -57,11 +82,13 @@ export async function GET(
     };
 
     // ONE compute pass. Whichever format is requested below renders THIS
-    // result — the CSV and the PDF are never two calculations.
+    // result — the preview, the CSV and the PDF are never two calculations.
     const run = await runReport(def.id as ReportId, scope, range, meta);
 
     // JSON preview — same numbers, no render. Useful for an on-screen preview
-    // and for anything that wants the figures rather than the document.
+    // and for anything that wants the figures rather than the document. It
+    // reads `run.result`: the SAME binding the CSV and PDF branches below
+    // close over, which is what makes divergence structurally impossible.
     if (searchParams.get("format") === "json") {
       return NextResponse.json({
         ok: true,

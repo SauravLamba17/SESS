@@ -2,6 +2,23 @@ import "server-only";
 import { db } from "@/lib/db";
 
 /**
+ * RED TIER — never cache, see SESS_Caching_Strategy.docx Section 3. (partial)
+ *
+ * getEmployeeByClerkId() below — the Clerk-id -> Employee resolution — is NOT
+ * cached and must never be. It is not a display read: its result feeds
+ * AUTHORIZATION predicates, most visibly the atomic where-clause in
+ * app/api/manager/leave/route.ts that is the only thing deciding whether a
+ * manager may approve a request, and the scope resolution in
+ * lib/reports/scope.ts that decides whose rows a report may cover. Section 8:
+ * "Do not use cached permissions as the sole authority for security
+ * decisions."
+ *
+ * The DISPLAY projections of this data are cached instead, separately and
+ * narrowly, in lib/cache/employees.ts — a roster of names, a profile card.
+ * Those are read only to render, never to decide.
+ */
+
+/**
  * Data-access scoping helpers.
  *
  * The manager→direct-reports rule is enforced HERE, in the actual queries

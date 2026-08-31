@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { lateMinutesForShift } from "@/lib/attendance/validation";
 import { fail } from "@/lib/api/response";
 import { ymd } from "@/lib/reports/range";
+import { onAttendanceCorrected } from "@/lib/invalidation/attendance";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -183,6 +184,12 @@ export async function POST(req: NextRequest) {
 
       return u;
     });
+
+    // §5 "Attendance punch created/edited → invalidate relevant attendance
+    // summary/history". After the transaction committed, never inside it — a
+    // tag dropped inside a transaction that then rolls back would refill the
+    // cache with the value the write did not change.
+    onAttendanceCorrected();
 
     return NextResponse.json({
       ok: true,

@@ -1,6 +1,15 @@
 import { createHash, randomBytes } from "node:crypto";
 
 /**
+ * RED TIER — never cache, see SESS_Caching_Strategy.docx Section 3.
+ *
+ * Section 8: "Never put passwords, tokens, API keys or Clerk secrets in an
+ * application cache." A plaintext agent token exists only inside the single
+ * response that issues it; what is persisted is its SHA-256 hash, and neither
+ * form is ever placed in the Data Cache, a CDN, Redis or any other layer.
+ */
+
+/**
  * Agent-token helpers.
  *
  * Lives in lib/ rather than the route because a Next.js route module may only

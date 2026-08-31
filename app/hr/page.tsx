@@ -8,15 +8,11 @@ import { getEmployeeByClerkId } from "@/lib/data/scope";
 import { TodayWidgets } from "@/components/engagement/today-widgets";
 import { loadToday } from "@/lib/engagement/today";
 import { currentPeriod } from "@/lib/period";
+import { ymd } from "@/lib/reports/range";
+import { getDepartments } from "@/lib/cache/departments";
+import { getHrDashboardTotals, RETENTION_WARNING_DAYS } from "@/lib/cache/dashboard";
 
 export const dynamic = "force-dynamic";
-
-/** Retention rows this close to their scheduled redaction date need attention. */
-const RETENTION_WARNING_DAYS = 30;
-
-function startOfDay(d: Date): Date {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-}
 
 /**
  * HR's own notifications — the same Notification model, the same panel
@@ -48,99 +44,42 @@ async function loadNotifications() {
 }
 
 /**
- * Every figure on this dashboard, in ONE Promise.all — the same shape the
- * Employee, Manager and Super Admin dashboards already use.
+ * Every figure on this dashboard, read through the ORANGE-tier cache
+ * (lib/cache/dashboard.ts) plus the GREEN-tier department list
+ * (lib/cache/departments.ts) — SESS_Caching_Strategy.docx §2/§4.
  *
- * Until now this page was the last one still rendering hardcoded literals
- * ("248 employees", "93% present"), which meant it stated numbers that were
- * never true of the actual database. Nothing here scales with headcount: every
- * entry is a count or groupBy the database resolves, plus one bounded
- * distinct-department query.
+ * The queries themselves are unchanged; they moved into lib/cache/ so no
+ * route or page implements its own caching inline. Only counts are cached:
+ * the payroll entry is a row count per status, never a money figure (§3).
+ *
+ * The two calls sit on different tiers on purpose — totals expire in 30
+ * seconds, the department list in an hour — so they are awaited in parallel
+ * rather than fused into one entry that would re-run both on the shorter TTL.
  */
 async function load() {
   const now = new Date();
-  const today = startOfDay(now);
-  const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
   const { period } = currentPeriod(now);
-  const retentionCutoff = new Date(
-    now.getTime() + RETENTION_WARNING_DAYS * 24 * 60 * 60 * 1000,
-  );
 
   try {
-    const [
-      activeCount,
-      departments,
-      presentToday,
-      payrollByStatus,
-      openWarnings,
-      unreleasedWarnings,
-      idleConsent,
-      retentionExpiring,
-    ] = await Promise.all([
-      db.employee.count({ where: { active: true } }),
-      db.employee.findMany({
-        where: { active: true },
-        select: { department: true },
-        distinct: ["department"],
-      }),
-      // Distinct employees with a punch today — a second punch must not count
-      // twice, so this is a distinct-employee count, not an attendance count.
-      db.attendance.findMany({
-        where: { date: { gte: today, lt: tomorrow } },
-        select: { employeeId: true },
-        distinct: ["employeeId"],
-      }),
-      db.payroll.groupBy({
-        by: ["status"],
-        where: { month: period },
-        _count: { _all: true },
-      }),
-      db.warningLetter.count({ where: { acknowledged: false } }),
-      db.warningLetter.count({ where: { status: "DRAFT" } }),
-      // IDLE_TRACKING is the ONLY consent type that exists — Phase 11 removed
-      // FACE_VERIFICATION along with the feature. Distinct by employee so a
-      // re-consent does not inflate the count.
-      db.consentRecord.findMany({
-        where: { consentType: "IDLE_TRACKING" },
-        select: { employeeId: true },
-        distinct: ["employeeId"],
-      }),
-      db.employee.count({
-        where: {
-          active: false,
-          redactedAt: null,
-          scheduledRedactionAt: { not: null, lte: retentionCutoff },
-        },
-      }),
+    const [totals, departments] = await Promise.all([
+      getHrDashboardTotals(period, ymd(now)),
+      getDepartments(),
     ]);
-
-    const countFor = (s: "DRAFT" | "SUBMITTED" | "FINALIZED") =>
-      payrollByStatus.find((r) => r.status === s)?._count._all ?? 0;
 
     return {
       error: null as string | null,
-      activeCount,
-      departmentCount: departments.length,
-      presentCount: presentToday.length,
       period,
-      payroll: {
-        draft: countFor("DRAFT"),
-        submitted: countFor("SUBMITTED"),
-        finalized: countFor("FINALIZED"),
-      },
-      openWarnings,
-      unreleasedWarnings,
-      idleConsentCount: idleConsent.length,
-      retentionExpiring,
+      departmentCount: departments.length,
+      ...totals,
     };
   } catch (err) {
     console.error("[hr/dashboard] load failed:", err);
     return {
       error: "Dashboard figures could not be loaded.",
+      period,
       activeCount: 0,
       departmentCount: 0,
       presentCount: 0,
-      period,
       payroll: { draft: 0, submitted: 0, finalized: 0 },
       openWarnings: 0,
       unreleasedWarnings: 0,

@@ -3,18 +3,18 @@ import { Panel, PanelHeader } from "@/components/ui/panel";
 import { StatusDot } from "@/components/ui/status-dot";
 import { ShiftForm } from "@/components/hr/shift-form";
 import { ShiftActiveToggle } from "@/components/hr/shift-deactivate-button";
-import { db } from "@/lib/db";
+import { getShiftsWithAssignedCounts } from "@/lib/cache/shifts";
 import { ErrorPanel } from "@/components/ui/notice";
 
 export const dynamic = "force-dynamic";
 
 async function load() {
   try {
-    // One query with a relation _count — no per-shift employee lookups.
-    const shifts = await db.shift.findMany({
-      include: { _count: { select: { employees: true } } },
-      orderBy: [{ active: "desc" }, { name: "asc" }],
-    });
+    // GREEN TIER (SESS_Caching_Strategy.docx §2/§4) — shift definitions, 1 hr,
+    // invalidated by name the moment one is edited or (de)activated. Still the
+    // same single query with a relation _count; it just lives in lib/cache/
+    // now, so no page owns caching logic of its own.
+    const shifts = await getShiftsWithAssignedCounts();
     return { shifts, error: null };
   } catch (err) {
     console.error("[hr/shifts] failed:", err);
@@ -67,13 +67,13 @@ export default async function ShiftsPage() {
                       </div>
                       <div className="mt-0.5 font-mono text-xs text-text-muted">
                         {s.startTime}–{s.endTime} · +{s.gracePeriodMinutes}m grace ·{" "}
-                        {s._count.employees} assigned
+                        {s.assignedCount} assigned
                       </div>
                     </div>
                     <ShiftActiveToggle
                       id={s.id}
                       active={s.active}
-                      assignedCount={s._count.employees}
+                      assignedCount={s.assignedCount}
                     />
                   </div>
 

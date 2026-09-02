@@ -5,7 +5,7 @@ import { parseDateOnly } from "@/lib/period";
 import { getCurrentRole } from "@/lib/auth";
 import { onboardEmployee } from "@/lib/employees/onboard";
 import { sendEmployeeInvitation } from "@/lib/employees/invite";
-import { clerkCreateInvitation } from "@/lib/employees/invite-clerk";
+import { clerkCreateInvitation, clerkFindUserByEmail } from "@/lib/employees/invite-clerk";
 import { ROLES, type Role } from "@/lib/auth-types";
 import { fail } from "@/lib/api/response";
 import { onEmployeeRosterChanged } from "@/lib/invalidation/employee";
@@ -88,14 +88,17 @@ export async function POST(req: NextRequest) {
 
     // Invitation AFTER the commit — the Employee exists whatever happens here.
     // A Clerk failure is reported to HR, never allowed to undo the onboard.
-    let invitation: { sent: boolean; error?: string } | null = null;
+    let invitation: { sent: boolean; linked: boolean; message?: string; error?: string } | null = null;
     if (sendInvitation) {
       const inv = await sendEmployeeInvitation(
         db,
         { employeeId: result.employee.id, email, role: inviteRole, actorUserId: userId },
         clerkCreateInvitation,
+        clerkFindUserByEmail,
       );
-      invitation = inv.ok ? { sent: true } : { sent: false, error: inv.message };
+      invitation = inv.ok
+        ? { sent: !inv.linked, linked: inv.linked, message: inv.message }
+        : { sent: false, linked: false, error: inv.message };
     }
 
     return NextResponse.json({

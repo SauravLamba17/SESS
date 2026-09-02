@@ -154,6 +154,9 @@ async function main() {
 
   // (a) HR re-inviting a redacted ex-employee would write email +
   //     pendingInvitationId back — the exact two fields redaction nulls.
+  // No Clerk account owns these throwaway addresses, so every case below
+  // takes the ordinary invitation path rather than the link-now path.
+  const noClerkUser = async () => null;
   let clerkCalled = false;
   const invite = await sendEmployeeInvitation(
     db,
@@ -162,6 +165,7 @@ async function main() {
       clerkCalled = true;
       return { id: "inv_should_not_happen" };
     },
+    noClerkUser,
   );
   check("invite REFUSED for a redacted employee", invite.ok === false);
   eq("…with code REDACTED", invite.ok === false ? invite.code : null, "REDACTED");
@@ -187,6 +191,7 @@ async function main() {
     db,
     { employeeId: emp2.id, role: "EMPLOYEE", actorUserId: TAG },
     async () => ({ id: "inv_nope" }),
+    noClerkUser,
   );
   check("invite REFUSED for an offboarded employee", invite2.ok === false);
   eq("…with code INACTIVE", invite2.ok === false ? invite2.code : null, "INACTIVE");
@@ -205,6 +210,7 @@ async function main() {
     db,
     { employeeId: emp3.id, role: "EMPLOYEE", actorUserId: TAG },
     async () => ({ id: "inv_ok" }),
+    noClerkUser,
   );
   check("an ACTIVE employee is STILL invitable (no over-block)", invite3.ok === true);
 

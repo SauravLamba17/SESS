@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getEffectiveUserId, getCurrentRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { sendEmployeeInvitation } from "@/lib/employees/invite";
-import { clerkCreateInvitation } from "@/lib/employees/invite-clerk";
+import { clerkCreateInvitation, clerkFindUserByEmail } from "@/lib/employees/invite-clerk";
 import { ROLES, type Role } from "@/lib/auth-types";
 import { fail } from "@/lib/api/response";
 
@@ -55,6 +55,7 @@ export async function POST(req: NextRequest) {
       db,
       { employeeId, email: email || null, role: inviteRole, actorUserId: userId },
       clerkCreateInvitation,
+      clerkFindUserByEmail,
     );
     if (!result.ok) {
       // INACTIVE/REDACTED are 409: the request is well-formed, it conflicts
@@ -70,7 +71,16 @@ export async function POST(req: NextRequest) {
               : 400;
       return fail(result.code, result.message, status);
     }
-    return NextResponse.json({ ok: true, invitationId: result.invitationId });
+    // `linked` distinguishes the two success outcomes: an invitation was
+    // emailed, or the address already had an account and was attached now.
+    return result.linked
+      ? NextResponse.json({ ok: true, linked: true, message: result.message })
+      : NextResponse.json({
+          ok: true,
+          linked: false,
+          invitationId: result.invitationId,
+          message: result.message,
+        });
   } catch (err) {
     console.error("[hr/employee/invite] failed:", err);
     return fail("SERVER_ERROR", "Could not send the invitation", 503);

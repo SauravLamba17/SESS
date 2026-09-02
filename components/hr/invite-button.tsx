@@ -25,9 +25,11 @@ export function InviteButton({
   const [newEmail, setNewEmail] = useState("");
   const [role, setRole] = useState<Role>("EMPLOYEE");
   const [err, setErr] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
 
   function send() {
     setErr(null);
+    setNote(null);
     start(async () => {
       try {
         const res = await fetch("/api/hr/employee/invite", {
@@ -37,7 +39,11 @@ export function InviteButton({
         });
         const data = await res.json();
         if (!res.ok) return setErr(data.error ?? "Failed to send the invitation");
-        setOpen(false);
+        // No email goes out when the address already had an account, so say so
+        // instead of closing silently — otherwise HR waits for a mail that is
+        // never coming.
+        if (data.linked) setNote(data.message ?? "Account already existed — linked.");
+        else setOpen(false);
         router.refresh();
       } catch {
         setErr("Network error");
@@ -89,12 +95,13 @@ export function InviteButton({
       </button>
       <button
         type="button"
-        onClick={() => { setOpen(false); setErr(null); }}
+        onClick={() => { setOpen(false); setErr(null); setNote(null); }}
         className="text-xs text-text-muted hover:text-text"
       >
         Cancel
       </button>
       {err && <span className="w-full text-xs text-danger">{err}</span>}
+      {note && <span className="w-full text-xs text-text-muted">{note}</span>}
     </div>
   );
 }

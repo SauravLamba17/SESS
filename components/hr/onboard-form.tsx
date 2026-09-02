@@ -61,9 +61,11 @@ export function OnboardForm({
           ok: true,
           text: !data.invitation
             ? "Employee onboarded."
-            : data.invitation.sent
-              ? "Employee onboarded — login invitation sent."
-              : `Employee onboarded, but the invitation failed: ${data.invitation.error}. Use "Send invitation" on the roster to retry.`,
+            : data.invitation.linked
+              ? `Employee onboarded — ${data.invitation.message}`
+              : data.invitation.sent
+                ? "Employee onboarded — login invitation sent."
+                : `Employee onboarded, but the invitation failed: ${data.invitation.error}. Use "Send invitation" on the roster to retry.`,
         });
         setF({ employeeCode: "", name: "", department: "", designation: "", managerId: "", joiningDate: "", machineId: "", email: "" });
         setSendInvitation(false);

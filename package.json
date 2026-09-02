@@ -12,6 +12,7 @@
     "selfcheck:cache": "node --import ./scripts/alias-loader.mjs ./scripts/caching.selfcheck.ts"
   },
   "dependencies": {
+    "@clerk/backend": "^2.33.6",
     "@clerk/nextjs": "^6.39.6",
     "@prisma/client": "^6.19.3",
     "@react-pdf/renderer": "^4.5.1",

@@ -5,7 +5,7 @@ import { onboardEmployee, createDefaultOnboardingTasks } from "@/lib/employees/o
 import { notifyHr } from "@/lib/notify";
 import { checkAttestation, attestationIp } from "@/lib/attestation";
 import { sendEmployeeInvitation } from "@/lib/employees/invite";
-import { clerkCreateInvitation } from "@/lib/employees/invite-clerk";
+import { clerkCreateInvitation, clerkFindUserByEmail } from "@/lib/employees/invite-clerk";
 import { ROLES, type Role } from "@/lib/auth-types";
 import { fail } from "@/lib/api/response";
 import {
@@ -276,7 +276,7 @@ export async function POST(req: NextRequest) {
 
     // OPT-IN login invitation, AFTER the conversion committed — same shared
     // logic as manual onboarding; a Clerk failure never undoes the hire.
-    let invitation: { sent: boolean; error?: string } | null = null;
+    let invitation: { sent: boolean; linked: boolean; message?: string; error?: string } | null = null;
     if (body.sendInvitation === true) {
       const inviteRole = (ROLES as string[]).includes(String(body.inviteRole))
         ? (body.inviteRole as Role)
@@ -290,8 +290,11 @@ export async function POST(req: NextRequest) {
           actorUserId: userId,
         },
         clerkCreateInvitation,
+        clerkFindUserByEmail,
       );
-      invitation = inv.ok ? { sent: true } : { sent: false, error: inv.message };
+      invitation = inv.ok
+        ? { sent: !inv.linked, linked: inv.linked, message: inv.message }
+        : { sent: false, linked: false, error: inv.message };
     }
 
     return NextResponse.json({

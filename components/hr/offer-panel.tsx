@@ -151,9 +151,11 @@ export function OfferPanel({
             ? `Hired. Employee ${data.employeeCode} created with a salary structure and ${data.onboardingTasksCreated} onboarding tasks.` +
               (!data.invitation
                 ? ""
-                : data.invitation.sent
-                  ? " Login invitation sent."
-                  : ` Login invitation FAILED: ${data.invitation.error} — retry from the Employee Master roster.`)
+                : data.invitation.linked
+                  ? ` ${data.invitation.message}`
+                  : data.invitation.sent
+                    ? " Login invitation sent."
+                    : ` Login invitation FAILED: ${data.invitation.error} — retry from the Employee Master roster.`)
             : label,
         );
         router.refresh();

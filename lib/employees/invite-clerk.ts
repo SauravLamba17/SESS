@@ -1,7 +1,7 @@
 import "server-only";
 import { clerkClient } from "@clerk/nextjs/server";
 import { appUrl } from "@/lib/app-url";
-import type { CreateInvitationFn } from "@/lib/employees/invite";
+import type { CreateInvitationFn, FindClerkUserByEmailFn } from "@/lib/employees/invite";
 
 /**
  * The real Clerk Backend API call, kept in its own file so lib/employees/
@@ -37,4 +37,20 @@ export const clerkCreateInvitation: CreateInvitationFn = async (params) => {
     ...params,
     redirectUrl: appUrl("/sign-up"),
   });
+};
+
+/**
+ * Does this address already own a Clerk account?
+ *
+ * Asked BEFORE every invitation (see lib/employees/invite.ts): an existing
+ * account can never sign up again, so it can never fire user.created, so an
+ * invitation sent to it could never be resolved into a User row.
+ *
+ * `emailAddress` is Clerk's own exact-match filter, not a fuzzy `query`, so
+ * this cannot half-match a different person's address.
+ */
+export const clerkFindUserByEmail: FindClerkUserByEmailFn = async (email) => {
+  const client = await clerkClient();
+  const { data } = await client.users.getUserList({ emailAddress: [email], limit: 1 });
+  return data[0] ? { id: data[0].id } : null;
 };

@@ -14,6 +14,7 @@ import { buildAuditQuery, totalPages } from "../lib/audit-query.ts";
 import { validateCsv, type ValidationContext } from "../lib/employees/csv-import.ts";
 import { checkAttestation, attestationIp } from "../lib/attestation.ts";
 import { onboardEmployee } from "../lib/employees/onboard.ts";
+import { notifyEmployee } from "../lib/notify.ts";
 
 const db = new PrismaClient();
 
@@ -41,7 +42,21 @@ async function cleanup() {
   });
   const ids = emps.map((e) => e.id);
 
-  await db.notification.deleteMany({ where: { employeeId: { in: ids } } });
+  // Notification -> User is an FK now, so notifications go before the Users
+  // that receive them, and those Users before the Employees they link to.
+  const notifUsers = await db.user.findMany({
+    where: { employeeId: { in: ids } },
+    select: { id: true },
+  });
+  await db.notification.deleteMany({
+    where: {
+      OR: [
+        { employeeId: { in: ids } },
+        { recipientUserId: { in: notifUsers.map((u) => u.id) } },
+      ],
+    },
+  });
+  await db.user.deleteMany({ where: { employeeId: { in: ids } } });
   await db.warningLetter.deleteMany({ where: { employeeId: { in: ids } } });
   await db.leaveRequest.deleteMany({ where: { employeeId: { in: ids } } });
   await db.expenseClaim.deleteMany({ where: { employeeId: { in: ids } } });
@@ -171,6 +186,13 @@ async function main() {
         joiningDate: new Date(2020, 0, 1),
       },
     });
+    // A notification is addressed to a USER now, so the employee under test
+    // needs the login they would really have. This is not scaffolding around
+    // the assertion — it is the condition the assertion is about: the recipient
+    // resolution below is exactly what the routes perform.
+    const empUser = await db.user.create({
+      data: { clerkId: `${TAG}-clerk-asha`, role: "EMPLOYEE", employeeId: emp.id },
+    });
 
     // (a) LEAVE_APPROVED — the exact transaction shape the route runs.
     const leave = await db.leaveRequest.create({
@@ -186,13 +208,15 @@ async function main() {
         where: { id: leave.id, status: "PENDING" },
         data: { status: "APPROVED", approvedBy: ACTOR },
       });
-      await tx.notification.create({
-        data: {
-          employeeId: emp.id,
-          type: "LEAVE_APPROVED",
-          message: "Your leave request for 2026-08-03 was approved.",
-        },
-      });
+      // The REAL helper the route calls — so this exercises recipient
+      // resolution (Employee -> their User), not a hand-rolled insert that
+      // could drift from production.
+      await notifyEmployee(
+        tx,
+        emp.id,
+        "LEAVE_APPROVED",
+        "Your leave request for 2026-08-03 was approved.",
+      );
     });
     const leaveNote = await db.notification.findFirst({
       where: { employeeId: emp.id, type: "LEAVE_APPROVED" },
@@ -200,6 +224,9 @@ async function main() {
     check("2a LEAVE_APPROVED notification created for the employee",
       leaveNote !== null && leaveNote.read === false,
       `"${leaveNote?.message}"`);
+    check("2a-i addressed to the employee's USER, with the employee kept as context",
+      leaveNote?.recipientUserId === empUser.id && leaveNote?.employeeId === emp.id,
+      `recipientUserId=${leaveNote?.recipientUserId} employeeId=${leaveNote?.employeeId}`);
 
     // (b) WARNING_RELEASED
     const letter = await db.warningLetter.create({
@@ -210,13 +237,12 @@ async function main() {
         where: { id: letter.id, status: "DRAFT" },
         data: { status: "RELEASED", releasedBy: ACTOR, releasedAt: new Date() },
       });
-      await tx.notification.create({
-        data: {
-          employeeId: emp.id,
-          type: "WARNING_RELEASED",
-          message: "A warning letter has been issued to you and requires your acknowledgement.",
-        },
-      });
+      await notifyEmployee(
+        tx,
+        emp.id,
+        "WARNING_RELEASED",
+        "A warning letter has been issued to you and requires your acknowledgement.",
+      );
     });
     check("2b WARNING_RELEASED notification created",
       (await db.notification.count({ where: { employeeId: emp.id, type: "WARNING_RELEASED" } })) === 1);
@@ -236,13 +262,12 @@ async function main() {
         where: { id: claim.id, status: "PENDING" },
         data: { status: "REJECTED", approvedBy: ACTOR, approvedAt: new Date() },
       });
-      await tx.notification.create({
-        data: {
-          employeeId: emp.id,
-          type: "EXPENSE_REJECTED",
-          message: "Your travel expense claim for ₹1250.50 was not approved.",
-        },
-      });
+      await notifyEmployee(
+        tx,
+        emp.id,
+        "EXPENSE_REJECTED",
+        "Your travel expense claim for ₹1250.50 was not approved.",
+      );
     });
     check("2c EXPENSE_REJECTED notification created",
       (await db.notification.count({ where: { employeeId: emp.id, type: "EXPENSE_REJECTED" } })) === 1);
@@ -254,6 +279,14 @@ async function main() {
     check("2d three distinct notification types recorded for this employee",
       new Set(allTypes.map((t) => t.type)).size === 3,
       Array.from(new Set(allTypes.map((t) => t.type))).sort().join(", "));
+
+    const allAddressed = await db.notification.findMany({
+      where: { employeeId: emp.id },
+      select: { recipientUserId: true },
+    });
+    check("2e every employee-subject notification is addressed to that employee's User",
+      allAddressed.length === 3 && allAddressed.every((n) => n.recipientUserId === empUser.id),
+      `${allAddressed.length} row(s), all recipientUserId=${empUser.id}`);
 
     // ── STEP 3: BULK CSV IMPORT ─────────────────────────────────────
     step("3", "bulk CSV import — validate before any write");

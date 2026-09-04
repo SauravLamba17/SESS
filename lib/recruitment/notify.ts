@@ -1,45 +1,35 @@
-import type { Prisma } from "@prisma/client";
+// Relative + explicit extension, matching every other lib->lib VALUE import
+// in this codebase (lib/payroll/assemble.ts, lib/reports/csv.ts, ...). The
+// "@/" alias resolves under Next but NOT under the plain-node verify
+// scripts that import this module, and this is a value import, not a type.
+import { notifyHr, hrUserIds, type Tx } from "../notify.ts";
 
 /**
- * HR-facing notifications, using Phase 7's Notification model unchanged.
+ * HR-facing recruitment notifications.
  *
- * ── WHY THIS FILE EXISTS (the addressing problem) ──────────────────────────
+ * ── WHAT CHANGED, AND WHY THIS FILE IS NOW THIN ───────────────────────────
  *
- * Phase 7's Notification is addressed to an EMPLOYEE (`employeeId`, non-null).
- * That fits PAYSLIP_READY perfectly: the recipient is a specific person who
- * definitionally has an Employee record, because the payslip is theirs.
+ * This module used to carry its own recipient resolution and a long note
+ * explaining that it could not fix the real problem. That note described the
+ * defect exactly:
  *
- * "Tell HR a candidate applied" is a different kind of address — it targets a
- * ROLE, not a person. I checked whether that distinction actually bites here:
+ *   "`User.employeeId` is NULLABLE, so the schema permits an HR user with no
+ *    Employee record... If HR users ever exist without Employee records, the
+ *    count returned here goes to 0 and the caller logs it — which is the signal
+ *    to add `recipientRole` for real."
  *
- *   • Role at runtime comes from CLERK metadata (lib/auth.ts realRoleOf), not
- *     from the DB `User` table.
- *   • `User.employeeId` is NULLABLE, so the schema permits an HR user with no
- *     Employee record.
- *   • `User` rows come from two paths. The live one is the Clerk invitation
- *     webhook (app/api/webhooks/clerk → linkClerkUserToEmployee), which creates
- *     the User when an invited person accepts and links it to their existing
- *     Employee. The other is prisma/seed-test-data.ts, which is demo-only and
- *     refuses to run unless DEMO_MODE=true. Phase 5 onboarding itself creates
- *     an Employee and NO User row — the User appears later, on acceptance.
- *   • Neither path is obliged to attach an Employee, and a Super Admin can
- *     authenticate through Clerk with no DB row at all.
+ * That signal has been acted on. Notification now addresses a USER
+ * (`recipientUserId`, required) and keeps Employee as optional context, so the
+ * workaround this file existed to document is gone. Recipient resolution lives
+ * once, in lib/notify.ts, and asks User.role directly — an HR administrator
+ * with no Employee record now receives these like anyone else.
  *
- * So "every HR user has an Employee record" is NOT structurally guaranteed.
- * No row counts are quoted here on purpose: a count describes whatever data
- * happens to exist at one moment and is wrong again the next time anyone is
- * onboarded, offboarded, or the demo accounts are cleared.
- *
- * Rather than restructure Notification (adding a nullable `recipientRole` would
- * make `employeeId` nullable and weaken the guarantee every existing
- * PAYSLIP_READY row relies on), this resolves recipients through the existing
- * User→Employee link and makes the zero-recipient case LOUD instead of silent.
- * If HR users ever exist without Employee records, the count returned here goes
- * to 0 and the caller logs it — which is the signal to add `recipientRole` for
- * real.
+ * The file remains only for its domain vocabulary: "tell HR a candidate
+ * applied" is a recruitment concept, and app/api/careers/apply reads better
+ * calling that than calling notifyHr with a hand-built sentence.
  */
 
-export type Tx = Prisma.TransactionClient;
+export type { Tx };
 
 export interface NotifyResult {
   recipients: number;
@@ -48,39 +38,30 @@ export interface NotifyResult {
 }
 
 /**
- * Active employees whose linked User has role HR.
+ * Every HR recipient, as User ids.
  *
- * A single query with a relation filter — no per-user lookup, and it stays one
- * query however many HR staff exist.
+ * Returns `{ id }[]` — the same shape as before — but these are User ids now,
+ * not Employee ids, because the recipient of a notification is a User.
  */
 export async function hrRecipients(tx: Tx): Promise<{ id: string }[]> {
-  return tx.employee.findMany({
-    where: { active: true, user: { role: "HR" } },
-    select: { id: true },
-  });
+  return (await hrUserIds(tx)).map((id) => ({ id }));
 }
 
 /**
  * Notify HR that a candidate applied.
  *
- * Uses tx.notification.createMany — the identical model and creation pattern
- * as Phase 7's PAYSLIP_READY (see app/api/admin/payroll/finalize/route.ts).
- * No second notification mechanism is introduced.
+ * employeeId is left null by notifyHr(): the notification concerns a
+ * CANDIDATE, who has no Employee record, and certainly does not concern the HR
+ * staffer receiving it.
  */
 export async function notifyHrOfApplication(
   tx: Tx,
   input: { candidateName: string; requisitionTitle: string },
 ): Promise<NotifyResult> {
-  const recipients = await hrRecipients(tx);
-  if (recipients.length === 0) return { recipients: 0, noRecipients: true };
-
-  await tx.notification.createMany({
-    data: recipients.map((r) => ({
-      employeeId: r.id,
-      type: "NEW_APPLICATION",
-      message: `${input.candidateName} applied for ${input.requisitionTitle}.`,
-    })),
-  });
-
-  return { recipients: recipients.length, noRecipients: false };
+  const recipients = await notifyHr(
+    tx,
+    "NEW_APPLICATION",
+    `${input.candidateName} applied for ${input.requisitionTitle}.`,
+  );
+  return { recipients, noRecipients: recipients === 0 };
 }

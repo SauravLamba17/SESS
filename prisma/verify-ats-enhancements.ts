@@ -190,9 +190,9 @@ async function main() {
     // ── STEP 2: HR NOTIFICATION ─────────────────────────────────────
     step("2", "HR notification on a new public application");
     const recipients = await hrRecipients(db);
-    check("2a at least one HR recipient resolves (active Employee + User.role=HR)",
+    check("2a at least one HR recipient resolves (User.role=HR, no Employee required)",
       recipients.length > 0,
-      `${recipients.length} recipient(s) — resolved via the User→Employee link`);
+      `${recipients.length} recipient(s) — resolved from User.role directly`);
 
     const notifiedBefore = await db.notification.count({ where: { type: "NEW_APPLICATION" } });
     const result = await db.$transaction((tx) =>
@@ -212,11 +212,20 @@ async function main() {
 
     const note = await db.notification.findFirst({
       where: { type: "NEW_APPLICATION", message: { contains: TAG } },
-      include: { employee: { select: { name: true, employeeCode: true, user: { select: { role: true } } } } },
+      include: { recipient: { select: { role: true, employeeId: true } } },
     });
-    check("2d targeted at an employee whose linked User role is HR",
-      note?.employee.user?.role === "HR",
-      `recipient=${note?.employee.employeeCode}/${note?.employee.name} role=${note?.employee.user?.role}`);
+    check("2d addressed to a USER whose role is HR",
+      note?.recipient.role === "HR",
+      `recipientUserId=${note?.recipientUserId} role=${note?.recipient.role}`);
+    // The strengthened form of the old assertion. This is role-addressed news
+    // about a CANDIDATE, so it concerns no employee — employeeId must be null
+    // rather than pointing at whichever HR staffer happened to receive it.
+    check("2d-i carries NO employee context — it concerns a candidate, not the recipient",
+      note?.employeeId === null,
+      `employeeId=${note?.employeeId ?? "null"}`);
+    check("2d-ii delivery does not depend on the recipient having an HR profile",
+      note !== null,
+      `recipient employeeId=${note?.recipient.employeeId ?? "null"} — either value delivers`);
     check("2e message names both the candidate and the requisition",
       !!note && note.message.includes("Ravi Nair") && note.message.includes("QA Engineer"),
       `"${note?.message}"`);

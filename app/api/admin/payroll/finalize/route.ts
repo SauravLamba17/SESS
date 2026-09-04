@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { isPeriod } from "@/lib/period";
 import { periodLabel } from "@/lib/payroll/format";
 import { fail } from "@/lib/api/response";
+import { notifyEach } from "@/lib/notify";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -125,10 +126,15 @@ export async function POST(req: NextRequest) {
         }
 
         // ── Payslip-ready notifications ──
-        await tx.notification.createMany({
-          data: pending.map((p) => ({
+        // Routed through notifyEach() rather than an inline createMany so the
+        // "who receives this" resolution (Employee -> their User) lives in one
+        // place. employeeId stays on every row: a payslip notification is
+        // genuinely ABOUT that employee, not merely delivered to them.
+        await notifyEach(
+          tx,
+          pending.map((p) => ({
             employeeId: p.employeeId,
-            type: "PAYSLIP_READY",
+            type: "PAYSLIP_READY" as const,
             message: p.adjustmentForPayrollId
               ? // A correction is the message an employee most needs to read —
                 // it says their pay for an already-closed month has changed.
@@ -139,7 +145,7 @@ export async function POST(req: NextRequest) {
                 ? `Your full & final settlement for ${periodLabel(period)} is ready to download.`
                 : `Your payslip for ${periodLabel(period)} is ready to download.`,
           })),
-        });
+        );
 
         await tx.auditLog.create({
           data: { actorUserId: userId, action: "PAYROLL_RUN_FINALIZED", targetEntity: period },

@@ -60,6 +60,18 @@ enum LoanStatus {
   CLOSED
 }
 
+// SESS's APPLICATION identity: who may sign in, and what they may do.
+//
+// `employeeId` is OPTIONAL and that is a legitimate, intended state — not an
+// anomaly and not a Super Admin marker. Employee is the HR/organizational
+// profile (department, manager, attendance, payroll); User is the application
+// identity. They usually overlap, but an administrator, auditor or external
+// operator is a valid SESS User with no HR profile at all.
+//
+// IMPORTANT: never infer a role from `employeeId == null`. Authorization is
+// decided by `role` alone, everywhere, as it already is throughout this
+// codebase. The absence of an Employee link is the absence of HR data, nothing
+// more.
 model User {
   id         String    @id @default(cuid())
   clerkId    String    @unique
@@ -67,6 +79,10 @@ model User {
   employee   Employee? @relation(fields: [employeeId], references: [id])
   employeeId String?   @unique
   createdAt  DateTime  @default(now())
+
+  // Notifications are addressed to the USER, so an employee-less
+  // administrator is reachable by system alerts.
+  notifications Notification[]
 }
 
 model Employee {
@@ -531,16 +547,40 @@ model SalaryAdvance {
   @@index([employeeId, status])
 }
 
+// A notification answers TWO different questions, and they are not the same
+// question:
+//
+//   recipientUserId — WHO RECEIVES THIS. Always required. It is a User,
+//                     because delivery is an application-identity concern.
+//   employeeId      — WHICH HR ENTITY IT CONCERNS. Optional context.
+//
+// They coincide for "your payslip is ready" (the recipient is the subject) and
+// diverge for "a candidate applied" (HR receives it; it concerns no employee)
+// and for any system/admin alert, which sets employeeId = null.
+//
+// employeeId was previously the REQUIRED recipient. That made every
+// notification depend on an HR profile, so an employee-less administrator was
+// silently unreachable by system alerts — a real delivery gap, not a cosmetic
+// one. See migration 20260904120000_notification_user_recipient.
 model Notification {
-  id         String   @id @default(cuid())
-  employeeId String
-  employee   Employee @relation(fields: [employeeId], references: [id])
-  type       String // e.g. "PAYSLIP_READY"
-  message    String
-  read       Boolean  @default(false)
-  createdAt  DateTime @default(now())
+  id              String    @id @default(cuid())
+  recipientUserId String
+  recipient       User      @relation(fields: [recipientUserId], references: [id])
+  // Optional HR context: the employee this notification is ABOUT. Null for
+  // system/admin alerts and role-addressed news (NEW_APPLICATION, OFFER_*).
+  employeeId      String?
+  employee        Employee? @relation(fields: [employeeId], references: [id])
+  type            String // e.g. "PAYSLIP_READY"
+  message         String
+  read            Boolean   @default(false)
+  createdAt       DateTime  @default(now())
 
-  @@index([employeeId, read])
+  // The panel query is always "my unread first" — keyed on the recipient now,
+  // which is what every read path filters by.
+  @@index([recipientUserId, read])
+  // Kept so the employee-context lookups (orphan sweep, per-employee counts in
+  // the verify suites) stay indexed rather than sequential-scanning.
+  @@index([employeeId])
 }
 
 // Append-only. Nothing in this codebase updates or deletes an AuditLog row,

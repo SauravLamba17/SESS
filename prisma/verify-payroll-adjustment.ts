@@ -8,6 +8,7 @@
  * Run:  node --env-file=.env prisma/verify-payroll-adjustment.ts
  */
 import { PrismaClient, Prisma } from "@prisma/client";
+import { notifyEmployee } from "../lib/notify.ts";
 import { computeGrossNet } from "../lib/payroll/compute.ts";
 import { linkAdjustments } from "../lib/payroll/adjustments.ts";
 
@@ -48,7 +49,13 @@ async function canAdjust(payrollId: string) {
 
 async function cleanup(employeeId?: string) {
   if (!employeeId) return;
-  await db.notification.deleteMany({ where: { employeeId } });
+  // Notification -> User is an FK now: notifications first, then the User
+  // that receives them, then the Employee it links to.
+  const u = await db.user.findFirst({ where: { employeeId }, select: { id: true } });
+  await db.notification.deleteMany({
+    where: { OR: [{ employeeId }, ...(u ? [{ recipientUserId: u.id }] : [])] },
+  });
+  await db.user.deleteMany({ where: { employeeId } });
   // Adjustments reference originals — delete children before parents.
   await db.payroll.deleteMany({
     where: { employeeId, adjustmentForPayrollId: { not: null } },
@@ -80,6 +87,11 @@ async function main() {
       },
     });
     employeeId = employee.id;
+    // The correction notification is delivered to a USER — give the test
+    // employee the login they would really have.
+    const empUser = await db.user.create({
+      data: { clerkId: `${CODE}-clerk`, role: "EMPLOYEE", employeeId },
+    });
 
     const base = computeGrossNet({
       basic: "30000.00", hra: "15000.00", specialAllowance: "5000.00",
@@ -232,16 +244,21 @@ async function main() {
         where: { id: adjustment.id, status: "SUBMITTED" },
         data: { status: "FINALIZED", finalizedBy: ADMIN, finalizedAt: new Date(2019, 7, 3) },
       });
-      await tx.notification.create({
-        data: {
-          employeeId: employeeId!,
-          type: "PAYSLIP_READY",
-          message: "A correction to your May 2019 payslip pays an additional ₹1850.00.",
-        },
-      });
+      await notifyEmployee(
+        tx,
+        employeeId!,
+        "PAYSLIP_READY",
+        "A correction to your May 2019 payslip pays an additional ₹1850.00.",
+      );
       return upd.count;
     });
     check("W3 SUBMITTED→FINALIZED, exactly 1 row", fin === 1, `count=${fin}`);
+    const corrNote = await db.notification.findFirst({
+      where: { employeeId, type: "PAYSLIP_READY" },
+    });
+    check("W3a correction notification addressed to the employee's User",
+      corrNote?.recipientUserId === empUser.id && corrNote?.employeeId === employeeId,
+      `recipientUserId=${corrNote?.recipientUserId} employeeId=${corrNote?.employeeId}`);
 
     const tamperAdj = await db.payroll.updateMany({
       where: { id: adjustment.id, status: "DRAFT" },

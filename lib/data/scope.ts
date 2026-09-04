@@ -34,6 +34,26 @@ export function getEmployeeByClerkId(clerkId: string) {
     .then((u) => u?.employee ?? null);
 }
 
+/**
+ * Resolve the SESS User (application identity) behind a Clerk id.
+ *
+ * Distinct from getEmployeeByClerkId above, and needed wherever the question is
+ * "who is this account" rather than "what is this person in the org chart".
+ * `employeeId` comes back nullable because it genuinely is: an administrator or
+ * auditor is a valid User with no HR profile, and a caller that only needs the
+ * identity must not be forced through an Employee that may not exist.
+ *
+ * RED TIER, like everything else in this file — never cache it. Its result is
+ * the scope predicate in app/employee/notifications-actions.ts, which decides
+ * whose notifications a request may mark read.
+ */
+export function getUserByClerkId(clerkId: string) {
+  return db.user.findUnique({
+    where: { clerkId },
+    select: { id: true, role: true, employeeId: true },
+  });
+}
+
 /** The manager's DIRECT reports only (single level). Shift batched in. */
 export function getDirectReports(managerEmployeeId: string) {
   return db.employee.findMany({

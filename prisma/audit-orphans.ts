@@ -43,7 +43,6 @@ async function main() {
     ),
     await rowsOf("ExpenseClaim", () => db.expenseClaim.findMany({ select: { employeeId: true } })),
     await rowsOf("SalaryAdvance", () => db.salaryAdvance.findMany({ select: { employeeId: true } })),
-    await rowsOf("Notification", () => db.notification.findMany({ select: { employeeId: true } })),
     await rowsOf("ConsentRecord", () => db.consentRecord.findMany({ select: { employeeId: true } })),
     await rowsOf("LeaveRequest", () => db.leaveRequest.findMany({ select: { employeeId: true } })),
     await rowsOf("MonthlyTarget", () => db.monthlyTarget.findMany({ select: { employeeId: true } })),
@@ -63,6 +62,19 @@ async function main() {
       `${orphans > 0 ? "✗" : " "} ${table.padEnd(24)} ${String(rows).padStart(4)}   ${String(orphans).padStart(4)}`,
     );
   }
+
+  // Notification.employeeId is NULLABLE now — it is optional HR context, not a
+  // recipient. A null is a system/role-addressed alert that concerns no
+  // employee, which is a valid row and NOT an orphan; only a non-null id
+  // pointing at a vanished Employee is.
+  const notifications = await db.notification.findMany({ select: { employeeId: true } });
+  const badNotification = notifications.filter(
+    (n) => n.employeeId !== null && !live.has(n.employeeId),
+  ).length;
+  console.log(
+    `${badNotification > 0 ? "✗" : " "} ${"Notification".padEnd(24)} ${String(notifications.length).padStart(4)}   ${String(badNotification).padStart(4)}`,
+  );
+  totalOrphans += badNotification;
 
   // Employee self-relation.
   const badManager = (

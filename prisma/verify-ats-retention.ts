@@ -190,11 +190,14 @@ async function main() {
 
     const note = await db.notification.findFirst({
       where: { type: "NEW_APPLICATION", message: { contains: TAG } },
-      include: { employee: { select: { employeeCode: true, user: { select: { role: true } } } } },
+      include: { recipient: { select: { role: true } } },
     });
-    check("2b targeted at an Employee whose linked User role is HR",
-      note?.employee.user?.role === "HR",
-      `recipient=${note?.employee.employeeCode} role=${note?.employee.user?.role}`);
+    check("2b addressed to a USER whose role is HR",
+      note?.recipient.role === "HR",
+      `recipientUserId=${note?.recipientUserId} role=${note?.recipient.role}`);
+    check("2b-i carries no employee context — it concerns a candidate",
+      note?.employeeId === null,
+      `employeeId=${note?.employeeId ?? "null"}`);
     check("2c message names candidate and requisition",
       !!note?.message.includes("Neha") && !!note?.message.includes("Machine Operator"),
       `"${note?.message}"`);

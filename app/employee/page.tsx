@@ -7,7 +7,6 @@ import { NotificationPanel } from "@/components/employee/notification-panel";
 import { TodayWidgets } from "@/components/engagement/today-widgets";
 import { loadToday } from "@/lib/engagement/today";
 import { db } from "@/lib/db";
-import { getEmployeeByClerkId } from "@/lib/data/scope";
 import { ownIdleTotals, hm } from "@/lib/idle/aggregate";
 import { currentPeriod } from "@/lib/period";
 import { scoreOutOfFive } from "@/lib/appraisal/display";
@@ -28,8 +27,20 @@ async function loadMetrics() {
   const userId = await getEffectiveUserId();
   if (!userId) return null;
   try {
-    const employee = await getEmployeeByClerkId(userId);
-    if (!employee) return null;
+    // ONE lookup for both identities: the User (who receives notifications)
+    // and the Employee (whose production/attendance/appraisal rows the rest of
+    // this dashboard is built from). getEmployeeByClerkId() resolves through
+    // User anyway and discards it, so keeping both costs nothing extra.
+    //
+    // This page still requires an Employee — every metric below is
+    // employee-scoped — so the early return stays. It is the HR dashboard, not
+    // this one, that must render for an employee-less account.
+    const me = await db.user.findUnique({
+      where: { clerkId: userId },
+      include: { employee: true },
+    });
+    const employee = me?.employee;
+    if (!me || !employee) return null;
     const { period, monthStart, monthEnd } = currentPeriod();
     const inMonth = { gte: monthStart, lt: monthEnd };
 
@@ -66,8 +77,9 @@ async function loadMetrics() {
         orderBy: { givenOn: "desc" },
       }),
       // Phase 7: own notifications — unread first, then most recent.
+      // Addressed by recipient User, not by Employee.
       db.notification.findMany({
-        where: { employeeId: employee.id },
+        where: { recipientUserId: me.id },
         orderBy: [{ read: "asc" }, { createdAt: "desc" }],
         take: 8,
       }),

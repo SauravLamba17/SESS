@@ -8,6 +8,9 @@
  * Run:  node --env-file=.env prisma/verify-payroll-workflow.ts
  */
 import { PrismaClient, Prisma } from "@prisma/client";
+// The real helpers the finalize route uses, so recipient resolution is
+// exercised here rather than re-implemented.
+import { notifyEach, notifyEmployee } from "../lib/notify.ts";
 import { computeGrossNet } from "../lib/payroll/compute.ts";
 import { assemblePayrollRow } from "../lib/payroll/assemble.ts";
 import { payableDays } from "../lib/payroll/proration.ts";
@@ -37,7 +40,13 @@ function step(n: number, title: string) {
 
 async function cleanup(employeeId?: string) {
   if (!employeeId) return;
-  await db.notification.deleteMany({ where: { employeeId } });
+  // Notification -> User is an FK now: notifications first, then the User
+  // that receives them, then the Employee it links to.
+  const u = await db.user.findFirst({ where: { employeeId }, select: { id: true } });
+  await db.notification.deleteMany({
+    where: { OR: [{ employeeId }, ...(u ? [{ recipientUserId: u.id }] : [])] },
+  });
+  await db.user.deleteMany({ where: { employeeId } });
   await db.expenseClaim.deleteMany({ where: { employeeId } });
   await db.payroll.deleteMany({ where: { employeeId } });
   await db.salaryAdvance.deleteMany({ where: { employeeId } });
@@ -68,6 +77,11 @@ async function main() {
       },
     });
     employeeId = employee.id;
+    // A payslip notification is delivered to a USER; give the test employee the
+    // login they would really have so the recipient actually resolves.
+    const empUser = await db.user.create({
+      data: { clerkId: `${CODE}-clerk`, role: "EMPLOYEE", employeeId },
+    });
 
     const structure = await db.salaryStructure.create({
       data: {
@@ -232,13 +246,14 @@ async function main() {
         }
       }
 
-      await tx.notification.createMany({
-        data: pendingRows.map((p) => ({
+      await notifyEach(
+        tx,
+        pendingRows.map((p) => ({
           employeeId: p.employeeId,
-          type: "PAYSLIP_READY",
+          type: "PAYSLIP_READY" as const,
           message: "Your payslip for April 2019 is ready to download.",
         })),
-      });
+      );
     });
 
     const advAfter = await db.salaryAdvance.findUnique({ where: { id: advance.id } });
@@ -391,13 +406,12 @@ async function main() {
           await tx.salaryAdvance.update({ where: { id: adv.id }, data: { status: "CLOSED" } });
         }
       }
-      await tx.notification.create({
-        data: {
-          employeeId: employeeId!,
-          type: "PAYSLIP_READY",
-          message: "Your full & final settlement for April 2019 is ready to download.",
-        },
-      });
+      await notifyEmployee(
+        tx,
+        employeeId!,
+        "PAYSLIP_READY",
+        "Your full & final settlement for April 2019 is ready to download.",
+      );
     });
 
     const advFinal = await db.salaryAdvance.findUnique({ where: { id: advance.id } });
@@ -457,6 +471,10 @@ async function main() {
     check("9c settlement notification names the settlement",
       notes.some((n) => n.message.toLowerCase().includes("full & final")),
       notes.map((n) => `"${n.message}"`).join(" | "));
+    check("9d addressed to the employee's User, employee kept as context",
+      notes.length === 2 &&
+        notes.every((n) => n.recipientUserId === empUser.id && n.employeeId === employeeId),
+      `recipientUserId=${notes.map((n) => n.recipientUserId).join(",")}`);
   } finally {
     console.log("\n── CLEANUP ───────────────────────────────────────────");
     await cleanup(employeeId);

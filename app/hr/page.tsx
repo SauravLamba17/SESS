@@ -4,7 +4,7 @@ import { StatusLabel } from "@/components/ui/status-dot";
 import { NotificationPanel } from "@/components/employee/notification-panel";
 import { getEffectiveUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { getEmployeeByClerkId } from "@/lib/data/scope";
+import { getUserByClerkId } from "@/lib/data/scope";
 import { TodayWidgets } from "@/components/engagement/today-widgets";
 import { loadToday } from "@/lib/engagement/today";
 import { currentPeriod } from "@/lib/period";
@@ -15,18 +15,23 @@ import { getHrDashboardTotals, RETENTION_WARNING_DAYS } from "@/lib/cache/dashbo
 export const dynamic = "force-dynamic";
 
 /**
- * HR's own notifications — the same Notification model, the same panel
- * component as the Employee dashboard. HR staff are Employees too, so their
- * notifications are addressed exactly like anyone else's.
+ * This account's own notifications — the same Notification model, the same
+ * panel component as the Employee dashboard.
+ *
+ * Addressed by USER, not by Employee. That matters here more than anywhere
+ * else: ROUTE_ACCESS.hr is ["HR", "SUPER_ADMIN"], so this dashboard is the
+ * surface where a Super Admin reads their notifications, and a Super Admin may
+ * legitimately have no Employee record at all. The old Employee lookup returned
+ * [] for them — every system alert silently invisible.
  */
 async function loadNotifications() {
   const userId = await getEffectiveUserId();
   if (!userId) return [];
   try {
-    const me = await getEmployeeByClerkId(userId);
+    const me = await getUserByClerkId(userId);
     if (!me) return [];
     const rows = await db.notification.findMany({
-      where: { employeeId: me.id },
+      where: { recipientUserId: me.id },
       orderBy: [{ read: "asc" }, { createdAt: "desc" }],
       take: 10,
     });

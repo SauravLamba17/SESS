@@ -210,7 +210,7 @@ export async function POST(req: NextRequest) {
     if (result.notified.noRecipients) {
       console.warn(
         `[careers/apply] Application ${result.application.id} stored, but NO HR recipient exists ` +
-          `(no active Employee linked to a User with role HR). Nobody was notified.`,
+          `(no User has role HR). Nobody was notified.`,
       );
     }
 

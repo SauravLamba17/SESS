@@ -220,7 +220,24 @@ export async function sendEmployeeInvitation(
 
 export type LinkResult =
   | { linked: true; userId: string; employeeId: string }
-  | { linked: false; reason: string };
+  | { linked: false; code: LinkFailure; reason: string };
+
+/**
+ * WHY a link did not happen. The three cases are NOT interchangeable and the
+ * self-healing caller below branches on them, so they must not be told apart
+ * by matching on `reason`'s prose:
+ *
+ *   ALREADY_LINKED_CLERK — this Clerk id already has a User row. Benign: a
+ *                          webhook retry, or a concurrent request that won.
+ *   NO_EMPLOYEE_MATCH    — no Employee owns this address. Benign and EXPECTED
+ *                          for an administrator with no HR profile; this is the
+ *                          one case where an employee-less User is correct.
+ *   EMPLOYEE_TAKEN       — an Employee owns the address but is already linked
+ *                          to a DIFFERENT Clerk account. AMBIGUOUS — two
+ *                          identities claim one person — so callers must fail
+ *                          closed here, never invent a second account.
+ */
+export type LinkFailure = "ALREADY_LINKED_CLERK" | "NO_EMPLOYEE_MATCH" | "EMPLOYEE_TAKEN";
 
 /**
  * Webhook side: correlate a Clerk user.created event to its Employee by email
@@ -230,7 +247,7 @@ export type LinkResult =
  */
 export async function linkClerkUserToEmployee(
   db: PrismaClient,
-  args: { clerkId: string; email: string; role: Role },
+  args: { clerkId: string; email: string; role: Role; source?: string },
 ): Promise<LinkResult> {
   const email = args.email.trim().toLowerCase();
 
@@ -239,15 +256,25 @@ export async function linkClerkUserToEmployee(
     where: { clerkId: args.clerkId },
     select: { id: true },
   });
-  if (existing) return { linked: false, reason: `clerkId ${args.clerkId} is already linked` };
+  if (existing)
+    return {
+      linked: false,
+      code: "ALREADY_LINKED_CLERK",
+      reason: `clerkId ${args.clerkId} is already linked`,
+    };
 
   const emp = await db.employee.findUnique({
     where: { email },
     select: { id: true, user: { select: { id: true } } },
   });
-  if (!emp) return { linked: false, reason: `no employee matches email ${email}` };
+  if (!emp)
+    return { linked: false, code: "NO_EMPLOYEE_MATCH", reason: `no employee matches email ${email}` };
   if (emp.user)
-    return { linked: false, reason: `employee ${emp.id} already has a linked account` };
+    return {
+      linked: false,
+      code: "EMPLOYEE_TAKEN",
+      reason: `employee ${emp.id} already has a linked account`,
+    };
 
   const [user] = await db.$transaction([
     db.user.create({
@@ -262,9 +289,166 @@ export async function linkClerkUserToEmployee(
         // The accepting user is the actor — nobody else performed this.
         actorUserId: args.clerkId,
         action: "EMPLOYEE_ACCOUNT_LINKED",
-        targetEntity: `employee=${emp.id} clerkId=${args.clerkId} role=${args.role}`,
+        targetEntity:
+          `employee=${emp.id} clerkId=${args.clerkId} role=${args.role}` +
+          (args.source ? ` source=${args.source}` : ""),
       },
     }),
   ]);
   return { linked: true, userId: user.id, employeeId: emp.id };
+}
+
+export type EnsureUserResult =
+  /** A User row now exists because THIS call created it. */
+  | { created: true; userId: string; employeeId: string | null; reason: string }
+  /** No row was created — either one already existed, or we refused. */
+  | { created: false; code: EnsureRefusal; reason: string };
+
+export type EnsureRefusal =
+  /** Benign: the row was already there (or a concurrent request created it). */
+  | "ALREADY_PROVISIONED"
+  /** Refused: Clerk's publicMetadata.role is missing or not a recognised Role. */
+  | "NO_ROLE"
+  /** Refused: no usable email, so the Employee match could not even be attempted. */
+  | "NO_EMAIL"
+  /** Refused: the matching Employee belongs to a different Clerk account. */
+  | "AMBIGUOUS"
+  /** Refused: the database rejected the write for a reason other than the race. */
+  | "CONFLICT";
+
+/**
+ * PHASE 6 — the self-healing half of account provisioning.
+ *
+ * Guarantee: every legitimate Clerk identity has a SESS User row. The webhook
+ * (app/api/webhooks/clerk/route.ts) remains the PRIMARY path and is unchanged;
+ * this is the safety net for the two cases it structurally cannot cover:
+ *
+ *   1. a Clerk account that pre-dates the webhook, or was created in the Clerk
+ *      dashboard rather than by accepting an invitation — user.created either
+ *      never fired for SESS or fired before the handler existed;
+ *   2. a delivery that failed or was dropped (already happened once here).
+ *
+ * Both produced the same dead end: authenticated in Clerk, invisible to SESS,
+ * with no recovery except somebody noticing and running a script by hand. This
+ * function is called from lib/auth.ts on every authenticated request, so the
+ * gap closes by itself the next time the person loads a page.
+ *
+ * ─── FAIL CLOSED, ALWAYS ─────────────────────────────────────────────────
+ * A User row IS an authorization grant, so every ambiguity refuses:
+ *   - `role` comes from Clerk's publicMetadata (the same source of truth
+ *     middleware.ts and realRoleOf() already use) and is NEVER defaulted. No
+ *     role, or an unrecognised one, creates NOTHING. In particular there is no
+ *     "default to EMPLOYEE" here — an unrecognised role means we do not know
+ *     who this is, and guessing the bottom of the hierarchy would still mint a
+ *     real account for an identity we cannot vouch for.
+ *   - no email → refuse, because the Employee match below could not be
+ *     attempted, so we cannot tell an administrator apart from staff.
+ *   - the address maps to an Employee already owned by another Clerk account →
+ *     refuse. Two identities claiming one person is exactly the state a script
+ *     must not resolve on its own.
+ * Every refusal leaves the caller in the situation it is in today: no User row,
+ * therefore no access. Nothing here can ever widen access on failure.
+ *
+ * ─── EMPLOYEE LINK IS OPTIONAL ───────────────────────────────────────────
+ * The Employee match is attempted through linkClerkUserToEmployee() — the same
+ * matcher the webhook uses, not a second copy of it — and attached when it
+ * hits. When no Employee owns the address, employeeId stays NULL: the correct
+ * shape for an administrator with no HR profile (see the User model comment).
+ * No Employee record is ever invented.
+ *
+ * ─── RACE SAFETY ─────────────────────────────────────────────────────────
+ * Two simultaneous requests from the same new identity both find no User row
+ * and both attempt a create. The authority resolving that is the DATABASE:
+ * User.clerkId is @unique, so exactly one INSERT commits and the other fails
+ * with P2002. This function catches P2002, re-reads, and reports the winner's
+ * row as ALREADY_PROVISIONED. There is no check-then-create window to lose,
+ * because the check is not what protects the invariant — the constraint is.
+ *
+ * Dependency-injected `db` for the same reason as the rest of this module: no
+ * db/Clerk import here, so prisma/verify-*.ts can exercise the REAL logic.
+ */
+export async function ensureUserForClerkIdentity(
+  db: PrismaClient,
+  args: { clerkId: string; email: string | null; role: Role | null; source?: string },
+): Promise<EnsureUserResult> {
+  if (!args.role)
+    return {
+      created: false,
+      code: "NO_ROLE",
+      reason: `no recognised role in Clerk publicMetadata for ${args.clerkId}`,
+    };
+
+  const email = args.email?.trim().toLowerCase() || null;
+  if (!email)
+    return { created: false, code: "NO_EMAIL", reason: `${args.clerkId} has no email address` };
+
+  const source = args.source ?? "self-heal";
+
+  // Attempt the Employee link first: when one matches, the linked row is the
+  // right answer and this returns having done the whole job.
+  let link: LinkResult;
+  try {
+    link = await linkClerkUserToEmployee(db, {
+      clerkId: args.clerkId,
+      email,
+      role: args.role,
+      source,
+    });
+  } catch (err) {
+    return { created: false, code: await raceOrConflict(err), reason: describe(err) };
+  }
+  if (link.linked)
+    return {
+      created: true,
+      userId: link.userId,
+      employeeId: link.employeeId,
+      reason: `linked to employee ${link.employeeId}`,
+    };
+  if (link.code === "ALREADY_LINKED_CLERK")
+    return { created: false, code: "ALREADY_PROVISIONED", reason: link.reason };
+  if (link.code === "EMPLOYEE_TAKEN")
+    return { created: false, code: "AMBIGUOUS", reason: link.reason };
+
+  // NO_EMPLOYEE_MATCH — the legitimate employee-less account. Create the User
+  // with employeeId NULL and audit it in the SAME transaction: an unaudited
+  // account appearing in the identity table is precisely what must not happen.
+  try {
+    const [user] = await db.$transaction([
+      db.user.create({ data: { clerkId: args.clerkId, role: args.role, employeeId: null } }),
+      db.auditLog.create({
+        data: {
+          // The account provisions its own application identity; no other party
+          // acted. `source` records how the row came to exist.
+          actorUserId: args.clerkId,
+          action: "USER_SELF_PROVISIONED",
+          targetEntity: `clerkId=${args.clerkId} email=${email} role=${args.role} employeeId=null source=${source}`,
+        },
+      }),
+    ]);
+    return {
+      created: true,
+      userId: user.id,
+      employeeId: null,
+      reason: `no employee matches ${email} — created with employeeId NULL`,
+    };
+  } catch (err) {
+    return { created: false, code: await raceOrConflict(err), reason: describe(err) };
+  }
+
+  /**
+   * A unique-constraint violation is only benign if it was OUR race: a User row
+   * for this exact clerkId now exists. Anything else (an employeeId collision,
+   * a genuine fault) stays a refusal rather than being reported as success.
+   */
+  async function raceOrConflict(err: unknown): Promise<EnsureRefusal> {
+    if ((err as { code?: string })?.code !== "P2002") return "CONFLICT";
+    const winner = await db.user.findUnique({
+      where: { clerkId: args.clerkId },
+      select: { id: true },
+    });
+    return winner ? "ALREADY_PROVISIONED" : "CONFLICT";
+  }
+  function describe(err: unknown): string {
+    return (err as { message?: string })?.message ?? String(err);
+  }
 }

@@ -123,7 +123,7 @@ export default async function OfferApprovalPage() {
         )}
         <p className="border-t border-border px-4 py-3 text-xs text-text-muted">
           Approval authorises the terms. HR then marks the offer as sent, and
-          records the candidate&apos;s real-world response — accepting converts
+          records the candidate’s real-world response — accepting converts
           them into an employee automatically.
         </p>
       </Panel>

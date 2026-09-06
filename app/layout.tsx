@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Space_Grotesk, Inter, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
@@ -26,9 +26,27 @@ const mono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SESS — Simplen Employee Self-Service",
+  // `template` lets each route set only its own name — the tab then reads
+  // "My Dashboard · SESS" instead of the same string on every page.
+  title: {
+    default: "SESS — Simplen Employee Self-Service",
+    template: "%s · SESS",
+  },
   description:
     "Attendance, quality-linked production appraisals, and precision workforce measurement.",
+};
+
+/**
+ * Matches the browser chrome to the page background per theme. The values are
+ * --color-base from app/globals.css: #0F1417 (dark) and #FFFFFF (light).
+ * "high-contrast" is a manual [data-theme] choice with no media query to key
+ * off, so it falls back to the dark entry — the closer of the two.
+ */
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#FFFFFF" },
+    { media: "(prefers-color-scheme: dark)", color: "#0F1417" },
+  ],
 };
 
 export default function RootLayout({

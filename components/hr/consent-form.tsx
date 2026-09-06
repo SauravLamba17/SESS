@@ -126,9 +126,9 @@ export function ConsentForm({
           <span className="text-xs text-text">
             Also generate the desktop agent token
             <span className="mt-0.5 block text-text-muted">
-              Idle tracking does nothing until {selectedName}&apos;s machine has a
+              Idle tracking does nothing until {selectedName}’s machine has a
               token. Ticking this issues it in the same step and shows it below —
-              you won&apos;t need to go anywhere else.
+              you won’t need to go anywhere else.
             </span>
           </span>
         </label>

@@ -139,7 +139,7 @@ export function AttendanceCorrection({
       )}
 
       <p className="mt-1.5 text-[10px] text-text-muted">
-        Lateness is recalculated from the new time against this employee&apos;s
+        Lateness is recalculated from the new time against this employee’s
         shift. Old and new values are written to the audit log.
       </p>
 

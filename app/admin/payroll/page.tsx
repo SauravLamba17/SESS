@@ -83,8 +83,8 @@ export default async function PayrollFinalizationPage() {
                 Note: HR has {draftsWaiting} DRAFT payroll row
                 {draftsWaiting === 1 ? "" : "s"} (
                 {draftPeriods.join(", ")}) that have not been submitted yet.
-                Draft rows never appear here — HR must run &quot;Submit run for
-                approval&quot; before you can finalize them.
+                Draft rows never appear here — HR must run “Submit run for
+                approval” before you can finalize them.
               </p>
             )}
           </div>

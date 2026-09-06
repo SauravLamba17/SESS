@@ -87,7 +87,7 @@ export default async function ProductionTargetsPage() {
       {data.manager && (
         <Panel>
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
-            <h3 className="text-sm font-semibold text-text">Direct Reports</h3>
+            <h2 className="text-sm font-semibold text-text">Direct Reports</h2>
             <span className="font-mono text-xs text-text-muted">{data.period}</span>
           </div>
           <div className="overflow-x-auto">

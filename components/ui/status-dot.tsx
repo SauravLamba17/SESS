@@ -23,15 +23,24 @@ const DOT: Record<StatusState, { token: string; label: string }> = {
 export function StatusDot({
   state,
   className,
+  decorative = false,
 }: {
   state: StatusState;
   className?: string;
+  /**
+   * Opt-in, and off by default so all 129 existing call sites keep announcing
+   * their state. Set it only where the dot repeats something the adjacent text
+   * already says, so a screen reader would otherwise read a bare "Good" with
+   * nothing to attach it to — see the topbar dot in portal-shell.tsx.
+   */
+  decorative?: boolean;
 }) {
   const { token, label } = DOT[state];
   return (
     <span
-      role="img"
-      aria-label={label}
+      role={decorative ? undefined : "img"}
+      aria-label={decorative ? undefined : label}
+      aria-hidden={decorative || undefined}
       className={cn("inline-block shrink-0 rounded-full", className)}
       style={{
         width: 7,

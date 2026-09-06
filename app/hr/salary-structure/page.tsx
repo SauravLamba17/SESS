@@ -287,7 +287,7 @@ export default async function SalaryStructurePage() {
         <p className="border-t border-border px-4 py-3 text-xs text-text-muted">
           One current structure per employee. Saving no longer discards the old
           one: the version being replaced is archived with its effective range
-          closed, and the full timeline appears under &quot;Salary history&quot;
+          closed, and the full timeline appears under “Salary history”
           above. The new structure must take effect after the current one — to
           fix a typo in the version in force, correct its effective date rather
           than recording a change that never happened. Payroll rows snapshot

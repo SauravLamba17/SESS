@@ -86,7 +86,7 @@ export default async function OrganizationPage() {
         <p className="border-t border-border px-4 py-3 text-xs text-text-muted">
           Departments are free-text values on employee records (set at
           onboarding). Renaming or merging a department would mean reassigning
-          every employee&apos;s record — flagged as future work, not a quick edit.
+          every employee’s record — flagged as future work, not a quick edit.
         </p>
       </Panel>
     </>

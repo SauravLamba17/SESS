@@ -126,7 +126,7 @@ export function BulkImport() {
         Columns: employeeCode, name, department, designation, managerEmployeeCode,
         joiningDate (YYYY-MM-DD), machineId, email (optional). Managers are
         referenced by their employee <em>code</em>, not an internal id. Login
-        invitations are NOT sent at import — use &quot;Send invitation&quot; on the
+        invitations are NOT sent at import — use “Send invitation” on the
         roster afterwards. Nothing is written until you confirm.
       </p>
 

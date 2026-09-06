@@ -201,8 +201,10 @@ select option:disabled {
     display: none !important;
   }
 
-  /* The shell locks the viewport to h-screen with an internal scroll
-     region; for print the content must flow across pages instead. */
+  /* The shell locks the viewport to h-dvh with an internal scroll
+     region; for print the content must flow across pages instead.
+     .h-screen is kept so any page still using it prints correctly. */
+  .h-dvh,
   .h-screen,
   .overflow-hidden,
   .overflow-y-auto {

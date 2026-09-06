@@ -698,17 +698,17 @@ export default function CinematicLanding({
             <h1 className={s.rv}>
               Attendance and payroll
               <br />
-              <span className={s.soft}>shouldn&apos;t be</span>{" "}
+              <span className={s.soft}>shouldn’t be</span>{" "}
               <span className={s.hot}>guessed.</span>
             </h1>
             <p className={`${s.lede} ${s.rv}`}>
               Shift-aware attendance, punctuality that tells a bad day apart from
               a bad pattern, and payroll built on deterministic logic — never a
-              model&apos;s best guess. Built end to end for Simplen eServices.
+              model’s best guess. Built end to end for Simplen eServices.
             </p>
             {signedInWithoutRole && (
               <p className={s.notice}>
-                You&apos;re signed in, but no role is set on your account yet.
+                You’re signed in, but no role is set on your account yet.
                 Ask an administrator to assign one.
               </p>
             )}
@@ -809,7 +809,7 @@ export default function CinematicLanding({
                   Shift-aware by design
                 </div>
                 <h2 className={s.rv}>
-                  Midnight isn&apos;t
+                  Midnight isn’t
                   <br />
                   a bug here.
                 </h2>
@@ -934,7 +934,7 @@ export default function CinematicLanding({
               what they should.
             </h2>
             <p className={`${s.lede} ${s.rv}`}>
-              Access isn&apos;t a hidden button. Every boundary is enforced at
+              Access isn’t a hidden button. Every boundary is enforced at
               the query itself — checked directly, never assumed from the
               interface.
             </p>
@@ -994,13 +994,13 @@ export default function CinematicLanding({
               <div className={s.glass}>
                 <div className={s.k}>Retention with an expiry</div>
                 <p>
-                  Personal data doesn&apos;t sit forever by default.{" "}
+                  Personal data doesn’t sit forever by default.{" "}
                   <b>Real redaction</b> on former employees, real deletion
                   schedules on candidates.
                 </p>
               </div>
               <div className={s.glass}>
-                <div className={s.k}>Record it, don&apos;t judge it</div>
+                <div className={s.k}>Record it, don’t judge it</div>
                 <p>
                   A flagged punch shows where and how precisely —{" "}
                   <b>evidence, not a verdict.</b> The system never blocks a punch
@@ -1029,7 +1029,7 @@ export default function CinematicLanding({
               </h2>
               <p className={`${s.lede} ${s.rv}`}>
                 Not a template bent to fit. Every rule was written for one
-                company&apos;s real shifts, real compliance posture, and real
+                company’s real shifts, real compliance posture, and real
                 people.
               </p>
               <div className={`${s.acts} ${s.rv}`}>

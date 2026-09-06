@@ -63,7 +63,7 @@ export function ProductionPdf({ r, meta }: { r: ProductionResult; meta: ReportMe
       <Note>
         Target is the figure recorded on each production entry, summed over the
         period — not a monthly target pro-rated to the range. An employee with
-        no target recorded shows &quot;—&quot; and is excluded from the met/below
+        no target recorded shows “—” and is excluded from the met/below
         counts.
       </Note>
     </ReportDocument>

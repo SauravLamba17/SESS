@@ -98,7 +98,7 @@ export default async function ShiftsPage() {
             </ul>
           )}
           <p className="px-4 py-3 text-xs text-text-muted">
-            Shifts are never hard-deleted — deactivate instead, so no employee&apos;s
+            Shifts are never hard-deleted — deactivate instead, so no employee’s
             assignment is orphaned.
           </p>
         </Panel>

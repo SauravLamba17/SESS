@@ -79,7 +79,7 @@ export default async function PulsePage() {
             <p className="mt-1">
               Your rating is stored in a table that has no employee field at
               all. A separate record notes only <em>that</em> you responded, so
-              you aren&apos;t asked twice — it never stores what you said. The
+              you aren’t asked twice — it never stores what you said. The
               two are never joined, anywhere. HR sees averages and counts only,
               never individual answers.
             </p>
@@ -88,7 +88,7 @@ export default async function PulsePage() {
       </Panel>
 
       {!me && (
-        <UnlinkedEmployeeNotice>No employee record is linked to your account yet, so you can&apos;t
+        <UnlinkedEmployeeNotice>No employee record is linked to your account yet, so you can’t
             respond.</UnlinkedEmployeeNotice>
       )}
 
@@ -96,7 +96,7 @@ export default async function PulsePage() {
         <Panel className="px-4 py-12 text-center">
           <p className="text-sm text-text">No open surveys right now.</p>
           <p className="mt-1 text-xs text-text-muted">
-            We&apos;ll let you know when there&apos;s something to weigh in on.
+            We’ll let you know when there’s something to weigh in on.
           </p>
         </Panel>
       ) : (
@@ -120,7 +120,7 @@ export default async function PulsePage() {
                   {done ? (
                     <p className="flex items-center gap-2 text-sm text-text-muted">
                       <StatusDot state="good" />
-                      You&apos;ve responded to this one. Thank you.
+                      You’ve responded to this one. Thank you.
                     </p>
                   ) : me ? (
                     <PulseRespondForm
@@ -138,7 +138,7 @@ export default async function PulsePage() {
 
       {surveys.length > 0 && open.length === 0 && (
         <p className="mt-4 text-center text-xs text-text-muted">
-          You&apos;re all caught up.
+          You’re all caught up.
         </p>
       )}
     </>

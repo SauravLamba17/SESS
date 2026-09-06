@@ -2,6 +2,7 @@ import { getEffectiveUserId } from "@/lib/auth";
 import { PageHeader } from "@/components/portal/portal-shell";
 import { Panel, PanelHeader, StatCard } from "@/components/ui/panel";
 import { StatusDot, StatusLabel, type StatusState } from "@/components/ui/status-dot";
+import { ErrorPanel, UnlinkedEmployeeNotice } from "@/components/ui/notice";
 import { ClockInWidget } from "@/components/employee/clock-in-widget";
 import { NotificationPanel } from "@/components/employee/notification-panel";
 import { TodayWidgets } from "@/components/engagement/today-widgets";
@@ -23,9 +24,18 @@ import {
 
 export const dynamic = "force-dynamic";
 
+// Tab title for this route; the root layout appends " · SESS".
+export const metadata = { title: "My Dashboard" };
+
+/**
+ * Returns the SAME { data, error } shape every other page in this portal uses
+ * (see app/employee/payslips/page.tsx and app/manager/page.tsx): a genuine
+ * failure and a missing Employee record are different situations and get
+ * different answers, rather than both collapsing to a screen of em-dashes.
+ */
 async function loadMetrics() {
   const userId = await getEffectiveUserId();
-  if (!userId) return null;
+  if (!userId) return { m: null, error: null };
   try {
     // ONE lookup for both identities: the User (who receives notifications)
     // and the Employee (whose production/attendance/appraisal rows the rest of
@@ -40,7 +50,7 @@ async function loadMetrics() {
       include: { employee: true },
     });
     const employee = me?.employee;
-    if (!me || !employee) return null;
+    if (!me || !employee) return { m: null, error: null };
     const { period, monthStart, monthEnd } = currentPeriod();
     const inMonth = { gte: monthStart, lt: monthEnd };
 
@@ -91,37 +101,43 @@ async function loadMetrics() {
       consents.find((c) => c.consentType === type) ?? null;
 
     return {
-      actual: prod._sum.unitsProduced ?? 0,
-      target: target?.targetUnits ?? null,
-      qualityAvg: qual._count._all > 0 ? qual._avg.qualityScore ?? null : null,
-      qualityCount: qual._count._all,
-      appraisalScore: appraisal?.finalScore ?? null,
-      appraisalPeriod: appraisal?.cycle.period ?? null,
-      today: own.today,
-      weekStart: own.weekStart,
-      weekByDate: own.weekByDate,
-      idle: latestConsent("IDLE_TRACKING"),
-      shift: own.shift,
-      ownIdle,
-      // Serialize Dates — they don't cross the RSC boundary as Date objects.
-      notifications: notifications.map((n) => ({
-        id: n.id,
-        type: n.type,
-        message: n.message,
-        read: n.read,
-        createdAt: n.createdAt.toISOString(),
-      })),
+      m: {
+        actual: prod._sum.unitsProduced ?? 0,
+        target: target?.targetUnits ?? null,
+        qualityAvg: qual._count._all > 0 ? qual._avg.qualityScore ?? null : null,
+        qualityCount: qual._count._all,
+        appraisalScore: appraisal?.finalScore ?? null,
+        appraisalPeriod: appraisal?.cycle.period ?? null,
+        today: own.today,
+        weekStart: own.weekStart,
+        weekByDate: own.weekByDate,
+        idle: latestConsent("IDLE_TRACKING"),
+        shift: own.shift,
+        ownIdle,
+        // Serialize Dates — they don't cross the RSC boundary as Date objects.
+        notifications: notifications.map((n) => ({
+          id: n.id,
+          type: n.type,
+          message: n.message,
+          read: n.read,
+          createdAt: n.createdAt.toISOString(),
+        })),
+      },
+      error: null,
     };
   } catch (err) {
     console.error("[employee/dashboard] metrics failed:", err);
-    return null;
+    return { m: null, error: "Your dashboard figures are unavailable right now." };
   }
 }
 
 export default async function EmployeeDashboard() {
   // Both loads run in parallel — the engagement widgets add one batched call,
   // not one query per widget.
-  const [m, engagementToday] = await Promise.all([loadMetrics(), loadToday()]);
+  const [{ m, error }, engagementToday] = await Promise.all([
+    loadMetrics(),
+    loadToday(),
+  ]);
 
   // Production vs Target card
   const prodPct =
@@ -157,140 +173,152 @@ export default async function EmployeeDashboard() {
 
       <TodayWidgets data={engagementToday} />
 
-      {m && m.notifications.length > 0 && (
-        <div className="mb-4">
-          <NotificationPanel items={m.notifications} />
-        </div>
+      {error && (
+        <ErrorPanel>{error}</ErrorPanel>
       )}
 
-      <div className="mb-4">
-        <ClockInWidget
-          initialCheckIn={today?.checkIn ? today.checkIn.toISOString() : null}
-          initialCheckOut={today?.checkOut ? today.checkOut.toISOString() : null}
-        />
-      </div>
+      {!m && !error && (
+        <UnlinkedEmployeeNotice />
+      )}
 
-      <ShiftBanner shift={m?.shift ?? null} />
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <TodayAttendanceCard today={today} />
-        {/* Real today totals from the same ownIdleTotals batch as the MTD card. */}
-        <StatCard
-          label="Idle Time (today)"
-          value={
-            !m?.ownIdle?.consent.active || m.ownIdle.today.totalMinutes === 0
-              ? "—"
-              : String(m.ownIdle.today.idleMinutes)
-          }
-          unit={
-            m?.ownIdle?.consent.active && m.ownIdle.today.totalMinutes > 0 ? "min" : undefined
-          }
-          state={
-            !m?.ownIdle?.consent.active || m.ownIdle.today.totalMinutes === 0
-              ? "idle"
-              : m.ownIdle.today.activePct !== null && m.ownIdle.today.activePct < 70
-                ? "warn"
-                : "good"
-          }
-          status={
-            !m?.ownIdle?.consent.active
-              ? "Tracking not active"
-              : m.ownIdle.today.totalMinutes === 0
-                ? "No data yet"
-                : `Active ${hm(m.ownIdle.today.activeMinutes)}`
-          }
-        />
-        <StatCard
-          label="Production vs Target"
-          value={prodPct === null ? "—" : `${prodPct}%`}
-          state={prodState}
-          status={
-            m && m.target !== null
-              ? `${m.actual} / ${m.target} units`
-              : "Target not set"
-          }
-          mono={prodPct !== null}
-        />
-      </div>
-
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <StatCard
-          label="Quality Score"
-          value={m?.qualityAvg == null ? "—" : m.qualityAvg.toFixed(1)}
-          state={qState}
-          status={
-            m?.qualityAvg == null
-              ? "No reviews yet"
-              : `${m.qualityCount} review${m.qualityCount === 1 ? "" : "s"} this month`
-          }
-          mono={m?.qualityAvg != null}
-        />
-        {/* Displayed on the 5-point scale; aState above still bands on the
-            real 0-100 value. */}
-        <StatCard
-          label="Appraisal"
-          value={scoreOutOfFive(aScore) ?? "—"}
-          unit={aScore == null ? undefined : "/ 5"}
-          state={aState}
-          status={aScore == null ? "Not yet appraised" : (m?.appraisalPeriod ?? "Published")}
-          mono={aScore != null}
-        />
-        {/* Your OWN idle/active data, shown as plainly as HR and your manager
-            see it. Nothing about your own tracking is hidden from you. */}
-        <StatCard
-          label="Active Time · MTD"
-          value={
-            !m?.ownIdle || m.ownIdle.month.activePct === null
-              ? "—"
-              : `${m.ownIdle.month.activePct}%`
-          }
-          state={
-            !m?.ownIdle?.consent.active || m.ownIdle.month.activePct === null
-              ? "idle"
-              : "good"
-          }
-          status={
-            !m?.ownIdle?.consent.active
-              ? "Tracking not active"
-              : m.ownIdle.month.totalMinutes === 0
-                ? "No data yet"
-                : `${hm(m.ownIdle.month.activeMinutes)} of ${hm(m.ownIdle.month.totalMinutes)}`
-          }
-        />
-      </div>
-
-      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <WeekAttendancePanel
-          weekStart={m?.weekStart ?? null}
-          weekByDate={m?.weekByDate ?? new Map()}
-        />
-
-        <Panel>
-          <PanelHeader title="Consent & Compliance" />
-          <div className="space-y-3 p-4 text-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-text-muted">Idle-time tracking</span>
-              <StatusLabel state={idle ? "good" : "idle"}>
-                {idle ? "Consent on file" : "Not on file"}
-              </StatusLabel>
+      {m && (
+        <>
+          {m.notifications.length > 0 && (
+            <div className="mb-4">
+              <NotificationPanel items={m.notifications} />
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-text-muted">Data retention</span>
-              <span className="font-mono text-xs text-text-muted">
-                {earliestRetention
-                  ? `expires ${ymd(earliestRetention)}`
-                  : "no expiry set"}
-              </span>
-            </div>
-            <div className="mt-2 flex items-center gap-2 rounded border border-border bg-surface-raised px-3 py-2">
-              <StatusDot state="idle" />
-              <span className="text-xs text-text-muted">
-                Consent is recorded by HR on the Compliance &amp; Consent page.
-              </span>
-            </div>
+          )}
+
+          <div className="mb-4">
+            <ClockInWidget
+              initialCheckIn={today?.checkIn ? today.checkIn.toISOString() : null}
+              initialCheckOut={today?.checkOut ? today.checkOut.toISOString() : null}
+            />
           </div>
-        </Panel>
-      </div>
+
+          <ShiftBanner shift={m?.shift ?? null} />
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <TodayAttendanceCard today={today} />
+            {/* Real today totals from the same ownIdleTotals batch as the MTD card. */}
+            <StatCard
+              label="Idle Time (today)"
+              value={
+                !m?.ownIdle?.consent.active || m.ownIdle.today.totalMinutes === 0
+                  ? "—"
+                  : String(m.ownIdle.today.idleMinutes)
+              }
+              unit={
+                m?.ownIdle?.consent.active && m.ownIdle.today.totalMinutes > 0 ? "min" : undefined
+              }
+              state={
+                !m?.ownIdle?.consent.active || m.ownIdle.today.totalMinutes === 0
+                  ? "idle"
+                  : m.ownIdle.today.activePct !== null && m.ownIdle.today.activePct < 70
+                    ? "warn"
+                    : "good"
+              }
+              status={
+                !m?.ownIdle?.consent.active
+                  ? "Tracking not active"
+                  : m.ownIdle.today.totalMinutes === 0
+                    ? "No data yet"
+                    : `Active ${hm(m.ownIdle.today.activeMinutes)}`
+              }
+            />
+            <StatCard
+              label="Production vs Target"
+              value={prodPct === null ? "—" : `${prodPct}%`}
+              state={prodState}
+              status={
+                m && m.target !== null
+                  ? `${m.actual} / ${m.target} units`
+                  : "Target not set"
+              }
+              mono={prodPct !== null}
+            />
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <StatCard
+              label="Quality Score"
+              value={m?.qualityAvg == null ? "—" : m.qualityAvg.toFixed(1)}
+              state={qState}
+              status={
+                m?.qualityAvg == null
+                  ? "No reviews yet"
+                  : `${m.qualityCount} review${m.qualityCount === 1 ? "" : "s"} this month`
+              }
+              mono={m?.qualityAvg != null}
+            />
+            {/* Displayed on the 5-point scale; aState above still bands on the
+                real 0-100 value. */}
+            <StatCard
+              label="Appraisal"
+              value={scoreOutOfFive(aScore) ?? "—"}
+              unit={aScore == null ? undefined : "/ 5"}
+              state={aState}
+              status={aScore == null ? "Not yet appraised" : (m?.appraisalPeriod ?? "Published")}
+              mono={aScore != null}
+            />
+            {/* Your OWN idle/active data, shown as plainly as HR and your manager
+                see it. Nothing about your own tracking is hidden from you. */}
+            <StatCard
+              label="Active Time · MTD"
+              value={
+                !m?.ownIdle || m.ownIdle.month.activePct === null
+                  ? "—"
+                  : `${m.ownIdle.month.activePct}%`
+              }
+              state={
+                !m?.ownIdle?.consent.active || m.ownIdle.month.activePct === null
+                  ? "idle"
+                  : "good"
+              }
+              status={
+                !m?.ownIdle?.consent.active
+                  ? "Tracking not active"
+                  : m.ownIdle.month.totalMinutes === 0
+                    ? "No data yet"
+                    : `${hm(m.ownIdle.month.activeMinutes)} of ${hm(m.ownIdle.month.totalMinutes)}`
+              }
+            />
+          </div>
+
+          <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <WeekAttendancePanel
+              weekStart={m?.weekStart ?? null}
+              weekByDate={m?.weekByDate ?? new Map()}
+            />
+
+            <Panel>
+              <PanelHeader title="Consent & Compliance" />
+              <div className="space-y-3 p-4 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-text-muted">Idle-time tracking</span>
+                  <StatusLabel state={idle ? "good" : "idle"}>
+                    {idle ? "Consent on file" : "Not on file"}
+                  </StatusLabel>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-text-muted">Data retention</span>
+                  <span className="font-mono text-xs text-text-muted">
+                    {earliestRetention
+                      ? `expires ${ymd(earliestRetention)}`
+                      : "no expiry set"}
+                  </span>
+                </div>
+                <div className="mt-2 flex items-center gap-2 rounded border border-border bg-surface-raised px-3 py-2">
+                  <StatusDot state="idle" />
+                  <span className="text-xs text-text-muted">
+                    Consent is recorded by HR on the Compliance &amp; Consent page.
+                  </span>
+                </div>
+              </div>
+            </Panel>
+          </div>
+        </>
+      )}
     </>
   );
 }

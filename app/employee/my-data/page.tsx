@@ -70,7 +70,7 @@ export default function MyDataPage() {
           <span className="text-xs text-text-muted">
             This export always contains your own records only. It is generated
             from your signed-in identity, so it is not possible for this page to
-            return anyone else&apos;s data.
+            return anyone else’s data.
           </span>
         </Panel>
       </div>

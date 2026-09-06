@@ -90,7 +90,7 @@ export function PulseRespondForm({
       </div>
       <p className="text-[10px] text-text-muted">
         {scaleMin} = strongly disagree · {scaleMax} = strongly agree. One
-        response each, and it can&apos;t be changed afterwards — that&apos;s part
+        response each, and it can’t be changed afterwards — that’s part
         of how responses stay unlinkable to you.
       </p>
       {error && <p className="text-xs text-danger">{error}</p>}

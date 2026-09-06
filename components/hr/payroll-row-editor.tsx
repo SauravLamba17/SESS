@@ -187,7 +187,7 @@ export function PayrollRowEditor({ row }: { row: EditableRow }) {
           className={inputClass.replace("font-mono", "")}
         />
         <p className="mt-1 text-[10px] text-text-muted">
-          TDS is entered from the company&apos;s accountant. SESS never calculates
+          TDS is entered from the company’s accountant. SESS never calculates
           it, and never applies a tax slab or exemption.
         </p>
       </div>

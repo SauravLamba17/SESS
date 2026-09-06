@@ -100,7 +100,7 @@ export default async function CommunityPage() {
                 <ShoutOutForm people={people.filter((p) => p.id !== me.id)} />
               ) : (
                 <p className="text-sm text-text-muted">
-                  No employee record is linked to your account yet, so you can&apos;t
+                  No employee record is linked to your account yet, so you can’t
                   post. You can still read the wall.
                 </p>
               )}

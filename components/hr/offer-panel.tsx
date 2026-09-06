@@ -385,7 +385,7 @@ export function OfferPanel({
             {responding === "ACCEPTED" ? "accepted" : "declined"} this offer.
             Type their full name to confirm what you were told. Your user id, the
             time and your IP are recorded alongside it — this is a record of your
-            data entry on the candidate&apos;s behalf, not of their own signature.
+            data entry on the candidate’s behalf, not of their own signature.
           </p>
           <input
             type="text"
@@ -402,7 +402,7 @@ export function OfferPanel({
                 checked={sendInvitation}
                 onChange={(e) => setSendInvitation(e.target.checked)}
               />
-              Send a SESS login invitation to the candidate&apos;s email (as Employee)
+              Send a SESS login invitation to the candidate’s email (as Employee)
             </label>
           )}
           <div className="mt-2 flex items-center justify-end gap-2">

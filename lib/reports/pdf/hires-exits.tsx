@@ -77,7 +77,7 @@ export function HiresExitsPdf({ r, meta }: { r: HiresExitsResult; meta: ReportMe
 
       <Note>
         Attrition is exits divided by the average of the headcount at the start
-        and end of the period. An exit is dated by the employee&apos;s last
+        and end of the period. An exit is dated by the employee’s last
         working day.
       </Note>
     </ReportDocument>

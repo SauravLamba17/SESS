@@ -1,6 +1,7 @@
 import { PageHeader } from "@/components/portal/portal-shell";
 import { Panel, PanelHeader, StatCard } from "@/components/ui/panel";
 import { StatusLabel } from "@/components/ui/status-dot";
+import { ErrorPanel } from "@/components/ui/notice";
 import { NotificationPanel } from "@/components/employee/notification-panel";
 import { getEffectiveUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -13,6 +14,9 @@ import { getDepartments } from "@/lib/cache/departments";
 import { getHrDashboardTotals, RETENTION_WARNING_DAYS } from "@/lib/cache/dashboard";
 
 export const dynamic = "force-dynamic";
+
+// Tab title for this route; the root layout appends " · SESS".
+export const metadata = { title: "HR Dashboard" };
 
 /**
  * This account's own notifications — the same Notification model, the same
@@ -130,9 +134,7 @@ export default async function HRDashboard() {
       <TodayWidgets data={today} />
 
       {d.error && (
-        <Panel className="mb-4 border-danger/40 p-4">
-          <p className="text-sm text-danger">{d.error}</p>
-        </Panel>
+        <ErrorPanel>{d.error}</ErrorPanel>
       )}
 
       {notifications.length > 0 && (

@@ -82,7 +82,7 @@ export function AttendancePdf({ r, meta }: { r: AttendanceResult; meta: ReportMe
           ? "This scope includes employees on a shift that crosses midnight, so their averages use a CIRCULAR mean — an arithmetic mean of 23:00 and 01:00 would report 12:00 rather than midnight. Day-shift figures use the plain arithmetic mean."
           : "All shifts in this scope run within a single calendar day, so a plain arithmetic mean is used throughout."}
         {"\n"}
-        &quot;No punch recorded&quot; counts weekdays in the period with no
+        “No punch recorded” counts weekdays in the period with no
         attendance row ({r.expectedWeekdayCount} expected employee-days minus{" "}
         {r.totalPunchDays} punched). It includes approved leave and public
         holidays — it is not a count of unauthorised absence.

@@ -72,7 +72,7 @@ export function HolidayForm() {
         />
         <p className="mt-1 text-[10px] text-text-muted">
           Enter the actual date for this year. Festival dates shift each year,
-          so SESS never guesses them — add next year&apos;s dates when they&apos;re
+          so SESS never guesses them — add next year’s dates when they’re
           known.
         </p>
       </div>

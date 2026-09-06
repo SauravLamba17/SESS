@@ -89,7 +89,7 @@ export default async function IntegrationsPage() {
           ))}
         </div>
         <p className="border-t border-border px-4 py-3 text-xs text-text-muted">
-          To change any of these, edit the deployment&apos;s .env and restart —
+          To change any of these, edit the deployment’s .env and restart —
           deliberately not editable from the browser, so a compromised admin
           session cannot exfiltrate or rotate credentials.
         </p>

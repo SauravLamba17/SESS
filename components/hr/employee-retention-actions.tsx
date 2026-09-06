@@ -96,7 +96,7 @@ export function EmployeeRetentionActions({
             This is irreversible
           </p>
           <p className="mt-1.5 text-[11px] text-text-muted">
-            <span className="text-text">Will be erased</span> on {name}&apos;s
+            <span className="text-text">Will be erased</span> on {name}’s
             record: <span className="font-mono">{redactedFields.join(", ")}</span>.
           </p>
           <p className="mt-1 text-[11px] text-text-muted">
@@ -109,7 +109,7 @@ export function EmployeeRetentionActions({
         </>
       ) : (
         <p className="text-xs text-text">
-          Push {name}&apos;s redaction date out by one year. Use this only when
+          Push {name}’s redaction date out by one year. Use this only when
           there is a live legal or audit reason to hold their full record.
         </p>
       )}

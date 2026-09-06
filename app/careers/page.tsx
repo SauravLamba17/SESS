@@ -38,7 +38,7 @@ export default async function CareersPage() {
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-text">Open Positions</h1>
         <p className="mt-2 max-w-2xl text-sm text-text-muted">
-          We&apos;re hiring. Browse the roles below and apply with your resume —
+          We’re hiring. Browse the roles below and apply with your resume —
           a member of our team reads every application.
         </p>
       </div>

@@ -101,7 +101,9 @@ export function GlobalSearch() {
           }}
           placeholder="Search…"
           aria-label="Search"
-          className="w-full rounded border border-border bg-background py-1.5 pl-8 pr-8 text-sm text-text placeholder:text-text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          // text-base (16px), not text-sm: iOS zooms the whole viewport when a
+          // focused input's font is under 16px, and there is no way back out.
+          className="w-full rounded border border-border bg-background py-1.5 pl-8 pr-8 text-base text-text placeholder:text-text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         />
         {loading && (
           <Loader2

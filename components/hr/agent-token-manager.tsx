@@ -127,7 +127,7 @@ export function AgentTokenManager({
       {confirmRegen && (
         <div className="rounded border border-warn/40 bg-warn/10 p-2.5">
           <p className="text-[11px] text-warn">
-            This replaces {name}&apos;s existing token. The agent already
+            This replaces {name}’s existing token. The agent already
             installed on their machine will stop reporting until the new token is
             entered into it.
           </p>

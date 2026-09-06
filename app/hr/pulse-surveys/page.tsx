@@ -61,7 +61,7 @@ export default async function PulseSurveysPage() {
         <div className="flex items-start gap-3">
           <ShieldCheck size={16} className="mt-0.5 shrink-0 text-good" />
           <div className="text-xs text-text-muted">
-            <p className="text-text">Why you can&apos;t see who said what</p>
+            <p className="text-text">Why you can’t see who said what</p>
             <p className="mt-1">
               Ratings are stored with no employee field. A separate record
               tracks only that someone responded, to stop double-voting — it

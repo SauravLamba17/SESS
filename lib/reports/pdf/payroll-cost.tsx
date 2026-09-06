@@ -83,8 +83,8 @@ export function PayrollCostPdf({ r, meta }: { r: PayrollCostResult; meta: Report
           : "No draft or submitted rows existed in this period, so this total is complete."}
         {"\n"}
         Cost to company = gross + employer PF + bonus + reimbursements. It is
-        deliberately not net pay, which excludes the employer&apos;s own
-        contribution. TDS shown is the figure HR recorded from the company&apos;s
+        deliberately not net pay, which excludes the employer’s own
+        contribution. TDS shown is the figure HR recorded from the company’s
         accountant; this system computes no tax.{"\n"}
         Payroll is monthly, so a month is included in full whenever the
         reporting period touches any part of it — a part-month period does not

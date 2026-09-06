@@ -23,6 +23,9 @@ import { parseRange, ymd, monthKey } from "@/lib/reports/range";
 
 export const dynamic = "force-dynamic";
 
+// Tab title for this route; the root layout appends " · SESS".
+export const metadata = { title: "System Dashboard" };
+
 /** Hours after check-in past which an open row means "forgot to clock out". */
 const FORGOTTEN_CHECKOUT_HOURS = 14;
 
@@ -456,7 +459,7 @@ export default async function SystemDashboard() {
               stages={d.funnel.stages.map((s) => ({ stage: s.stage, reached: s.reached }))}
             />
             <p className="mt-2 text-[11px] text-text-muted">
-              &quot;Reached&quot; counts applications at or beyond each stage.
+              “Reached” counts applications at or beyond each stage.
               {d.funnel.rejectedCount > 0 &&
                 ` ${d.funnel.rejectedCount} rejected application${d.funnel.rejectedCount === 1 ? " is" : "s are"} off-funnel and not shown.`}
             </p>

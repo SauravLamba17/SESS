@@ -37,7 +37,9 @@ export function PanelHeader({
         className,
       )}
     >
-      <h3 className="text-sm font-semibold text-text">{title}</h3>
+      {/* h2, not h3: the only heading above a panel is the page's own h1 from
+          PageHeader, so h3 skipped a level on every page in the product. */}
+      <h2 className="text-sm font-semibold text-text">{title}</h2>
       {action}
     </div>
   );

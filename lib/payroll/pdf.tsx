@@ -318,7 +318,7 @@ function Payslip({ d }: { d: PayslipData }) {
         <Text style={s.note}>
           Net pay = Gross Earnings − Total Deductions + Bonus + Reimbursements.
           Total Deductions includes any salary-advance recovery.{"\n"}
-          TDS shown above is the figure recorded by HR from the company&apos;s
+          TDS shown above is the figure recorded by HR from the company’s
           accountant{d.tdsSource ? ` (${d.tdsSource})` : ""}. It is not computed
           by this system.
         </Text>
@@ -433,12 +433,12 @@ function Form16({ d }: { d: Form16Data }) {
         <Text style={s.note}>
           This statement aggregates figures already recorded against finalized
           payroll runs. Every TDS amount shown was entered by HR from the
-          company&apos;s accountant
+          company’s accountant
           {d.tdsSources.length > 0 ? ` (${d.tdsSources.join("; ")})` : ""}.
           {"\n"}
           No tax slab, exemption, rebate or deduction under Chapter VI-A has
           been computed by this system. Verify against Form 26AS / AIS before
-          filing, and consult the company&apos;s accountant for the certified
+          filing, and consult the company’s accountant for the certified
           Part A and TRACES-generated document.
         </Text>
 
@@ -534,7 +534,7 @@ function OfferLetter({ d }: { d: OfferLetterData }) {
           The figures above are gross of statutory deductions. Provident Fund,
           ESI, Professional Tax and TDS will be deducted as applicable under
           Indian law and shown on each monthly payslip. TDS is determined by the
-          company&apos;s accountant, not by this system.{"\n"}
+          company’s accountant, not by this system.{"\n"}
           {"\n"}
           This offer is subject to satisfactory verification of the documents
           collected during onboarding. Please confirm your acceptance to the HR

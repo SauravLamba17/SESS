@@ -120,7 +120,7 @@ export default async function RolesPermissions() {
           </div>
           <p className="border-t border-border px-4 py-3 text-xs text-text-muted">
             A role change updates the SESS database first, then the Clerk
-            account&apos;s metadata. If the Clerk sync fails, the row shows an
+            account’s metadata. If the Clerk sync fails, the row shows an
             explicit retry — it is never left silently out of sync. Audit:{" "}
             <span className="font-mono">USER_ROLE_CHANGED</span>. The last Super
             Admin cannot be demoted.

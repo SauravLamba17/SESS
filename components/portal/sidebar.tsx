@@ -106,6 +106,9 @@ export function Sidebar({ portal, role }: { portal: PortalKey; role?: Role | nul
       <Link
         key={item.href}
         href={item.href}
+        // The active item was signalled by background colour alone; screen
+        // readers had no way to tell which nav entry is the current one.
+        aria-current={active ? "page" : undefined}
         className={cn(
           // shrink-0 + whitespace-nowrap keep each item intact inside the
           // horizontally scrolling mobile strip.

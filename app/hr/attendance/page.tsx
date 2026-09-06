@@ -381,7 +381,7 @@ export default async function AttendanceOversight({
 
         <p className="border-t border-border px-4 py-3 text-xs text-text-muted">
           A correction rewrites the stored clock times and recalculates lateness
-          from the employee&apos;s shift. Both the old and new values are recorded
+          from the employee’s shift. Both the old and new values are recorded
           under{" "}
           <span className="font-mono">ATTENDANCE_MANUALLY_CORRECTED</span> in the
           audit log, with the reason given — the corrected row no longer holds

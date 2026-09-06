@@ -70,7 +70,7 @@ export function RecruitmentFunnelPdf({
       />
 
       <Note>
-        &quot;Reached&quot; counts applications whose CURRENT stage is at or
+        “Reached” counts applications whose CURRENT stage is at or
         beyond that stage. This schema stores no per-application stage history,
         so how far a rejected candidate progressed before rejection cannot be
         recovered — the {r.rejectedCount} rejected application(s) are reported on

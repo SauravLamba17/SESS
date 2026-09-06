@@ -24,6 +24,9 @@ import {
 
 export const dynamic = "force-dynamic";
 
+// Tab title for this route; the root layout appends " · SESS".
+export const metadata = { title: "Team Dashboard" };
+
 function punctualityState(pct: number | null): StatusState {
   if (pct === null) return "idle";
   if (pct >= 95) return "good";
@@ -204,12 +207,16 @@ export default async function ManagerDashboard() {
               />
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
+                  <caption className="sr-only">
+                    Your direct reports, with month-to-date punctuality,
+                    production against target, and latest quality score.
+                  </caption>
                   <thead>
                     <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-text-muted">
-                      <th className="px-4 py-3 font-medium">Employee</th>
-                      <th className="px-4 py-3 font-medium">Punctuality (MTD)</th>
-                      <th className="px-4 py-3 font-medium">Production (MTD)</th>
-                      <th className="px-4 py-3 font-medium">Quality</th>
+                      <th scope="col" className="px-4 py-3 font-medium">Employee</th>
+                      <th scope="col" className="px-4 py-3 font-medium">Punctuality (MTD)</th>
+                      <th scope="col" className="px-4 py-3 font-medium">Production (MTD)</th>
+                      <th scope="col" className="px-4 py-3 font-medium">Quality</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">

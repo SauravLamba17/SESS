@@ -64,7 +64,7 @@ export default async function HrIdleTrackingPage() {
               <span className="font-mono text-text">{threshold}s</span>. No
               screenshots, no application or website tracking, no keystrokes, and
               no productivity scoring. The desktop agent is visible in the
-              employee&apos;s system tray at all times and can be paused by them.
+              employee’s system tray at all times and can be paused by them.
               Issue a token only after recording consent on{" "}
               <Link href="/hr/compliance" className="text-accent underline">
                 Compliance &amp; Consent
@@ -197,8 +197,8 @@ export default async function HrIdleTrackingPage() {
         )}
         <p className="border-t border-border px-4 py-3 text-xs text-text-muted">
           <MonitorSmartphone size={12} className="mr-1 inline" />
-          An employee whose consent is not active shows &quot;tracking
-          paused&quot; — any totals beside it are historical, not current. The
+          An employee whose consent is not active shows “tracking
+          paused” — any totals beside it are historical, not current. The
           server rejects new heartbeats for them.
         </p>
       </Panel>

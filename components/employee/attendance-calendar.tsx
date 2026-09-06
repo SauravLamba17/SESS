@@ -142,10 +142,10 @@ export function AttendanceCalendar({
     <div>
       {/* Header + month nav */}
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-text">
+        <h2 className="text-sm font-semibold text-text">
           {MONTHS[month - 1]}{" "}
           <span className="font-mono text-text-muted">{year}</span>
-        </h3>
+        </h2>
         <div className="flex items-center gap-1">
           <button
             type="button"

@@ -30,7 +30,7 @@ export async function PortalShell({
   const imp = await getImpersonation();
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-background">
+    <div className="flex h-dvh flex-col overflow-hidden bg-background">
       {imp && (
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-danger/40 bg-danger/15 px-4 py-2 text-sm lg:gap-3 lg:px-6">
           <span className="inline-flex items-center gap-2 text-danger">
@@ -60,7 +60,9 @@ export async function PortalShell({
         <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border bg-surface px-4 lg:px-6">
           <div className="flex min-w-0 items-center gap-2.5">
-            <StatusDot state="good" />
+            {/* Always "good" — pure decoration beside the portal name, so it
+                announced a context-free "Good" to screen readers. */}
+            <StatusDot state="good" decorative />
             {/* The portal name is already on the nav strip on mobile. */}
             <span className="hidden truncate text-sm font-medium text-text sm:inline">
               {meta.title} Portal

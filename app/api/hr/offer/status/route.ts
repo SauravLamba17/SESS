@@ -5,7 +5,11 @@ import { onboardEmployee, createDefaultOnboardingTasks } from "@/lib/employees/o
 import { notifyHr } from "@/lib/notify";
 import { checkAttestation, attestationIp } from "@/lib/attestation";
 import { sendEmployeeInvitation } from "@/lib/employees/invite";
-import { clerkCreateInvitation, clerkFindUserByEmail } from "@/lib/employees/invite-clerk";
+import {
+  clerkCreateInvitation,
+  clerkFindUserByEmail,
+  clerkRevokeInvitation,
+} from "@/lib/employees/invite-clerk";
 import { ROLES, type Role } from "@/lib/auth-types";
 import { fail } from "@/lib/api/response";
 import {
@@ -61,6 +65,13 @@ export async function POST(req: NextRequest) {
   const id = typeof body.id === "string" ? body.id : "";
   const status = typeof body.status === "string" ? body.status : "";
   if (!id || !status) return fail("BAD_INPUT", "id and status are required", 400);
+  // Refused BEFORE the hire commits — see sendEmployeeInvitation().
+  if (
+    body.sendInvitation === true &&
+    String(body.inviteRole) === "SUPER_ADMIN" &&
+    role !== "SUPER_ADMIN"
+  )
+    return fail("FORBIDDEN_ROLE", "Only a Super Admin can invite someone as Super Admin.", 403);
 
   try {
     const offer = await db.offer.findUnique({
@@ -288,9 +299,11 @@ export async function POST(req: NextRequest) {
           email: offer.application.candidate.email,
           role: inviteRole,
           actorUserId: userId,
+          actorRole: role,
         },
         clerkCreateInvitation,
         clerkFindUserByEmail,
+        clerkRevokeInvitation,
       );
       invitation = inv.ok
         ? { sent: !inv.linked, linked: inv.linked, message: inv.message }

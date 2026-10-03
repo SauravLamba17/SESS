@@ -118,9 +118,27 @@ export async function POST(req: NextRequest) {
 
       // Atomic: status guard means a concurrent approve/send cannot be
       // overwritten between the read above and this write.
-      const upd = await db.offer.updateMany({
-        where: { id: application.offer.id, status: "DRAFT" },
-        data: fields,
+      // Audited in the same transaction, WITH the new figures: approval is a
+      // Super Admin decision on these numbers, so an HR edit made just before
+      // approval must leave a record of exactly what changed and who did it.
+      const offerId = application.offer.id;
+      const upd = await db.$transaction(async (tx) => {
+        const u = await tx.offer.updateMany({
+          where: { id: offerId, status: "DRAFT" },
+          data: fields,
+        });
+        if (u.count === 1)
+          await tx.auditLog.create({
+            data: {
+              actorUserId: userId,
+              action: "OFFER_UPDATED",
+              targetEntity:
+                `${offerId} basic=${fields.proposedBasic} hra=${fields.proposedHra} ` +
+                `special=${fields.proposedSpecialAllowance} designation=${fields.proposedDesignation} ` +
+                `department=${fields.proposedDepartment} joining=${joiningDateStr}`,
+            },
+          });
+        return u;
       });
       if (upd.count === 0)
         return fail(

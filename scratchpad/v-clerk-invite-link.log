@@ -1,0 +1,100 @@
+(node:21424) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/Saurav/Desktop/WORK/SESS/prisma/verify-clerk-invite-link.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to C:\Users\Saurav\Desktop\WORK\SESS\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+── 1: onboardEmployee stores a lowercased email ─
+PASS  onboard succeeded
+        {"ok":true,"employee":{"id":"cmurqiah50001wgj47n894651","employeeCode":"ZZ-INV-0001","name":"ZZ-INV Invite Target"}}
+PASS  email normalized + stored
+        got zz-inv-employee@example.invalid
+
+── 1b: duplicate email is refused ────────────────
+PASS  DUPLICATE_EMAIL returned
+        {"ok":false,"code":"DUPLICATE_EMAIL","message":"Email zz-inv-employee@example.invalid already belongs to employee ZZ-INV-0001"}
+
+── 2: sendEmployeeInvitation — stubbed Clerk call 
+PASS  invitation reported sent
+        {"ok":true,"linked":false,"invitationId":"inv_zzstub_123","message":"Login invitation sent to zz-inv-employee@example.invalid."}
+PASS  reported as an invitation, not an immediate link
+PASS  Clerk called with email + role metadata
+        [{"emailAddress":"zz-inv-employee@example.invalid","publicMetadata":{"role":"MANAGER"},"ignoreExisting":true}]
+PASS  pendingInvitationId stored
+PASS  EMPLOYEE_INVITATION_SENT audit row
+
+── 2b: Clerk failure is graceful — employee row survives 
+PASS  failure surfaced as CLERK_ERROR with Clerk's message
+        {"ok":false,"code":"CLERK_ERROR","message":"An invitation already exists."}
+PASS  employee record intact after failure
+
+── 2c: existing Clerk account → linked now, NO invitation 
+PASS  second employee onboarded
+        {"ok":true,"employee":{"id":"cmurqibba0005wgj4js2citff","employeeCode":"ZZ-INV-0003","name":"ZZ-INV Already Has Account"}}
+PASS  reported ok + linked
+        {"ok":true,"linked":true,"userId":"cmurqibo70008wgj4vo07u05j","employeeId":"cmurqibba0005wgj4js2citff","message":"That email already had a SESS account — it has been linked to this employee immediately, as HR. No invitation was sent; they can sign in with their existing password."}
+PASS  NO invitation was created
+        []
+PASS  HR-facing message says the account already existed
+        That email already had a SESS account — it has been linked to this employee immediately, as HR. No invitation was sent; they can sign in with their existing password.
+PASS  User row created with the requested role + employee
+        {"id":"cmurqibo70008wgj4vo07u05j","clerkId":"user_zzinvtest_0002","role":"HR","employeeId":"cmurqibba0005wgj4js2citff","createdAt":"2026-10-03T01:49:51.856Z"}
+PASS  no pendingInvitationId left behind
+PASS  EMPLOYEE_INVITATION_SKIPPED_EXISTING_ACCOUNT audit row
+PASS  EMPLOYEE_ACCOUNT_LINKED audit row
+PASS  no EMPLOYEE_INVITATION_SENT audit row
+
+── 2d: Clerk lookup outage fails CLOSED — no doomed invitation 
+PASS  surfaced as CLERK_ERROR
+        {"ok":false,"code":"CLERK_ERROR","message":"Clerk is unreachable."}
+PASS  no invitation created during the outage
+
+── 3: user.created with MATCHING email links a User row 
+PASS  linked
+        {"linked":true,"userId":"cmurqic7t000cwgj4t2cfgg16","employeeId":"cmurqiah50001wgj47n894651"}
+PASS  User row: clerkId + role + employeeId all correct
+        {"id":"cmurqic7t000cwgj4t2cfgg16","clerkId":"user_zzinvtest_0001","role":"MANAGER","employeeId":"cmurqiah50001wgj47n894651","createdAt":"2026-10-03T01:49:52.561Z"}
+PASS  pendingInvitationId cleared on link
+PASS  EMPLOYEE_ACCOUNT_LINKED audit row
+
+── 3b: duplicate delivery (same clerkId) is an idempotent no-op 
+PASS  second delivery not linked, no crash
+        {"linked":false,"code":"ALREADY_LINKED_CLERK","reason":"clerkId user_zzinvtest_0001 is already linked"}
+PASS  still exactly one User row
+PASS  role not overwritten by retry
+
+── 4: user.created with NON-matching email is a calm no-op 
+PASS  not linked, reason given
+        {"linked":false,"code":"NO_EMPLOYEE_MATCH","reason":"no employee matches email total-stranger@example.invalid"}
+PASS  no User row created for the stranger
+
+── 5: HR cannot invite a SUPER_ADMIN; a Super Admin can 
+PASS  5a HR → SUPER_ADMIN refused with FORBIDDEN_ROLE, Clerk never called
+        {"ok":false,"code":"FORBIDDEN_ROLE","message":"Only a Super Admin can invite someone as Super Admin."}
+PASS  5b …and nothing was written to the employee
+PASS  5c HR may still invite as HR
+        {"ok":true,"linked":false,"invitationId":"inv_zzgrant_1","message":"Login invitation sent to zz-inv-grant@example.invalid."}
+PASS  5c HR may still invite as MANAGER
+        {"ok":true,"linked":false,"invitationId":"inv_zzgrant_2","message":"Login invitation sent to zz-inv-grant@example.invalid."}
+PASS  5c HR may still invite as EMPLOYEE
+        {"ok":true,"linked":false,"invitationId":"inv_zzgrant_3","message":"Login invitation sent to zz-inv-grant@example.invalid."}
+PASS  5d a Super Admin may invite as SUPER_ADMIN
+        {"ok":true,"linked":false,"invitationId":"inv_zzgrant_4","message":"Login invitation sent to zz-inv-grant@example.invalid."}
+PASS  5e app/api/hr/employee/invite/route.ts refuses SUPER_ADMIN for a non-Super-Admin and passes actorRole
+PASS  5e app/api/hr/employee/route.ts refuses SUPER_ADMIN for a non-Super-Admin and passes actorRole
+PASS  5e app/api/hr/offer/status/route.ts refuses SUPER_ADMIN for a non-Super-Admin and passes actorRole
+PASS  5f components/hr/invite-button.tsx drops SUPER_ADMIN from its dropdown
+PASS  5f components/hr/onboard-form.tsx drops SUPER_ADMIN from its dropdown
+
+── 6: a resend revokes the previous invitation; a FAILED resend revokes nothing 
+PASS  6a every superseded invitation was revoked, in order
+        ["inv_zzgrant_1","inv_zzgrant_2","inv_zzgrant_3"]
+PASS  6b the employee now points at the latest invitation
+PASS  6c each revocation is audited
+PASS  6d a failed resend leaves the previous invitation alone
+PASS  6e a revoke Clerk refuses (already expired) does not block the resend, and is audited
+        {"ok":true,"linked":false,"invitationId":"inv_zzgrant_5","message":"Login invitation sent to zz-inv-grant@example.invalid."}
+PASS  6f app/api/hr/employee/offboard/route.ts revokes the pending invitation
+PASS  6f app/api/hr/employee/retention/route.ts revokes the pending invitation
+
+══ RESULT: 48 passed, 0 failed ══
+cleanup complete

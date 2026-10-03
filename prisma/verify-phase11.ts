@@ -3,16 +3,27 @@
  * kill switch, and the organization aggregation.
  *
  * Runs against the REAL database with the REAL logic (lib/admin/user-role.ts,
- * lib/admin/organization.ts, and the live /api/agent/heartbeat route over
- * HTTP). The ONLY stub is the Clerk metadata call — same injectable pattern as
- * the invitation phase, so everything except the external HTTP call to Clerk
- * is exercised for real.
+ * lib/admin/organization.ts, and the real /api/agent/heartbeat POST handler).
+ * The ONLY stub is the Clerk metadata call — same injectable pattern as the
+ * invitation phase.
  *
- * The kill-switch section requires the dev server on localhost:3005 (it POSTs
- * real heartbeats). Creates its own throwaway data, restores the toggle, and
- * deletes everything, pass or fail.
+ * ─── THE KILL SWITCH IS NEVER WRITTEN TO THE LIVE ROW ─────────────────────
+ * IDLE_TRACKING_ENABLED is one org-wide row. The previous version flipped it
+ * for real and called the dev server over HTTP, so any installed agent that
+ * beat during that window got shouldPause and latched itself stopped. Now the
+ * heartbeat handler is imported IN-PROCESS with globalThis.prisma set to an
+ * interactive-transaction client (lib/db.ts reuses globalThis.prisma), so the
+ * toggle, the fixtures and every write the route makes happen inside ONE
+ * transaction that is always rolled back. Postgres MVCC means every other
+ * connection keeps reading the committed value throughout; the only
+ * observable effect is that a Super Admin saving that toggle in the same
+ * few seconds would wait for the rollback. Section 2 ends by asserting the
+ * live row is byte-identical to before.
  *
- * Run (with `npm run dev` up):  node --env-file=.env prisma/verify-phase11.ts
+ * Creates its own throwaway data (sections 1, 3) and deletes it, pass or fail.
+ * No dev server needed.
+ *
+ * Run:  node --env-file=.env --import ./scripts/alias-loader.mjs prisma/verify-phase11.ts
  */
 import { PrismaClient } from "@prisma/client";
 import { changeUserRole, type UpdateClerkRoleFn } from "../lib/admin/user-role.ts";
@@ -25,7 +36,6 @@ const ACTOR = "test-p11-actor";
 const CLERK_ID = "user_zzp11test_0001";
 const TOKEN = "sess_agent_zzp11_test_token_000000000001";
 const KILL_KEY = "IDLE_TRACKING_ENABLED";
-const BASE = "http://localhost:3005";
 
 let pass = 0;
 let fail = 0;
@@ -53,15 +63,6 @@ async function cleanup() {
   await db.auditLog.deleteMany({
     where: { OR: [{ actorUserId: ACTOR }, ...ids.map((id) => ({ targetEntity: { contains: id } }))] },
   });
-}
-
-async function heartbeat(): Promise<{ status: number; body: Record<string, unknown> }> {
-  const res = await fetch(`${BASE}/api/agent/heartbeat`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${TOKEN}` },
-    body: JSON.stringify({ idleMinutes: 1, activeMinutes: 2, windowEnd: new Date().toISOString() }),
-  });
-  return { status: res.status, body: (await res.json()) as Record<string, unknown> };
 }
 
 async function main() {
@@ -149,52 +150,73 @@ async function main() {
     JSON.stringify({ r3, clerkCalls }),
   );
 
-  // ── 2: idle-tracking kill switch over the REAL heartbeat route ──
-  step("2", "kill switch — real heartbeats against the dev server");
-  await db.consentRecord.create({
-    data: { employeeId: emp.id, consentType: "IDLE_TRACKING", givenOn: new Date() },
-  });
-  await db.agentToken.create({ data: { employeeId: emp.id, token: TOKEN } });
-
-  let serverUp = true;
+  // ── 2: idle-tracking kill switch — real handler, rolled-back transaction ──
+  step("2", "kill switch — real heartbeat handler inside a rolled-back txn");
+  class Rollback extends Error {}
   try {
-    // Toggle ON explicitly first, so the test is deterministic.
-    await db.systemSetting.upsert({
-      where: { key: KILL_KEY },
-      update: { value: "true", updatedBy: ACTOR },
-      create: { key: KILL_KEY, value: "true", updatedBy: ACTOR },
-    });
-    const on = await heartbeat();
-    check("heartbeat ACCEPTED while enabled (consent valid)", on.status === 200, JSON.stringify(on));
+    await db.$transaction(
+      async (tx) => {
+        // Must be set BEFORE the route (and so lib/db.ts) is first imported.
+        (globalThis as unknown as { prisma: unknown }).prisma = tx;
+        const { POST } = await import("../app/api/agent/heartbeat/route.ts");
+        const { NextRequest } = await import("next/server");
+        const beat = async () => {
+          const res = await POST(
+            new NextRequest("http://localhost/api/agent/heartbeat", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${TOKEN}` },
+              body: JSON.stringify({ idleMinutes: 1, activeMinutes: 2, windowEnd: new Date().toISOString() }),
+            }),
+          );
+          return { status: res.status, body: (await res.json()) as Record<string, unknown> };
+        };
 
-    await db.systemSetting.update({ where: { key: KILL_KEY }, data: { value: "false" } });
-    const off = await heartbeat();
-    check(
-      "heartbeat REJECTED when disabled — despite valid token AND consent",
-      off.status === 403 && off.body.code === "IDLE_TRACKING_DISABLED",
-      JSON.stringify(off),
+        await tx.consentRecord.create({
+          data: { employeeId: emp.id, consentType: "IDLE_TRACKING", givenOn: new Date() },
+        });
+        await tx.agentToken.create({ data: { employeeId: emp.id, token: TOKEN } });
+
+        await tx.systemSetting.upsert({
+          where: { key: KILL_KEY },
+          update: { value: "true", updatedBy: ACTOR },
+          create: { key: KILL_KEY, value: "true", updatedBy: ACTOR },
+        });
+        const on = await beat();
+        check("heartbeat ACCEPTED while enabled (consent valid)", on.status === 200, JSON.stringify(on));
+
+        await tx.systemSetting.update({ where: { key: KILL_KEY }, data: { value: "false" } });
+        const off = await beat();
+        check(
+          "heartbeat REJECTED when disabled — despite valid token AND consent",
+          off.status === 403 && off.body.code === "IDLE_TRACKING_DISABLED",
+          JSON.stringify(off),
+        );
+        check("rejection tells the agent to pause", off.body.shouldPause === true);
+
+        await tx.systemSetting.update({ where: { key: KILL_KEY }, data: { value: "true" } });
+        const backOn = await beat();
+        check("heartbeat accepted again after re-enable", backOn.status === 200, JSON.stringify(backOn));
+
+        const logged = await tx.idleLog.findFirst({ where: { employeeId: emp.id } });
+        check(
+          "only the ACCEPTED beats were stored (1+2 twice, nothing from the rejected one)",
+          logged?.idleMinutes === 2 && logged?.activeMinutes === 4,
+          JSON.stringify(logged),
+        );
+        throw new Rollback();
+      },
+      { maxWait: 10_000, timeout: 60_000 },
     );
-    check("rejection tells the agent to pause", off.body.shouldPause === true);
-
-    await db.systemSetting.update({ where: { key: KILL_KEY }, data: { value: "true" } });
-    const backOn = await heartbeat();
-    check("heartbeat accepted again after re-enable", backOn.status === 200, JSON.stringify(backOn));
   } catch (e) {
-    serverUp = false;
-    check(
-      "kill-switch HTTP test ran (is `npm run dev` up on :3005?)",
-      false,
-      e instanceof Error ? e.message : String(e),
-    );
+    if (!(e instanceof Rollback))
+      check("kill-switch section ran", false, e instanceof Error ? e.message : String(e));
   }
-  if (serverUp) {
-    const logged = await db.idleLog.findFirst({ where: { employeeId: emp.id } });
-    check(
-      "only the ACCEPTED beats were stored (1+2 twice, nothing from the rejected one)",
-      logged?.idleMinutes === 2 && logged?.activeMinutes === 4,
-      JSON.stringify(logged),
-    );
-  }
+  const afterKill = await db.systemSetting.findUnique({ where: { key: KILL_KEY } });
+  check(
+    "LIVE kill-switch row untouched (identical to before the suite)",
+    JSON.stringify(afterKill) === JSON.stringify(priorKill),
+    `before=${JSON.stringify(priorKill)} after=${JSON.stringify(afterKill)}`,
+  );
 
   // ── 3: organization aggregation ────────────────────────────────
   step("3", "departmentSummary — known test data");
@@ -234,18 +256,6 @@ async function main() {
   );
   check("QA: headcount 1, overseen by the (cross-department) manager", qa?.headcount === 1 && qa.managers[0] === `${TAG} Manager`, JSON.stringify(qa));
   check("sorted by headcount desc", summary[0]?.department === `${TAG}-Ops`);
-
-  // ── restore the kill switch to its pre-test state ──────────────
-  if (priorKill) {
-    await db.systemSetting.upsert({
-      where: { key: KILL_KEY },
-      update: { value: priorKill.value, updatedBy: priorKill.updatedBy },
-      create: { key: KILL_KEY, value: priorKill.value, updatedBy: priorKill.updatedBy },
-    });
-  } else {
-    await db.systemSetting.deleteMany({ where: { key: KILL_KEY } });
-  }
-  console.log("\nkill switch restored to pre-test state");
 
   console.log(`\n══ RESULT: ${pass} passed, ${fail} failed ══`);
   if (fail > 0) process.exitCode = 1;

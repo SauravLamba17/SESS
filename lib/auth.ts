@@ -3,7 +3,7 @@ import { cache } from "react";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { cookies } from "next/headers";
 import type { Role } from "@/lib/auth-types";
-import { ROLE_RANK, coerceRole } from "@/lib/auth-types";
+import { coerceRole } from "@/lib/auth-types";
 import {
   IMP_COOKIE,
   verifyImpersonation,
@@ -182,11 +182,4 @@ export async function getRealIdentity(): Promise<{ realUserId: string | null; re
 /** Active impersonation payload, or null. */
 export async function getImpersonation(): Promise<ImpersonationPayload | null> {
   return (await resolveIdentity()).impersonation;
-}
-
-/** True when the EFFECTIVE role is at least `min` in the hierarchy. */
-export async function hasAtLeastRole(min: Role): Promise<boolean> {
-  const role = (await resolveIdentity()).role;
-  if (!role) return false;
-  return ROLE_RANK[role] >= ROLE_RANK[min];
 }

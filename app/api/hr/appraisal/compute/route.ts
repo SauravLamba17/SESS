@@ -247,6 +247,13 @@ export async function POST(req: NextRequest) {
             },
           });
         }
+        await tx.auditLog.create({
+          data: {
+            actorUserId: userId,
+            action: "APPRAISAL_SCORES_COMPUTED",
+            targetEntity: `cycle=${cycleId} rowsWritten=${pending.length}`,
+          },
+        });
         return null;
       },
       { timeout: 60_000 },

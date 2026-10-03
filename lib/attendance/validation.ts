@@ -7,6 +7,8 @@
 // A failed validation NEVER drops the punch — the caller still writes the
 // Attendance row and records `reviewReason` from `failures` here.
 
+import { startOfDay } from "../period.ts";
+
 export type ValidationMode = "NONE" | "IP_LOCK" | "GEOFENCE" | "BOTH";
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -71,7 +73,7 @@ export function shiftCrossesMidnight(shift: ShiftWindow | null | undefined): boo
  * and never consult this function. Only a NEW row's date comes from here.
  */
 export function shiftDateFor(at: Date, shift: ShiftWindow | null | undefined): Date {
-  const ownDay = new Date(at.getFullYear(), at.getMonth(), at.getDate());
+  const ownDay = startOfDay(at);
   if (!shiftCrossesMidnight(shift)) return ownDay;
 
   const end = parseHHMM(shift!.endTime);

@@ -2,6 +2,8 @@ import "server-only";
 import { db } from "@/lib/db";
 import { formatClock } from "@/lib/time-display";
 import { ymd } from "@/lib/reports/range";
+import { startOfDay } from "@/lib/period";
+import { MAX_OPEN_SHIFT_HOURS } from "@/lib/attendance/validation";
 
 /**
  * "My own attendance today / this week / my shift" — the data behind the
@@ -17,10 +19,6 @@ import { ymd } from "@/lib/reports/range";
  * this inside its own Promise.all and keep everything in a single round trip,
  * which is how both dashboards already batch.
  */
-
-export function startOfDay(d: Date): Date {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-}
 
 /**
  * Re-exported rather than reimplemented: these dashboards render on the SERVER,
@@ -54,9 +52,21 @@ export async function loadOwnAttendance(employeeId: string, shiftId: string | nu
     weekStart.getDate() + 7,
   );
 
-  const [today, weekAtt, shift] = await Promise.all([
+  const openSince = new Date(now.getTime() - MAX_OPEN_SHIFT_HOURS * 3_600_000);
+
+  const [today, punchRow, weekAtt, shift] = await Promise.all([
     db.attendance.findFirst({
       where: { employeeId, date: { gte: todayStart, lt: tomorrowStart } },
+    }),
+    // What the NEXT punch will do — the punch route's own direction lookup
+    // (app/api/attendance/punch: most recent check-in within
+    // MAX_OPEN_SHIFT_HOURS), not "a row dated today". A night-shift worker at
+    // 01:00 has an open row dated YESTERDAY: `today` above is null for them,
+    // but the punch would record a check-out, so the clock-in widget is
+    // seeded from this instead and its button always matches the action.
+    db.attendance.findFirst({
+      where: { employeeId, checkIn: { not: null, gte: openSince } },
+      orderBy: { checkIn: "desc" },
     }),
     db.attendance.findMany({
       where: { employeeId, date: { gte: weekStart, lt: weekEnd } },
@@ -68,6 +78,7 @@ export async function loadOwnAttendance(employeeId: string, shiftId: string | nu
 
   return {
     today,
+    punchRow,
     shift,
     weekStart,
     weekByDate: new Map(weekAtt.map((a) => [ymd(a.date), a])),

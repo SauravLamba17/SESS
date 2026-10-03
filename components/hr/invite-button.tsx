@@ -80,7 +80,7 @@ export function InviteButton({
         aria-label="Role for the invited account"
         className="rounded border border-border bg-background px-2 py-1 text-xs text-text focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       >
-        {ROLES.map((r) => (
+        {ROLES.filter((r) => r !== "SUPER_ADMIN").map((r) => (
           <option key={r} value={r}>{ROLE_LABEL[r]}</option>
         ))}
       </select>

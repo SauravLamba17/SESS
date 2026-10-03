@@ -20,6 +20,7 @@ import type { Role } from "@/lib/auth-types";
 import { computeHeadcount, headcountOn } from "@/lib/reports/headcount";
 import { computeRecruitmentFunnel } from "@/lib/reports/recruitment-funnel";
 import { parseRange, ymd, monthKey } from "@/lib/reports/range";
+import { startOfDay } from "@/lib/period";
 
 export const dynamic = "force-dynamic";
 
@@ -28,10 +29,6 @@ export const metadata = { title: "System Dashboard" };
 
 /** Hours after check-in past which an open row means "forgot to clock out". */
 const FORGOTTEN_CHECKOUT_HOURS = 14;
-
-function startOfDay(d: Date): Date {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-}
 
 /**
  * Everything the dashboard needs, in ONE Promise.all.

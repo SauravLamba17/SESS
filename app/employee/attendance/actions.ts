@@ -3,19 +3,14 @@
 import { getEffectiveUserId } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { parseDateOnly } from "@/lib/period";
-import { getEmployeeByClerkId } from "@/lib/data/scope";
+import { parseDateOnly, startOfDay } from "@/lib/period";
+import { getEmployeeByClerkId, OFFBOARDED_READ_ONLY } from "@/lib/data/scope";
 import { onLeaveRequested } from "@/lib/invalidation/leave";
 
 export interface LeaveFormState {
   ok: boolean;
   error?: string;
   fieldErrors?: Partial<Record<"startDate" | "endDate" | "reason", string>>;
-}
-
-function todayMidnight(): Date {
-  const n = new Date();
-  return new Date(n.getFullYear(), n.getMonth(), n.getDate());
 }
 
 /**
@@ -38,7 +33,7 @@ export async function submitLeaveRequest(input: {
   const start = parseDateOnly(input.startDate);
   const end = parseDateOnly(input.endDate);
   const reason = typeof input.reason === "string" ? input.reason.trim() : "";
-  const today = todayMidnight();
+  const today = startOfDay(new Date());
 
   if (!start) fieldErrors.startDate = "Enter a valid start date.";
   if (!end) fieldErrors.endDate = "Enter a valid end date.";
@@ -67,6 +62,7 @@ export async function submitLeaveRequest(input: {
           "No employee record is linked to your account. Contact HR to complete onboarding.",
       };
     }
+    if (!employee.active) return { ok: false, error: OFFBOARDED_READ_ONLY };
 
     await db.leaveRequest.create({
       data: {

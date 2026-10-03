@@ -1,0 +1,56 @@
+(node:27376) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/Saurav/Desktop/WORK/SESS/prisma/verify-redaction-robustness.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to C:\Users\Saurav\Desktop\WORK\SESS\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+── 1: redaction touches exactly four fields ─────────
+PASS  REDACTED_FIELDS is the documented set
+PASS  name and employeeCode are PRESERVED, not redacted
+PASS  a 2019 leaver is due for redaction today
+PASS  email → null
+PASS  dateOfBirth → null
+PASS  pendingInvitationId → null
+PASS  emergencyContact → marker (a STRING, never null)
+PASS  redactedAt stamped
+PASS  name PRESERVED
+PASS  employeeCode PRESERVED
+PASS  department PRESERVED
+PASS  designation PRESERVED
+PASS  offboardedAt PRESERVED (pro-ration depends on it)
+
+── 2: reports and payslips read only PRESERVED fields 
+PASS  reports' EMPLOYEE_SELECT does not read email
+PASS  reports' EMPLOYEE_SELECT does not read emergencyContact
+PASS  reports' EMPLOYEE_SELECT does not read dateOfBirth
+PASS  reports' EMPLOYEE_SELECT does not read pendingInvitationId
+PASS  payslip does not read email
+PASS  payslip does not read emergencyContact
+PASS  payslip does not read dateOfBirth
+PASS  payslip does not read pendingInvitationId
+PASS  form16 does not read email
+PASS  form16 does not read emergencyContact
+PASS  form16 does not read dateOfBirth
+PASS  form16 does not read pendingInvitationId
+PASS  a redacted employee still has everything a payslip needs
+        name=ZZ-REDACT Former Employee code=ZZ-REDACT-1
+PASS  my-data PDF guards email with a fallback
+PASS  my-data PDF guards emergencyContact with a fallback
+PASS  birthday widget guards a null dateOfBirth
+
+── 3: the two write paths refuse a redacted employee 
+PASS  invite REFUSED for a redacted employee
+PASS  …with code REDACTED
+PASS  …and Clerk was never called
+PASS  …email is STILL null (redaction not reversed)
+PASS  …pendingInvitationId is STILL null
+PASS  invite REFUSED for an offboarded employee
+PASS  …with code INACTIVE
+PASS  an ACTIVE employee is STILL invitable (no over-block)
+PASS  updateProfile refuses a redacted employee
+PASS  updateProfile refuses an inactive employee
+PASS  …and both guards run BEFORE the write
+
+── CLEANUP ───────────────────────────────────────────
+PASS  every test row removed
+
+══ RESULT: 41 passed, 0 failed ══

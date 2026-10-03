@@ -329,6 +329,47 @@ async function main() {
   check("the stale day-1 row stays open for HR to see", sRows[0].checkOut === null);
   check("day 2 opened its own row", sRows[1].checkOut === null && ymd(sRows[1].date) === "2026-07-09");
 
+  // ── 8: the clock-in widget agrees with the punch after midnight ──
+  step("8", "after midnight the widget shows Clock OUT, matching the punch");
+  const owlEmp = await db.employee.create({
+    data: {
+      employeeCode: `${TAG}-N2`, name: `${TAG} Night Owl`, department: "Assembly",
+      joiningDate: new Date(2026, 0, 1), shiftId: night.id,
+    },
+  });
+  console.log(`  punch @ 2026-07-08 18:10 → ${await punch(owlEmp.id, new Date(2026, 6, 8, 18, 10), night)}`);
+  const at0100 = new Date(2026, 6, 9, 1, 0);
+  // The OLD widget seed: "a row dated today" — empty at 01:00 on the 9th.
+  const dateKeyed = await db.attendance.findFirst({
+    where: { employeeId: owlEmp.id, date: { gte: new Date(2026, 6, 9), lt: new Date(2026, 6, 10) } },
+  });
+  check("the old date-keyed seed finds nothing at 01:00 (it showed 'Clock in')", dateKeyed === null);
+  // The NEW seed: own-summary's punchRow — the punch route's own lookup.
+  const seed = await db.attendance.findFirst({
+    where: {
+      employeeId: owlEmp.id,
+      checkIn: { not: null, gte: new Date(at0100.getTime() - MAX_OPEN_SHIFT_HOURS * 3_600_000) },
+    },
+    orderBy: { checkIn: "desc" },
+  });
+  check("the new seed finds the open row, so the widget shows clocked-in", seed !== null && seed.checkOut === null);
+  eq(
+    "…and the punch it would send is a CHECK_OUT",
+    resolvePunch({ at: at0100, shift: night, recentRow: seed }).action,
+    "CHECK_OUT",
+  );
+  const fs = await import("node:fs");
+  const ownSrc = fs.readFileSync("lib/attendance/own-summary.ts", "utf8");
+  check(
+    "own-summary's punchRow uses that exact lookup",
+    /checkIn: \{ not: null, gte: openSince \}[\s\S]{0,80}orderBy: \{ checkIn: "desc" \}/.test(ownSrc) &&
+      ownSrc.includes("MAX_OPEN_SHIFT_HOURS"),
+  );
+  for (const page of ["app/employee/page.tsx", "app/manager/page.tsx"]) {
+    const src = fs.readFileSync(page, "utf8");
+    check(`${page} seeds ClockInWidget from punchRow, not today`, /initialCheckIn=\{[^}]*punchRow/.test(src));
+  }
+
   console.log(`\n══ RESULT: ${pass} passed, ${fail} failed ══`);
   if (fail > 0) process.exitCode = 1;
 }

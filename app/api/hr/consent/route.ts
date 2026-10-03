@@ -42,9 +42,16 @@ export async function POST(req: NextRequest) {
     const emp = await db.employee.findUnique({ where: { id: employeeId }, select: { id: true } });
     if (!emp) return fail("NOT_FOUND", "Employee not found", 404);
 
-    const record = await db.consentRecord.create({
-      data: { employeeId, consentType, givenOn, retentionExpiry },
-    });
+    const [record] = await db.$transaction([
+      db.consentRecord.create({ data: { employeeId, consentType, givenOn, retentionExpiry } }),
+      db.auditLog.create({
+        data: {
+          actorUserId: userId,
+          action: "CONSENT_RECORDED",
+          targetEntity: `employee=${employeeId} type=${consentType}`,
+        },
+      }),
+    ]);
     return NextResponse.json({ ok: true, id: record.id });
   } catch (err) {
     console.error("[hr/consent] failed:", err);

@@ -1,7 +1,8 @@
 import { Panel, PanelHeader, StatCard } from "@/components/ui/panel";
 import { StatusDot, StatusLabel, type StatusState } from "@/components/ui/status-dot";
-import { fmtTime, startOfDay, type OwnAttendance } from "@/lib/attendance/own-summary";
+import { fmtTime, type OwnAttendance } from "@/lib/attendance/own-summary";
 import { ymd } from "@/lib/reports/range";
+import { startOfDay } from "@/lib/period";
 
 /**
  * The three presentational pieces that sit around the clock-in widget: the

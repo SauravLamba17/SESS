@@ -39,7 +39,7 @@ export default function GlobalError({
   }, [error]);
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
+    <main className="flex min-h-dvh items-center justify-center bg-background px-4 py-10">
       <div className="w-full max-w-md rounded border border-border bg-surface p-6 shadow-panel sm:p-8">
         <div className="flex items-start gap-3">
           <AlertTriangle size={22} className="mt-0.5 shrink-0 text-danger" />

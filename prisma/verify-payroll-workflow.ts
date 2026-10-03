@@ -14,6 +14,7 @@ import { notifyEach, notifyEmployee } from "../lib/notify.ts";
 import { computeGrossNet } from "../lib/payroll/compute.ts";
 import { assemblePayrollRow } from "../lib/payroll/assemble.ts";
 import { payableDays } from "../lib/payroll/proration.ts";
+import { recoverLoans, LoanUnmatchedError } from "../lib/payroll/loan-recovery.ts";
 
 const db = new PrismaClient();
 
@@ -220,7 +221,13 @@ async function main() {
     step(5, "finalize as Super Admin (loan reduced + notification)");
     const pendingRows = await db.payroll.findMany({
       where: { month: PERIOD, status: "SUBMITTED", employeeId },
-      select: { id: true, employeeId: true, loanDeduction: true, isFinalSettlement: true },
+      select: {
+        id: true,
+        employeeId: true,
+        loanDeduction: true,
+        isFinalSettlement: true,
+        employee: { select: { employeeCode: true, name: true } },
+      },
     });
 
     await db.$transaction(async (tx) => {
@@ -230,21 +237,8 @@ async function main() {
       });
       if (upd.count !== pendingRows.length) throw new Error("PARTIAL");
 
-      for (const row of pendingRows.filter((p) => p.loanDeduction.greaterThan(0))) {
-        const adv = await tx.salaryAdvance.findFirst({
-          where: { employeeId: row.employeeId, status: "ACTIVE" },
-          orderBy: { issuedAt: "asc" },
-        });
-        if (!adv) continue;
-        const reduced = await tx.salaryAdvance.updateMany({
-          where: { id: adv.id, status: "ACTIVE", remainingBalance: { gte: row.loanDeduction } },
-          data: { remainingBalance: { decrement: row.loanDeduction } },
-        });
-        if (reduced.count === 0) continue;
-        if (adv.remainingBalance.minus(row.loanDeduction).lessThanOrEqualTo(0)) {
-          await tx.salaryAdvance.update({ where: { id: adv.id }, data: { status: "CLOSED" } });
-        }
-      }
+      // The finalize route's own loan-recovery code, not a copy of it.
+      await recoverLoans(tx, pendingRows);
 
       await notifyEach(
         tx,
@@ -262,6 +256,65 @@ async function main() {
       `remainingBalance=${advAfter?.remainingBalance.toFixed(2)}`);
     check("5b advance still ACTIVE (balance remains)",
       advAfter?.status === "ACTIVE", `status=${advAfter?.status}`);
+
+    // ── STEP 5x (Part 2 decision 2) ─────────────────────────────────
+    step(5.5, "a loan deduction with no matching advance REFUSES finalize");
+    // A SUBMITTED row whose deduction exceeds what the advance still owes —
+    // the "two months drafted from one balance" case.
+    const orphan = await db.payroll.create({
+      data: {
+        employeeId,
+        month: "2019-11",
+        basic: new Prisma.Decimal("10000.00"),
+        hra: new Prisma.Decimal("0.00"),
+        specialAllowance: new Prisma.Decimal("0.00"),
+        gross: new Prisma.Decimal("10000.00"),
+        loanDeduction: new Prisma.Decimal("999999.00"),
+        deductions: new Prisma.Decimal("999999.00"),
+        net: new Prisma.Decimal("-989999.00"),
+        status: "SUBMITTED",
+        processedBy: HR,
+      },
+      select: {
+        id: true,
+        employeeId: true,
+        loanDeduction: true,
+        employee: { select: { employeeCode: true, name: true } },
+      },
+    });
+    const balanceBefore = (await db.salaryAdvance.findUnique({ where: { id: advance.id } }))!.remainingBalance;
+    let refused: unknown = null;
+    try {
+      await db.$transaction(async (tx) => {
+        await tx.payroll.updateMany({
+          where: { id: orphan.id, status: "SUBMITTED" },
+          data: { status: "FINALIZED", finalizedBy: ADMIN, finalizedAt: new Date() },
+        });
+        await recoverLoans(tx, [orphan]);
+      });
+    } catch (e) {
+      refused = e;
+    }
+    check(
+      "5x-a finalize throws LoanUnmatchedError naming the row",
+      refused instanceof LoanUnmatchedError && refused.message.includes(orphan.id),
+      refused instanceof Error ? refused.message : String(refused),
+    );
+    check(
+      "5x-b …and the whole transition rolled back (row still SUBMITTED)",
+      (await db.payroll.findUnique({ where: { id: orphan.id } }))?.status === "SUBMITTED",
+    );
+    check(
+      "5x-c …and the advance ledger is untouched",
+      (await db.salaryAdvance.findUnique({ where: { id: advance.id } }))!.remainingBalance.equals(balanceBefore),
+    );
+    await db.payroll.delete({ where: { id: orphan.id } });
+    const finalizeSrc = (await import("node:fs")).readFileSync("app/api/admin/payroll/finalize/route.ts", "utf8");
+    check(
+      "5x-d the finalize route uses recoverLoans and maps the refusal to 409 LOAN_UNMATCHED",
+      finalizeSrc.includes("await recoverLoans(tx, pending)") && finalizeSrc.includes('"LOAN_UNMATCHED"') &&
+        !/if \(!advance\) continue|reduced\.count === 0\) continue/.test(finalizeSrc),
+    );
 
     // ── STEP 6 ──────────────────────────────────────────────────────
     step(6, "attempt to edit the FINALIZED row");

@@ -246,9 +246,13 @@ async function main() {
   eq("employee with no punches → null avg", rowD.avgPunchIn, null);
   const assembly = attendance.byDepartment.find((d) => d.department === "Assembly")!;
   eq("Assembly dept avg punch-in = 09:15 (punch-weighted)", assembly.avgPunchIn, "09:15");
-  // 22 weekdays × 4 employees = 88 expected; 4 punched → 84 with no punch.
-  eq("expected employee-weekdays", attendance.expectedWeekdayCount, 88);
-  eq("days with no punch", attendance.noPunchDays, 84);
+  // Clipped to each employee's employment (June 2026 has 22 weekdays):
+  //   Alpha (joined 2025) 22 · Bravo (joined Wed 10 Jun) 15 ·
+  //   Charlie (last day Sat 20 Jun) 15 · Delta (joins 5 Jul) 0  → 52.
+  // 4 punched → 48 with no punch. (Was 22 × 4 = 88 / 84, which counted Delta
+  // absent all June before joining and Charlie absent after leaving.)
+  eq("expected employee-weekdays", attendance.expectedWeekdayCount, 52);
+  eq("days with no punch", attendance.noPunchDays, 48);
 
   // ── 3: HIRES & EXITS ────────────────────────────────────────────
   step("3", "New Hires & Exits");

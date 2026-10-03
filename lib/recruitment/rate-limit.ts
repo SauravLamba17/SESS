@@ -2,7 +2,8 @@ import "server-only";
 import { db } from "@/lib/db";
 
 /**
- * IP rate limiter for the PUBLIC application endpoint, backed by Postgres.
+ * Sliding-window rate limiter backed by Postgres. Keyed by IP for the PUBLIC
+ * application endpoint, and by agent token for the idle-agent heartbeat.
  *
  * ─── WHY NOT THE IN-MEMORY MAP THIS REPLACES ─────────────────────────────
  * The previous version kept a per-process Map. That works on a single
@@ -24,8 +25,22 @@ import { db } from "@/lib/db";
 export const RATE_LIMIT_MAX = 5; // applications ...
 export const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // ... per IP per hour
 
-/** The only action using this table today; the column exists so it can serve more. */
 export const CAREERS_APPLY_ACTION = "careers_apply";
+
+/**
+ * Desktop-agent heartbeats, keyed by AgentToken id (never the bearer secret,
+ * which must not be copied into a second table).
+ *
+ * Why 120 and not ~20: the agent buffers up to 96 unsent 15-minute windows
+ * (agent/src/tracker.js MAX_BUFFERED_BATCHES, ~24h offline) and drains them
+ * back-to-back on reconnect. The INSTALLED agent treats any non-shouldPause
+ * 4xx as a malformed batch and DISCARDS it — a 429 is not retried. So the cap
+ * must clear one full backlog plus the normal 4/hour, or a laptop that was
+ * offline for a day would silently lose most of that day. 120 still bounds a
+ * leaked token to 120 writes/hour instead of unlimited.
+ */
+export const AGENT_HEARTBEAT_ACTION = "agent_heartbeat";
+export const AGENT_HEARTBEAT_MAX = 120;
 
 /**
  * How long a row is kept. Anything older than the longest window in use is
@@ -70,6 +85,7 @@ export async function checkRateLimit(
   key: string,
   action: string = CAREERS_APPLY_ACTION,
   now: Date = new Date(),
+  max: number = RATE_LIMIT_MAX,
 ): Promise<RateResult> {
   const windowStart = new Date(now.getTime() - RATE_LIMIT_WINDOW_MS);
 
@@ -80,10 +96,10 @@ export async function checkRateLimit(
       orderBy: { createdAt: "asc" },
       // Only the oldest matters for retryAfter, and the count is capped by the
       // limit itself — no need to read an unbounded flood into memory.
-      take: RATE_LIMIT_MAX,
+      take: max,
     });
 
-    if (attempts.length >= RATE_LIMIT_MAX) {
+    if (attempts.length >= max) {
       const oldest = attempts[0].createdAt.getTime();
       const freesAt = oldest + RATE_LIMIT_WINDOW_MS;
       return {
@@ -98,12 +114,12 @@ export async function checkRateLimit(
 
     return {
       allowed: true,
-      remaining: RATE_LIMIT_MAX - (attempts.length + 1),
+      remaining: max - (attempts.length + 1),
       retryAfterSeconds: 0,
     };
   } catch (err) {
     console.error("[rate-limit] check failed; FAILING OPEN and allowing:", err);
-    return { allowed: true, remaining: RATE_LIMIT_MAX, retryAfterSeconds: 0 };
+    return { allowed: true, remaining: max, retryAfterSeconds: 0 };
   }
 }
 

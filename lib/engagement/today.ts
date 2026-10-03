@@ -2,6 +2,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { getHolidaysOn } from "@/lib/cache/shifts";
 import { ymd } from "@/lib/reports/range";
+import { startOfDay } from "@/lib/period";
 import {
   derivePresence,
   presenceCounts,
@@ -33,10 +34,6 @@ export interface TodayData {
   birthdays: { id: string; name: string; department: string }[];
   holidays: { id: string; name: string }[];
   today: Date;
-}
-
-function startOfDay(d: Date): Date {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
 export async function loadToday(now = new Date()): Promise<TodayData> {

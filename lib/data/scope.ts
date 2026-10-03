@@ -27,6 +27,15 @@ import { db } from "@/lib/db";
  * down the tree (no recursive descent).
  */
 
+/**
+ * The one refusal every self-service WRITE path gives an offboarded employee.
+ * Former employees keep their login on purpose (lib/auth.ts — to download
+ * their own payslips and data), so the app must be READ-ONLY for them: each
+ * write path checks `employee.active` right after resolving the caller.
+ */
+export const OFFBOARDED_READ_ONLY =
+  "Your employment record is closed, so SESS is read-only for you now. Contact HR if you believe this is wrong.";
+
 /** Resolve the Employee record linked to a Clerk user. */
 export function getEmployeeByClerkId(clerkId: string) {
   return db.user

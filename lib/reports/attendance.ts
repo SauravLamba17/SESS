@@ -11,6 +11,24 @@ import type { DateRange } from "./range.ts";
 import { weekdaysInRange } from "./range.ts";
 import type { ReportEmployee } from "./types.ts";
 import { pct } from "./types.ts";
+import { startOfDay } from "../period.ts";
+
+/**
+ * Mon–Fri days in `range` on which `e` was actually employed: joining day
+ * through last working day (offboardedAt is INCLUSIVE — payroll pays it).
+ * Someone who left before the range, or joins after it, expects zero days.
+ */
+function employedWeekdays(range: DateRange, e: ReportEmployee): number {
+  const joined = startOfDay(e.joiningDate);
+  const start = joined > range.start ? joined : range.start;
+  let endExclusive = range.endExclusive;
+  if (e.offboardedAt) {
+    const off = startOfDay(e.offboardedAt);
+    const dayAfterLast = new Date(off.getFullYear(), off.getMonth(), off.getDate() + 1);
+    if (dayAfterLast < endExclusive) endExclusive = dayAfterLast;
+  }
+  return start < endExclusive ? weekdaysInRange({ ...range, start, endExclusive }) : 0;
+}
 
 export interface AttendanceRow {
   employeeId: string;
@@ -287,7 +305,9 @@ export function computeAttendance(
 
   const totalPunchDays = byEmployee.reduce((n, r) => n + r.punchDays, 0);
   const lateCount = byEmployee.reduce((n, r) => n + r.lateCount, 0);
-  const expectedWeekdayCount = weekdaysInRange(range) * employees.length;
+  // Per employee, clipped to their employment — NOT weekdays × headcount,
+  // which counted leavers and future joiners as absent every day.
+  const expectedWeekdayCount = employees.reduce((n, e) => n + employedWeekdays(range, e), 0);
 
   return {
     totalPunchDays,

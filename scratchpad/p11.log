@@ -1,0 +1,48 @@
+(node:6268) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/Saurav/Desktop/WORK/SESS/prisma/verify-phase11.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to C:\Users\Saurav\Desktop\WORK\SESS\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+── 1: changeUserRole — success path (stubbed Clerk) 
+PASS  returned ok + synced
+        {"ok":true,"oldRole":"EMPLOYEE","newRole":"MANAGER","clerkSynced":true}
+PASS  old→new roles reported
+PASS  DB role updated
+PASS  Clerk called with clerkId + new role (DB was first)
+        [{"clerkId":"user_zzp11test_0001","role":"MANAGER"}]
+PASS  USER_ROLE_CHANGED audit row includes old and new role
+        user=cmuqgdtd90002wgu4dimpehhz clerkId=user_zzp11test_0001 EMPLOYEE→MANAGER
+
+── 1b: changeUserRole — Clerk failure surfaces, never silent 
+[admin/user-role] DB role updated but Clerk sync FAILED for clerkId=user_zzp11test_0001: clerk unreachable (simulated)
+PASS  ok but clerkSynced=false with the error message
+        {"ok":true,"oldRole":"MANAGER","newRole":"HR","clerkSynced":false,"clerkError":"clerk unreachable (simulated)"}
+PASS  DB role still updated despite Clerk failure
+PASS  USER_ROLE_CLERK_SYNC_FAILED audit row
+
+── 1c: retry path — same role re-syncs Clerk ─────
+PASS  same-role call retried the Clerk sync successfully
+        {"r3":{"ok":true,"oldRole":"HR","newRole":"HR","clerkSynced":true},"clerkCalls":[{"clerkId":"user_zzp11test_0001","role":"HR"}]}
+
+── 2: kill switch — real heartbeat handler inside a rolled-back txn 
+PASS  heartbeat ACCEPTED while enabled (consent valid)
+        {"status":200,"body":{"ok":true,"date":"2026-10-02","dayTotals":{"idleMinutes":1,"activeMinutes":2},"idleThresholdSeconds":210}}
+PASS  heartbeat REJECTED when disabled — despite valid token AND consent
+        {"status":403,"body":{"error":"Idle tracking is disabled org-wide by the administrator. Tracking is paused — this batch was not stored.","code":"IDLE_TRACKING_DISABLED","shouldPause":true}}
+PASS  rejection tells the agent to pause
+PASS  heartbeat accepted again after re-enable
+        {"status":200,"body":{"ok":true,"date":"2026-10-02","dayTotals":{"idleMinutes":2,"activeMinutes":4},"idleThresholdSeconds":210}}
+PASS  only the ACCEPTED beats were stored (1+2 twice, nothing from the rejected one)
+        {"id":"cmuqgdwrv000cwgu4g1a9ciza","employeeId":"cmuqgdta60000wgu4zu2ylsfn","date":"2026-10-01T18:30:00.000Z","idleMinutes":2,"activeMinutes":4}
+PASS  LIVE kill-switch row untouched (identical to before the suite)
+        before=null after=null
+
+── 3: departmentSummary — known test data ───────
+PASS  Ops: headcount 3 (target + manager + worker A), managed by the manager
+        {"department":"ZZ-P11-Ops","headcount":3,"managers":["ZZ-P11 Manager"]}
+PASS  QA: headcount 1, overseen by the (cross-department) manager
+        {"department":"ZZ-P11-QA","headcount":1,"managers":["ZZ-P11 Manager"]}
+PASS  sorted by headcount desc
+
+══ RESULT: 18 passed, 0 failed ══
+cleanup complete

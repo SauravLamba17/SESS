@@ -34,9 +34,20 @@ export async function POST(req: NextRequest) {
     if (action === "close" || action === "reopen") {
       const id = typeof body.id === "string" ? body.id : "";
       if (!id) return fail("BAD_INPUT", "id is required", 400);
-      const upd = await db.pulseSurvey.updateMany({
-        where: { id },
-        data: { active: action === "reopen" },
+      const upd = await db.$transaction(async (tx) => {
+        const u = await tx.pulseSurvey.updateMany({
+          where: { id },
+          data: { active: action === "reopen" },
+        });
+        if (u.count === 1)
+          await tx.auditLog.create({
+            data: {
+              actorUserId: userId,
+              action: action === "reopen" ? "PULSE_SURVEY_REOPENED" : "PULSE_SURVEY_CLOSED",
+              targetEntity: id,
+            },
+          });
+        return u;
       });
       if (upd.count === 0) return fail("NOT_FOUND", "Survey not found", 404);
       return NextResponse.json({ ok: true, id, active: action === "reopen" });

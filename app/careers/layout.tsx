@@ -10,7 +10,7 @@ import { Logo } from "@/components/brand/logo";
  */
 export default function CareersLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-dvh bg-background">
       <header className="border-b border-border bg-surface">
         <div className="mx-auto flex h-14 max-w-4xl items-center justify-between px-6">
           <Link href="/careers" className="flex items-center gap-3">

@@ -286,7 +286,8 @@ function Payslip({ d }: { d: PayslipData }) {
           </View>
         </View>
 
-        {/* Additions paid after deductions — not part of taxable gross. */}
+        {/* Additions paid after deductions — outside the payslip's gross column. (Bonus
+            IS taxable salary: Form 16 adds it into gross — see app/api/form16.) */}
         <View style={[s.columns, { marginTop: 14 }]}>
           <View style={s.column}>
             <Text style={s.colHead}>ADDITIONS</Text>

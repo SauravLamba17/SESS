@@ -166,7 +166,9 @@ async function main() {
   ];
   for (const r of MANAGER_ROUTES) {
     const src = fs.readFileSync(path.join(ROOT, r), "utf8");
-    const gate = src.indexOf('hasAtLeastRole("MANAGER")');
+    // The explicit-list idiom every other privileged route uses (standardised
+    // from hasAtLeastRole("MANAGER"), which admitted exactly these three).
+    const gate = src.indexOf('role !== "MANAGER" && role !== "HR" && role !== "SUPER_ADMIN"');
     const scope = src.indexOf("managerId: manager.id");
     check(`${r.replace("app/api/manager/", "")} — role gate present`, gate > 0);
     check(
@@ -208,12 +210,12 @@ async function main() {
     bossUser?.role === "EMPLOYEE" && underling.managerId === boss.id,
     `role=${bossUser?.role}, manages ${underling.employeeCode}`,
   );
-  // ROLE_RANK is what hasAtLeastRole() compares; EMPLOYEE must rank below MANAGER.
-  const { ROLE_RANK } = await import("../lib/auth-types.ts");
+  // The gate admits MANAGER, HR and SUPER_ADMIN by name; EMPLOYEE is not one.
+  const admitted = ["MANAGER", "HR", "SUPER_ADMIN"];
   check(
-    "…and hasAtLeastRole(\"MANAGER\") rejects that role",
-    ROLE_RANK.EMPLOYEE < ROLE_RANK.MANAGER,
-    `EMPLOYEE=${ROLE_RANK.EMPLOYEE} < MANAGER=${ROLE_RANK.MANAGER}`,
+    "…and the manager role gate rejects that role",
+    !admitted.includes(bossUser?.role ?? ""),
+    `role=${bossUser?.role}, admitted=${admitted.join("/")}`,
   );
 
   // ── 4: publish atomicity ──────────────────────────────────────
@@ -302,6 +304,105 @@ async function main() {
   const head = readme.slice(0, readme.indexOf("### Cut from scope"));
   check("README no longer advertises camera-verified attendance", !/Camera-verified/i.test(head));
   check("README no longer advertises per-machine averages", !/Per-machine performance/i.test(head));
+
+  // ── 6: offboarding is claimed atomically ─────────────────────
+  step("6", "two concurrent offboards: exactly one wins (no double settlement)");
+  const off = fs.readFileSync(path.join(ROOT, "app/api/hr/employee/offboard/route.ts"), "utf8");
+  check(
+    "offboard route claims with updateMany WHERE { id, active: true }",
+    /employee\.updateMany\(\{\s*where: \{ id: employeeId, active: true \}/.test(off) &&
+      off.includes("claimed.count !== 1"),
+  );
+  const leaver = await db.employee.create({
+    data: {
+      employeeCode: `${TAG}-LEAVER`,
+      name: `${TAG} Leaver`,
+      department: "Assembly",
+      joiningDate: new Date(2020, 0, 1),
+    },
+  });
+  // The exact claim the route makes, raced in two real transactions. The
+  // sleep holds the first lock open so the second genuinely overlaps it.
+  const claim = () =>
+    db.$transaction(async (tx) => {
+      const r = await tx.employee.updateMany({
+        where: { id: leaver.id, active: true },
+        data: { active: false, offboardedAt: new Date(2026, 0, 31) },
+      });
+      await new Promise((res) => setTimeout(res, 300));
+      return r.count;
+    });
+  const counts = await Promise.all([claim(), claim()]);
+  check("exactly one of two concurrent claims succeeds", counts.sort().join(",") === "0,1", `counts=${counts}`);
+
+  // ── 7: no settlement on top of a regular run (Part 2 decision 3) ──
+  step("7", "offboard refuses a F&F settlement for a month already paid by a regular row");
+  const regularGuard = off.indexOf("OK_REGULAR_EXISTS");
+  check(
+    "the regular-row check runs BEFORE the settlement is created",
+    regularGuard > 0 && regularGuard < off.indexOf("tx.payroll.create("),
+  );
+  check(
+    "…and tells HR to use a payroll adjustment instead",
+    /Use a payroll adjustment for \$\{result\.period\}/.test(off),
+  );
+  // The route's exact predicate: a REGULAR row counts, a settlement or an
+  // adjustment for the same month does not.
+  const REGULAR = { isFinalSettlement: false, adjustmentForPayrollId: null };
+  const paid = await db.payroll.create({
+    data: { employeeId: leaver.id, month: "2099-03", processedBy: TAG },
+  });
+  check(
+    "a regular row for the month is found → settlement refused",
+    (await db.payroll.findFirst({ where: { employeeId: leaver.id, month: "2099-03", ...REGULAR } }))?.id === paid.id,
+  );
+  await db.payroll.create({
+    data: { employeeId: leaver.id, month: "2099-04", isFinalSettlement: true, processedBy: TAG },
+  });
+  check(
+    "an existing SETTLEMENT alone is not a regular row (no false refusal)",
+    (await db.payroll.findFirst({ where: { employeeId: leaver.id, month: "2099-04", ...REGULAR } })) === null,
+  );
+
+  // ── 8: Form 16 gross includes bonus (Part 2 decision 6) ──────
+  step("8", "Form 16 gross salary includes bonus");
+  const f16 = fs.readFileSync(path.join(ROOT, "app/api/form16/route.ts"), "utf8");
+  check("bonus is selected from finalized rows", /bonus: true/.test(f16));
+  check("taxable gross = gross + bonus", f16.includes("r.gross.plus(r.bonus)"));
+  check(
+    "both the annual total and each month use it",
+    f16.includes("a.plus(taxableGross(r))") && f16.includes("gross: taxableGross(r).toFixed(2)"),
+  );
+  check("the CA-review note is present", /reviewed by a CA/.test(f16));
+
+  // ── 9: previously unaudited state changes now write an AuditLog ──
+  step("9", "state changes are audited inside the same transaction");
+  const AUDITED: [string, string][] = [
+    ["app/api/hr/offer/route.ts", '"OFFER_UPDATED"'],
+    ["app/api/hr/consent/route.ts", '"CONSENT_RECORDED"'],
+    ["app/api/employee/warning/acknowledge/route.ts", '"WARNING_ACKNOWLEDGED"'],
+    ["app/api/hr/appraisal/exclude/route.ts", '"APPRAISAL_EMPLOYEE_EXCLUDED"'],
+    ["app/api/hr/appraisal/compute/route.ts", '"APPRAISAL_SCORES_COMPUTED"'],
+    ["app/api/hr/shifts/deactivate/route.ts", '"SHIFT_DEACTIVATED"'],
+    ["app/api/hr/requisition/route.ts", "`REQUISITION_STATUS_${status}`"],
+    ["app/api/hr/requisition/route.ts", '"REQUISITION_UPDATED"'],
+    ["app/api/hr/pulse-survey/route.ts", '"PULSE_SURVEY_CLOSED"'],
+    ["app/api/hr/onboarding-task/route.ts", '"ONBOARDING_TASK_ADDED"'],
+    ["app/api/hr/onboarding-task/route.ts", '"ONBOARDING_TASK_REMOVED"'],
+    ["app/api/hr/onboarding-task/route.ts", '"ONBOARDING_TASK_COMPLETED"'],
+    ["app/api/hr/application/feedback/route.ts", '"APPLICATION_REVIEW_NOTES_UPDATED"'],
+  ];
+  for (const [file, action] of AUDITED) {
+    const src = fs.readFileSync(path.join(ROOT, file), "utf8");
+    const at = src.indexOf(action);
+    // The nearest $transaction opened before the audit row, with no route
+    // return between them — i.e. the audit is written inside that transaction.
+    const txAt = src.lastIndexOf("$transaction(", at);
+    check(
+      `${file} audits ${action} inside a transaction`,
+      at > 0 && txAt > 0 && !src.slice(txAt, at).includes("NextResponse.json("),
+    );
+  }
 }
 
 main()

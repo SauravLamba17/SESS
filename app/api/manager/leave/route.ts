@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getEffectiveUserId, hasAtLeastRole } from "@/lib/auth";
+import { getEffectiveUserId, getCurrentRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getEmployeeByClerkId } from "@/lib/data/scope";
 import { notifyEmployee } from "@/lib/notify";
@@ -21,7 +21,8 @@ export async function POST(req: NextRequest) {
   // deliberately does not gate /api/**, so without this an EMPLOYEE-role user
   // in a manager position could drive their reports' records through the API
   // even though the UI never offers them the page.
-  if (!(await hasAtLeastRole("MANAGER")))
+  const role = await getCurrentRole();
+  if (role !== "MANAGER" && role !== "HR" && role !== "SUPER_ADMIN")
     return fail("FORBIDDEN", "Only a Manager or above may use this endpoint", 403);
 
   let body: { id?: unknown; decision?: unknown };

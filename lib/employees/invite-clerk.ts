@@ -1,7 +1,11 @@
 import "server-only";
 import { clerkClient } from "@clerk/nextjs/server";
 import { appUrl } from "@/lib/app-url";
-import type { CreateInvitationFn, FindClerkUserByEmailFn } from "@/lib/employees/invite";
+import type {
+  CreateInvitationFn,
+  FindClerkUserByEmailFn,
+  RevokeInvitationFn,
+} from "@/lib/employees/invite";
 
 /**
  * The real Clerk Backend API call, kept in its own file so lib/employees/
@@ -53,4 +57,10 @@ export const clerkFindUserByEmail: FindClerkUserByEmailFn = async (email) => {
   const client = await clerkClient();
   const { data } = await client.users.getUserList({ emailAddress: [email], limit: 1 });
   return data[0] ? { id: data[0].id } : null;
+};
+
+/** Revoke a pending invitation (resend, offboard, redaction). See revokePendingInvitation(). */
+export const clerkRevokeInvitation: RevokeInvitationFn = async (invitationId) => {
+  const client = await clerkClient();
+  await client.invitations.revokeInvitation(invitationId);
 };

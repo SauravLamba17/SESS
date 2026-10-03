@@ -37,7 +37,16 @@ export async function POST(req: NextRequest) {
     });
     if (!shift) return fail("NOT_FOUND", "Shift not found", 404);
 
-    await db.shift.update({ where: { id }, data: { active } });
+    await db.$transaction([
+      db.shift.update({ where: { id }, data: { active } }),
+      db.auditLog.create({
+        data: {
+          actorUserId: userId,
+          action: active ? "SHIFT_REACTIVATED" : "SHIFT_DEACTIVATED",
+          targetEntity: `${id} assignedEmployees=${shift._count.employees}`,
+        },
+      }),
+    ]);
 
     // §5: invalidate immediately after the successful write.
     onShiftDefinitionChanged();

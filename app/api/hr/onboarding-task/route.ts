@@ -42,14 +42,27 @@ export async function POST(req: NextRequest) {
       });
       if (!employee) return fail("NOT_FOUND", "Employee not found", 404);
 
-      const task = await db.onboardingTask.create({ data: { employeeId, taskName } });
+      const task = await db.$transaction(async (tx) => {
+        const t = await tx.onboardingTask.create({ data: { employeeId, taskName } });
+        await tx.auditLog.create({
+          data: { actorUserId: userId, action: "ONBOARDING_TASK_ADDED", targetEntity: `${t.id} employee=${employeeId}` },
+        });
+        return t;
+      });
       return NextResponse.json({ ok: true, id: task.id });
     }
 
     if (action === "remove") {
       const id = typeof body.id === "string" ? body.id : "";
       if (!id) return fail("BAD_INPUT", "id is required", 400);
-      const del = await db.onboardingTask.deleteMany({ where: { id } });
+      const del = await db.$transaction(async (tx) => {
+        const d = await tx.onboardingTask.deleteMany({ where: { id } });
+        if (d.count === 1)
+          await tx.auditLog.create({
+            data: { actorUserId: userId, action: "ONBOARDING_TASK_REMOVED", targetEntity: id },
+          });
+        return d;
+      });
       if (del.count === 0) return fail("NOT_FOUND", "Task not found", 404);
       return NextResponse.json({ ok: true, id });
     }
@@ -59,9 +72,20 @@ export async function POST(req: NextRequest) {
     const completed = body.completed === true;
     if (!id) return fail("BAD_INPUT", "id is required", 400);
 
-    const upd = await db.onboardingTask.updateMany({
-      where: { id },
-      data: { completed, completedAt: completed ? new Date() : null },
+    const upd = await db.$transaction(async (tx) => {
+      const u = await tx.onboardingTask.updateMany({
+        where: { id },
+        data: { completed, completedAt: completed ? new Date() : null },
+      });
+      if (u.count === 1)
+        await tx.auditLog.create({
+          data: {
+            actorUserId: userId,
+            action: completed ? "ONBOARDING_TASK_COMPLETED" : "ONBOARDING_TASK_REOPENED",
+            targetEntity: id,
+          },
+        });
+      return u;
     });
     if (upd.count === 0) return fail("NOT_FOUND", "Task not found", 404);
 

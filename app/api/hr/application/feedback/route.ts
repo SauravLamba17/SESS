@@ -46,10 +46,19 @@ export async function POST(req: NextRequest) {
     if (body.action === "notes") {
       const reviewNotes =
         typeof body.reviewNotes === "string" ? body.reviewNotes.trim().slice(0, 5000) : "";
-      await db.application.update({
-        where: { id: applicationId },
-        data: { reviewNotes: reviewNotes || null },
-      });
+      await db.$transaction([
+        db.application.update({
+          where: { id: applicationId },
+          data: { reviewNotes: reviewNotes || null },
+        }),
+        db.auditLog.create({
+          data: {
+            actorUserId: scope.userId,
+            action: "APPLICATION_REVIEW_NOTES_UPDATED",
+            targetEntity: `${applicationId} length=${reviewNotes.length}`,
+          },
+        }),
+      ]);
       return NextResponse.json({ ok: true, applicationId });
     }
 

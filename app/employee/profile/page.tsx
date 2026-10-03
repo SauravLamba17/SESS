@@ -29,7 +29,12 @@ async function loadEmployee() {
     if (!me) return { employee: null, error: null };
     const basics = await getEmployeeProfileBasics(me.id);
     const employee = basics
-      ? { ...basics, joiningDate: parseDateOnly(basics.joiningDate)! }
+      ? {
+          ...basics,
+          // Personal data: from the uncached row, never the shared cache.
+          emergencyContact: me.emergencyContact,
+          joiningDate: parseDateOnly(basics.joiningDate)!,
+        }
       : null;
     return { employee, error: null };
   } catch (err) {

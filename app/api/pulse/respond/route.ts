@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getEffectiveUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { getEmployeeByClerkId } from "@/lib/data/scope";
+import { getEmployeeByClerkId, OFFBOARDED_READ_ONLY } from "@/lib/data/scope";
 import { engagementEnabled } from "@/lib/system-settings";
 import { fail } from "@/lib/api/response";
 
@@ -62,6 +62,7 @@ export async function POST(req: NextRequest) {
         "No employee record is linked to your account, so you can't respond yet.",
         403,
       );
+    if (!me.active) return fail("OFFBOARDED", OFFBOARDED_READ_ONLY, 403);
 
     const survey = await db.pulseSurvey.findUnique({
       where: { id: surveyId },

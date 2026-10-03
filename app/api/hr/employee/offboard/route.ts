@@ -1,13 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getEffectiveUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { parseDateOnly } from "@/lib/period";
+import { parseDateOnly, startOfDay } from "@/lib/period";
 import { getCurrentRole } from "@/lib/auth";
 import { assemblePayrollRow } from "@/lib/payroll/assemble";
 import { scheduledRedactionFor, RETENTION_YEARS } from "@/lib/employees/retention";
 import { ymd } from "@/lib/reports/range";
 import { fail } from "@/lib/api/response";
 import { onEmployeeRosterChanged } from "@/lib/invalidation/employee";
+import { revokePendingInvitation } from "@/lib/employees/invite";
+import { clerkRevokeInvitation } from "@/lib/employees/invite-clerk";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -65,9 +67,11 @@ export async function POST(req: NextRequest) {
     if (!parsed) return fail("BAD_INPUT", "lastWorkingDay must be YYYY-MM-DD", 400);
     lastWorkingDay = parsed;
   } else {
-    const n = new Date();
-    lastWorkingDay = new Date(n.getFullYear(), n.getMonth(), n.getDate());
+    lastWorkingDay = startOfDay(new Date());
   }
+
+  // Captured inside the transaction, revoked in Clerk only after it commits.
+  let pendingInvitationId: string | null = null;
 
   try {
     const result = await db.$transaction(
@@ -78,6 +82,7 @@ export async function POST(req: NextRequest) {
             id: true,
             active: true,
             joiningDate: true,
+            pendingInvitationId: true,
             salaryStructure: {
               select: { basic: true, hra: true, specialAllowance: true },
             },
@@ -106,14 +111,25 @@ export async function POST(req: NextRequest) {
         // this is a deliberate design decision, not an oversight. See
         // lib/employees/invite.ts and app/employee/profile/actions.ts for the
         // corresponding write-protection guards that still apply to them.
-        await tx.employee.update({
-          where: { id: employeeId },
+        //
+        // `active: true` is in the WHERE, not just the check above: two
+        // concurrent offboards both read active=true, and an update keyed on
+        // id alone let BOTH through — two Full & Final settlements, paid twice
+        // once finalized (settlements are outside the payroll unique index on
+        // purpose). The second transaction re-evaluates this WHERE after the
+        // first commits, matches 0 rows, and stops here having written nothing.
+        const claimed = await tx.employee.updateMany({
+          where: { id: employeeId, active: true },
           data: {
             active: false,
             offboardedAt: lastWorkingDay,
             scheduledRedactionAt: scheduledRedactionFor(lastWorkingDay),
+            // A leaver's unaccepted invitation is revoked after commit (below).
+            pendingInvitationId: null,
           },
         });
+        if (claimed.count !== 1) return { code: "ALREADY_INACTIVE" as const };
+        pendingInvitationId = emp.pendingInvitationId;
         await tx.auditLog.create({
           data: {
             actorUserId: userId,
@@ -132,6 +148,18 @@ export async function POST(req: NextRequest) {
         }
 
         const period = periodOf(lastWorkingDay);
+
+        // A REGULAR row for this month already pays it (in full, or pro-rated
+        // to a joining date) — a settlement on top pays the month twice.
+        // Settlements sit outside the partial unique index on purpose, so the
+        // database cannot catch this; it is refused here, before anything is
+        // created. The offboard itself still stands: HR corrects that month's
+        // pay with a payroll adjustment instead.
+        const regular = await tx.payroll.findFirst({
+          where: { employeeId, month: period, isFinalSettlement: false, adjustmentForPayrollId: null },
+          select: { id: true, status: true },
+        });
+        if (regular) return { code: "OK_REGULAR_EXISTS" as const, period, status: regular.status };
 
         // A settlement must not double-pay a claim already folded into a
         // regular run, so the same includedInPayrollId guard applies.
@@ -218,6 +246,14 @@ export async function POST(req: NextRequest) {
       { timeout: 30_000 },
     );
 
+    // Best-effort and audited; never fails the offboard that already committed.
+    if (pendingInvitationId)
+      await revokePendingInvitation(
+        db,
+        { employeeId, invitationId: pendingInvitationId, actorUserId: userId, reason: "offboard" },
+        clerkRevokeInvitation,
+      ).catch((err) => console.error("[hr/employee offboard] invitation revoke failed:", err));
+
     switch (result.code) {
       case "NOT_FOUND":
         return fail("NOT_FOUND", "Employee not found", 404);
@@ -245,6 +281,17 @@ export async function POST(req: NextRequest) {
           settlement: null,
           warning:
             "Employee offboarded, but no full & final settlement was raised — they have no salary structure set.",
+        });
+      case "OK_REGULAR_EXISTS":
+        onEmployeeRosterChanged({ employeeId });
+        return NextResponse.json({
+          ok: true,
+          employeeId,
+          settlement: null,
+          warning:
+            `Employee offboarded, but no full & final settlement was raised: ${result.period} already has a ` +
+            `regular payroll row (${result.status}), and a settlement would pay that month twice. ` +
+            `Use a payroll adjustment for ${result.period} to correct the final month's pay instead.`,
         });
       default:
         // §5: same invalidation on the settlement path — one committed

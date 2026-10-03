@@ -21,14 +21,6 @@ export function coerceRole(value: unknown): Role | null {
   return ROLES.includes(value as Role) ? (value as Role) : null;
 }
 
-/** Strict hierarchy: SUPER_ADMIN > HR > MANAGER > EMPLOYEE. */
-export const ROLE_RANK: Record<Role, number> = {
-  EMPLOYEE: 0,
-  MANAGER: 1,
-  HR: 2,
-  SUPER_ADMIN: 3,
-};
-
 export const ROLE_LABEL: Record<Role, string> = {
   EMPLOYEE: "Employee",
   MANAGER: "Manager",

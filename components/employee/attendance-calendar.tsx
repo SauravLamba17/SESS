@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { StatusDot, type StatusState } from "@/components/ui/status-dot";
+import { startOfDay } from "@/lib/period";
 
 interface DayData {
   date: string; // YYYY-MM-DD
@@ -107,11 +108,8 @@ export function AttendanceCalendar({
   data?.days.forEach((d) => byDate.set(d.date, d));
 
   const joining = data ? new Date(data.joiningDate) : null;
-  const joiningDay = joining
-    ? new Date(joining.getFullYear(), joining.getMonth(), joining.getDate())
-    : null;
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const joiningDay = joining ? startOfDay(joining) : null;
+  const today = startOfDay(new Date());
 
   const monthLastDay = new Date(year, month - 1, daysInMonth);
   const wholeMonthBeforeJoining =

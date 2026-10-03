@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getEffectiveUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { getEmployeeByClerkId } from "@/lib/data/scope";
+import { getEmployeeByClerkId, OFFBOARDED_READ_ONLY } from "@/lib/data/scope";
 import {
   validatePunch,
   isLateCheckIn,
@@ -83,6 +83,11 @@ export async function POST(req: NextRequest) {
         { status: 409 },
       );
     }
+    if (!employee.active)
+      return NextResponse.json(
+        { ok: false, error: OFFBOARDED_READ_ONLY, code: "OFFBOARDED" },
+        { status: 403 },
+      );
 
     // Run validation regardless of punch direction. Mode is DB-backed since
     // Phase 11 (Super Admin adjusts it on /admin/modules; env var is the

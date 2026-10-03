@@ -3,14 +3,10 @@ import { Panel, PanelHeader } from "@/components/ui/panel";
 import { StatusDot } from "@/components/ui/status-dot";
 import { HolidayForm, RemoveHolidayButton } from "@/components/hr/holiday-manager";
 import { getHolidayCalendar } from "@/lib/cache/shifts";
-import { parseDateOnly } from "@/lib/period";
+import { parseDateOnly, startOfDay } from "@/lib/period";
 import { ErrorPanel } from "@/components/ui/notice";
 
 export const dynamic = "force-dynamic";
-
-function startOfDay(d: Date): Date {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-}
 
 async function load() {
   try {

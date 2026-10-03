@@ -1,0 +1,76 @@
+(node:25500) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/Saurav/Desktop/WORK/SESS/prisma/verify-phase12b.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to C:\Users\Saurav\Desktop\WORK\SESS\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+── 0: CSV escaping ──────────────────────────────────
+PASS  plain value unquoted
+PASS  comma forces quotes
+PASS  embedded quote is doubled
+PASS  newline forces quotes
+PASS  null becomes an EMPTY field, not the text null
+PASS  undefined becomes empty too
+PASS  zero survives as 0
+PASS  document shape
+
+── 1: CSV is a rendering of the same result, not a recomputation 
+PASS  headcount CSV carries the computed active headcount
+        Summary | Measure,Value | Active headcount,2 | Departments,2 | Headcount at period start,2 | Headcount at period end,2 | Net change,0 | 
+PASS  headcount CSV carries the computed department count
+PASS  headcount CSV row matches result for Assembly
+PASS  headcount CSV row matches result for Quality
+PASS  a name containing a comma is quoted, not split into two columns
+PASS  computed org avg punch-in (540+630+510)/3 = 560 → 09:20
+PASS  CSV prints the SAME avg punch-in the PDF would
+PASS  CSV prints the same minutes-since-midnight value
+PASS  CSV late count matches result
+PASS  per-employee CSV row matches the computed row exactly
+        ZZ-P12B-0001,"ZZ-P12B Alpha, A.",Assembly,2,1,1,50,30,09:45,linear
+PASS  day-shift employees are still averaged linearly
+PASS  only the FINALIZED row counted
+PASS  gross is one payslip, not two
+PASS  CSV total gross matches the computed value
+PASS  CSV reports the excluded DRAFT row rather than hiding it
+PASS  CSV cost to company matches the computed value
+
+── 2: CSV availability matches the spec ─────────────
+PASS  headcount offers CSV
+PASS  attendance offers CSV
+PASS  hires-exits offers CSV
+PASS  production offers CSV
+PASS  appraisal-distribution offers CSV
+PASS  payroll-cost offers CSV
+PASS  recruitment-funnel offers CSV
+PASS  idle-time offers CSV
+PASS  warning-letters offers CSV
+PASS  board-summary is PDF only
+PASS  my-data is PDF only
+PASS  exactly nine CSV-capable reports
+PASS  a role that cannot run a report at all gets no scope for it
+
+── 3: My Data Export — self only ────────────────────
+PASS  profile is the caller's own
+PASS  only A's attendance rows (B's excluded)
+PASS  no row in the export belongs to anyone else
+PASS  UNPUBLISHED appraisal cycle dropped
+PASS  the surviving score is the published one
+PASS  DRAFT warning letter dropped
+PASS  the surviving letter is the released one
+PASS  counts reflect the filtered totals
+
+── 3b: self scope is structural — no employeeId exists to pass 
+PASS  EMPLOYEE gets scope "self" — never wider
+PASS  MANAGER gets scope "self" — never wider
+PASS  HR gets scope "self" — never wider
+PASS  SUPER_ADMIN gets scope "self" — never wider
+PASS  signed-out gets nothing
+PASS  my-data is excluded from the org reports pages
+PASS  EMPLOYEE still sees ZERO organisation reports
+PASS  computeMyData takes no employee identifier at all
+
+── 5: HTTP — CSV format and the unauthenticated gate 
+FAIL  HTTP tests ran (is `npm run dev` up on :3005?)
+        fetch failed
+
+══ RESULT: 53 passed, 1 failed ══
+cleanup complete

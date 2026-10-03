@@ -71,7 +71,11 @@ export function onEmployeeProfileChanged(employeeId: string) {
 
 /**
  * A shift was assigned to an employee. The shift DEFINITIONS are unchanged;
- * what changed is the roster row that prints the shift name.
+ * what changed is the roster row that prints the shift name — and the
+ * per-shift "assigned" counts on /hr/shifts (getShiftsWithAssignedCounts,
+ * tagged TAG_SHIFTS). Without dropping that tag the page showed the old count
+ * for up to an hour, and HR could deactivate a shift without the "employees
+ * are still assigned" warning.
  */
 export function onEmployeeShiftAssigned(opts: {
   employeeId: string;
@@ -79,6 +83,7 @@ export function onEmployeeShiftAssigned(opts: {
 }) {
   revalidateTag(employeeTag(opts.employeeId));
   revalidateTag(TAG_ROSTER);
+  revalidateTag(TAG_SHIFTS);
   if (opts.managerEmployeeId) revalidateTag(teamTag(opts.managerEmployeeId));
 }
 

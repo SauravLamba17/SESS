@@ -1,0 +1,108 @@
+(node:13388) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/Saurav/Desktop/WORK/SESS/prisma/verify-night-shift.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to C:\Users\Saurav\Desktop\WORK\SESS\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+── 0: shift-window classification ─────────────────
+PASS  18:00-03:00 is recognised as crossing midnight
+PASS  09:00-17:00 is NOT
+PASS  a null shift is not treated as overnight
+PASS  a malformed shift is not treated as overnight
+
+── 0b: shiftDateFor — which calendar day a punch belongs to 
+PASS  night 18:10 on the 8th → the 8th
+PASS  night 00:30 on the 9th → still the 8th
+PASS  night 02:59 on the 9th → still the 8th (last minute of the tail)
+PASS  night 03:05 (past the shift end) → its own day
+PASS  DAY 09:05 on the 8th → the 8th (unchanged)
+PASS  DAY 17:02 on the 8th → the 8th (unchanged)
+PASS  no shift → the punch's own day (unchanged)
+
+── 1: AREA 1 — night shift produces ONE coherent row 
+  punch 1 @ 2026-07-08 18:10 → CHECK_IN (row dated 2026-07-08)
+  punch 2 @ 2026-07-09 03:05 → CHECK_OUT (open row closed)
+PASS  exactly ONE attendance row (was 2 before the fix)
+PASS  row is dated the shift's START day
+PASS  checkIn is 18:10
+PASS  checkOut is 03:05 the NEXT day
+PASS  checkOut is on the following calendar date
+
+── 1b: a third punch is not turned into a bogus check-in 
+  punch 3 @ 2026-07-09 03:30 → ALREADY_COMPLETE (no write)
+PASS  still exactly one row
+
+── 2: AREA 2 — lateness against the 18:00 start ───
+PASS  18:10 → 10 minutes late
+PASS  isLateForShift agrees
+PASS  stored lateMinutes on the row
+PASS  stored lateFlag
+PASS  17:55 (early) → not late
+PASS  00:30 arrival → 390 min late (was wrongly 'on time')
+PASS  without endTime the old behaviour is preserved exactly
+
+── 3: AREA 3 — hours worked across midnight ───────
+PASS  duration is 8h55m
+PASS  efficiency from the STORED row is a real positive number
+        11.2150 units/hour
+PASS  100 units / 8.9167h ≈ 11.21
+
+── 4: AREA 4 — payroll pro-ration attributes one day 
+PASS  full July for a long-tenured employee
+PASS  joined 8 July → 24 days (8th–31st inclusive)
+        payableDays reads joiningDate/offboardedAt only — never Attendance,
+        so one overnight shift can neither add nor lose a payable day.
+
+── 5: AREA 5 — circular mean, hand-verified ───────
+  linear mean of 23:00 & 01:00   = 720 min → 12:00   (wrong)
+  circular mean of 23:00 & 01:00 = 0 min → 00:00   (correct)
+PASS  linear mean is the nonsensical 12:00
+PASS  CIRCULAR MEAN OF 23:00 AND 01:00 IS 00:00
+PASS  …and formats as 00:00
+PASS  22:00 & 02:00 → 00:00
+PASS  18:00 & 20:00 (both pre-midnight) → 19:00
+PASS  a single 23:30 punch returns itself
+PASS  antipodal times (06:00 & 18:00) have no mean direction → null, not a fabricated number
+PASS  no punches → null
+
+── 5b: the day shift keeps the linear mean, unchanged 
+PASS  09:00 & 09:30 linear → 09:15
+PASS  averagePunchInMinutes defaults to linear
+PASS  explicit linear matches the default
+PASS  circular would give the same 09:15 for clustered day times
+
+── 6: AREA 5 end-to-end — computeAttendance picks the right mean 
+PASS  night employee averaged circularly → 00:00
+PASS  night employee method flagged
+PASS  DAY employee still 09:15
+PASS  day employee method flagged linear
+PASS  night department uses circular
+PASS  night department average → 00:00
+PASS  day-only department stays linear
+PASS  day-only department average → 09:15
+PASS  scope containing a night shift is flagged
+PASS  a day-only scope reports linear org method
+PASS  a day-only scope org average → 09:15
+PASS  day-only scope not flagged overnight
+
+── 7: REGRESSION — the 09:00–17:00 day shift is untouched 
+  punch 1 @ 2026-07-08 09:05 → CHECK_IN (row dated 2026-07-08)
+  punch 2 @ 2026-07-08 17:02 → CHECK_OUT (open row closed)
+PASS  one row, as before
+PASS  dated the punch's own day, as before
+PASS  late by 5 minutes, as before
+PASS  closed same day
+PASS  efficiency unchanged
+        12.5786 units/hour
+PASS  a third same-day punch is still ALREADY_COMPLETE
+PASS  still one row
+
+── 7b: next day's check-in is NOT swallowed by a stale open row 
+  day 1 09:00 in  → CHECK_IN (row dated 2026-07-08)
+  (no checkout — forgotten)
+  day 2 09:00 in  → CHECK_IN (row dated 2026-07-09)
+PASS  two separate days, not one merged row
+PASS  the stale day-1 row stays open for HR to see
+PASS  day 2 opened its own row
+
+══ RESULT: 63 passed, 0 failed ══
+cleanup complete

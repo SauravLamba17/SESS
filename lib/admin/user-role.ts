@@ -32,30 +32,39 @@ export async function changeUserRole(
   if (!user) return { ok: false, code: "NOT_FOUND", message: "User not found" };
   const oldRole = user.role as Role;
 
-  // Lockout guard: the system must always keep at least one Super Admin.
-  if (oldRole === "SUPER_ADMIN" && args.newRole !== "SUPER_ADMIN") {
-    const admins = await db.user.count({ where: { role: "SUPER_ADMIN" } });
-    if (admins <= 1)
-      return {
-        ok: false,
-        code: "LAST_SUPER_ADMIN",
-        message: "This is the only Super Admin account — demoting it would lock everyone out of administration.",
-      };
-  }
-
   // Same role: not an error — treat as a Clerk re-sync request (the retry
   // path after a failed sync) rather than refusing.
   if (oldRole !== args.newRole) {
-    await db.$transaction([
-      db.user.update({ where: { id: user.id }, data: { role: args.newRole } }),
-      db.auditLog.create({
+    const lastAdmin = await db.$transaction(async (tx) => {
+      // Lockout guard: the system must always keep at least one Super Admin.
+      //
+      // ATOMIC: every SUPER_ADMIN row is locked FOR UPDATE before counting. A
+      // plain count let two admins demote each other at the same instant —
+      // both saw 2, both committed, zero remained. Now the second transaction
+      // waits on the first's lock, re-reads after it commits, sees one admin
+      // left, and refuses. (Same idiom as lib/appraisal/cycle-lock.ts.)
+      if (oldRole === "SUPER_ADMIN") {
+        const admins = await tx.$queryRaw<{ id: string }[]>`
+          SELECT "id" FROM "User" WHERE "role" = 'SUPER_ADMIN' FOR UPDATE
+        `;
+        if (admins.length <= 1) return true;
+      }
+      await tx.user.update({ where: { id: user.id }, data: { role: args.newRole } });
+      await tx.auditLog.create({
         data: {
           actorUserId: args.actorUserId,
           action: "USER_ROLE_CHANGED",
           targetEntity: `user=${user.id} clerkId=${user.clerkId} ${oldRole}→${args.newRole}`,
         },
-      }),
-    ]);
+      });
+      return false;
+    });
+    if (lastAdmin)
+      return {
+        ok: false,
+        code: "LAST_SUPER_ADMIN",
+        message: "This is the only Super Admin account — demoting it would lock everyone out of administration.",
+      };
   }
 
   try {

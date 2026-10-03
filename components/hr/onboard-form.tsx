@@ -132,7 +132,7 @@ export function OnboardForm({
           <label className="inline-flex items-center gap-2 text-sm text-text-muted">
             Role
             <select value={inviteRole} onChange={(e) => setInviteRole(e.target.value as Role)} className={`${inputClass} w-auto`}>
-              {ROLES.map((r) => (
+              {ROLES.filter((r) => r !== "SUPER_ADMIN").map((r) => (
                 <option key={r} value={r}>{ROLE_LABEL[r]}</option>
               ))}
             </select>

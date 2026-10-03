@@ -160,12 +160,13 @@ async function main() {
   let clerkCalled = false;
   const invite = await sendEmployeeInvitation(
     db,
-    { employeeId: emp.id, email: "new.address@example.invalid", role: "EMPLOYEE", actorUserId: TAG },
+    { employeeId: emp.id, email: "new.address@example.invalid", role: "EMPLOYEE", actorUserId: TAG, actorRole: "HR" },
     async () => {
       clerkCalled = true;
       return { id: "inv_should_not_happen" };
     },
     noClerkUser,
+    async () => {},
   );
   check("invite REFUSED for a redacted employee", invite.ok === false);
   eq("…with code REDACTED", invite.ok === false ? invite.code : null, "REDACTED");
@@ -189,9 +190,10 @@ async function main() {
   });
   const invite2 = await sendEmployeeInvitation(
     db,
-    { employeeId: emp2.id, role: "EMPLOYEE", actorUserId: TAG },
+    { employeeId: emp2.id, role: "EMPLOYEE", actorUserId: TAG, actorRole: "HR" },
     async () => ({ id: "inv_nope" }),
     noClerkUser,
+    async () => {},
   );
   check("invite REFUSED for an offboarded employee", invite2.ok === false);
   eq("…with code INACTIVE", invite2.ok === false ? invite2.code : null, "INACTIVE");
@@ -208,9 +210,10 @@ async function main() {
   });
   const invite3 = await sendEmployeeInvitation(
     db,
-    { employeeId: emp3.id, role: "EMPLOYEE", actorUserId: TAG },
+    { employeeId: emp3.id, role: "EMPLOYEE", actorUserId: TAG, actorRole: "HR" },
     async () => ({ id: "inv_ok" }),
     noClerkUser,
+    async () => {},
   );
   check("an ACTIVE employee is STILL invitable (no over-block)", invite3.ok === true);
 
@@ -222,6 +225,30 @@ async function main() {
   const gIdx = profileSrc.indexOf("employee.redactedAt");
   const wIdx = profileSrc.indexOf("db.employee.update");
   check("…and both guards run BEFORE the write", gIdx > 0 && gIdx < wIdx);
+
+  // ── 4: former employees are read-only on EVERY self-service write ──
+  step("4", "the seven self-service write paths refuse an offboarded employee");
+  // [file, the resolved-employee variable, the first write the path makes]
+  const WRITE_PATHS: [string, string, string][] = [
+    ["app/employee/attendance/actions.ts", "employee", "db.leaveRequest.create"],
+    ["app/employee/expenses/actions.ts", "employee", "db.expenseClaim.create"],
+    ["app/employee/production/actions.ts", "employee", "db.production."],
+    ["app/api/attendance/punch/route.ts", "employee", "db.attendance."],
+    ["app/api/community/shoutout/route.ts", "me", "db.shoutOut."],
+    ["app/api/pulse/respond/route.ts", "me", "$transaction"],
+    ["app/api/employee/warning/acknowledge/route.ts", "employee", "warningLetter.updateMany"],
+  ];
+  for (const [file, v, firstWrite] of WRITE_PATHS) {
+    const src = fs.readFileSync(path.join(ROOT, file), "utf8");
+    const lookup = src.indexOf("getEmployeeByClerkId(userId)");
+    const guard = src.indexOf(`if (!${v}.active)`);
+    const write = src.indexOf(firstWrite, guard);
+    check(
+      `${file}: active guard after the lookup, before the first write, with the shared message`,
+      lookup > 0 && guard > lookup && write > guard && src.includes("OFFBOARDED_READ_ONLY"),
+      `lookup=${lookup} guard=${guard} write=${write}`,
+    );
+  }
 }
 
 main()

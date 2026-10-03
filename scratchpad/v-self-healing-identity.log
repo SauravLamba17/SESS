@@ -1,0 +1,126 @@
+(node:7448) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/Saurav/Desktop/WORK/SESS/prisma/verify-self-healing-identity.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to C:\Users\Saurav\Desktop\WORK\SESS\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+══ SELF-HEALING IDENTITY VERIFICATION (Phase 6) ════════
+
+── 0: the safety net is wired into the identity path 
+PASS  0a lib/auth.ts imports the shared provisioner (not a private copy)
+PASS  0b resolveIdentity() calls the check on the REAL identity, not the impersonated one
+        ensureUserRow(realUserId, realRole)
+PASS  0c it runs BEFORE the impersonation branch
+PASS  0d it returns without touching the DB when there is no role (fail closed)
+PASS  0e a thrown error cannot change who gets in — the check is wrapped
+PASS  0f the webhook still calls linkClerkUserToEmployee directly — unchanged, still primary
+PASS  0g the webhook does NOT call the self-heal path (they stay separate)
+
+── 1: valid role + no Employee match → User with employeeId NULL 
+PASS  1a a User row was created
+        {"created":true,"userId":"cmurqieyn0001wgqwun2k9avy","employeeId":null,"reason":"no employee matches zz-p6-admin@example.com — created with employeeId NULL"}
+PASS  1b role is exactly what Clerk metadata said
+        role=SUPER_ADMIN
+PASS  1c employeeId is NULL — no Employee was invented
+        employeeId=NULL
+PASS  1d the Employee match was ATTEMPTED and simply found nothing
+        no employee matches zz-p6-admin@example.com — created with employeeId NULL
+PASS  1e the creation is on the audit trail with its source
+        clerkId=user_zzp6_admin_0001 email=zz-p6-admin@example.com role=SUPER_ADMIN employeeId=null source=verify
+PASS  1f re-running is idempotent — no second row
+        {"created":false,"code":"ALREADY_PROVISIONED","reason":"clerkId user_zzp6_admin_0001 is already linked"}
+
+── 2: an Employee match by email IS attached ────────
+PASS  2a a User row was created
+        {"created":true,"userId":"cmurqifgz0005wgqw24b5dq7i","employeeId":"cmurqifab0003wgqw4ifmysvi","reason":"linked to employee cmurqifab0003wgqw4ifmysvi"}
+PASS  2b it is ATTACHED to the matching Employee
+        employeeId=cmurqifab0003wgqw4ifmysvi expected=cmurqifab0003wgqw4ifmysvi
+PASS  2c the email match is case/whitespace insensitive
+PASS  2d role is EMPLOYEE, never elevated by the match
+        role=EMPLOYEE
+PASS  2e audited as EMPLOYEE_ACCOUNT_LINKED, carrying the source
+        employee=cmurqifab0003wgqw4ifmysvi clerkId=user_zzp6_staff_0001 role=EMPLOYEE source=verify
+
+── 2b: no Employee match + a non-SUPER_ADMIN role → refused, nothing created 
+PASS  2b MANAGER with no Employee is refused (NO_EMPLOYEE) and no User row exists
+        {"created":false,"code":"NO_EMPLOYEE","reason":"no employee matches zz-p6-stale-manager@example.com and role MANAGER requires one"}
+PASS  2b HR with no Employee is refused (NO_EMPLOYEE) and no User row exists
+        {"created":false,"code":"NO_EMPLOYEE","reason":"no employee matches zz-p6-stale-hr@example.com and role HR requires one"}
+PASS  2b EMPLOYEE with no Employee is refused (NO_EMPLOYEE) and no User row exists
+        {"created":false,"code":"NO_EMPLOYEE","reason":"no employee matches zz-p6-stale-employee@example.com and role EMPLOYEE requires one"}
+
+── 3: two concurrent resolutions create exactly ONE row 
+PASS  3a exactly ONE User row exists after two concurrent calls
+        rows=1  a={"created":true,"userId":"cmurqig0q0008wgqwl5b6qoda","employeeId":null,"reason":"no employee matches zz-p6-race@example.com — created with employeeId NULL"}  b={"created":false,"code":"ALREADY_PROVISIONED","reason":"\nInvalid `prisma.user.create()` invocation:\n\n\nUnique constraint failed on the fields: (`clerkId`)"}
+PASS  3b exactly one call reports created:true, the other refuses cleanly
+        a.created=true b.created=false
+PASS  3c neither call threw — the loser degrades to a no-op
+PASS  3d only ONE audit row was written for the identity
+PASS  3e User.clerkId is genuinely @unique — a second INSERT raises P2002
+        error code=P2002
+PASS  3f the losing INSERT changed nothing (role still EMPLOYEE)
+
+── 4: no recognisable role → NOTHING is created ─────
+PASS  4. Clerk metadata role missing → refused, no User created
+        {"created":false,"code":"NO_ROLE","reason":"no recognised role in Clerk publicMetadata for user_zzp6_norole_0001"}
+PASS  4. Clerk metadata role null → refused, no User created
+        {"created":false,"code":"NO_ROLE","reason":"no recognised role in Clerk publicMetadata for user_zzp6_norole_0001"}
+PASS  4. Clerk metadata role empty string → refused, no User created
+        {"created":false,"code":"NO_ROLE","reason":"no recognised role in Clerk publicMetadata for user_zzp6_norole_0001"}
+PASS  4. Clerk metadata role unrecognised → refused, no User created
+        {"created":false,"code":"NO_ROLE","reason":"no recognised role in Clerk publicMetadata for user_zzp6_norole_0001"}
+PASS  4. Clerk metadata role lowercase near-miss → refused, no User created
+        {"created":false,"code":"NO_ROLE","reason":"no recognised role in Clerk publicMetadata for user_zzp6_norole_0001"}
+PASS  4. Clerk metadata role object → refused, no User created
+        {"created":false,"code":"NO_ROLE","reason":"no recognised role in Clerk publicMetadata for user_zzp6_norole_0001"}
+PASS  4g in particular it does NOT fall back to EMPLOYEE
+        an unknown identity gets no account at all, not a least-privileged one
+PASS  4h no email → refused (the Employee match cannot be attempted)
+        {"created":false,"code":"NO_EMAIL","reason":"user_zzp6_noemail_0001 has no email address"}
+PASS  4i an Employee already linked to another account → refused as AMBIGUOUS
+        {"created":false,"code":"AMBIGUOUS","reason":"employee cmurqifab0003wgqw4ifmysvi already has a linked account"}
+PASS  4j the existing link was not stolen or re-pointed
+
+── 5: the real Manager through this mechanism ───────
+        target: saurav@simplenbilling.co.in
+PASS  5a exactly one Clerk account owns that address
+        1 match(es)
+PASS  5b Clerk's publicMetadata.role is a recognised role
+        publicMetadata.role="MANAGER"
+        ensureUserForClerkIdentity → {"created":false,"code":"ALREADY_PROVISIONED","reason":"clerkId user_3Hp92w6Hi21i1ZKn65BajiZzBxq is already linked"}
+PASS  5c the Manager now has a real User row (direct query)
+        User cmtmp7mzk000iwg44aj5o0zg3 created 2026-09-04T08:35:00.471Z
+PASS  5d its role is MANAGER, taken from Clerk metadata
+        role=MANAGER
+PASS  5e clerkId matches the real Clerk account
+        user_3Hp92w6Hi21i1ZKn65BajiZzBxq vs user_3Hp92w6Hi21i1ZKn65BajiZzBxq
+PASS  5f the Employee match was attempted against the live table
+        matched Employee cmtmqv0tj0001wgd0yrtd2tk4 (EMP-0003) → attached
+PASS  5g employeeId reflects that match exactly
+        employeeId=cmtmqv0tj0001wgd0yrtd2tk4
+PASS  5h a second resolution is a no-op (idempotent)
+        {"created":false,"code":"ALREADY_PROVISIONED","reason":"clerkId user_3Hp92w6Hi21i1ZKn65BajiZzBxq is already linked"}
+
+── 6: the webhook's normal invitation path, unchanged 
+PASS  6a the webhook call still links the new account
+        {"linked":true,"userId":"cmurqiif8000jwgqwqh2xnj71","employeeId":"cmurqii9m000hwgqw3znvkwur"}
+PASS  6b the User row is created with the Employee attached
+        role=EMPLOYEE employeeId=cmurqii9m000hwgqw3znvkwur
+PASS  6c pendingInvitationId is cleared, as before
+PASS  6d the audit row is byte-for-byte what it was before Phase 6
+        employee=cmurqii9m000hwgqw3znvkwur clerkId=user_zzp6_hire_0001 role=EMPLOYEE — no source= suffix when the caller passes none
+PASS  6e a webhook retry is still a calm no-op
+        {"linked":false,"code":"ALREADY_LINKED_CLERK","reason":"clerkId user_zzp6_hire_0001 is already linked"}
+PASS  6f an uninvited signup is still a no-op, NOT an error and NOT a User
+        {"linked":false,"code":"NO_EMPLOYEE_MATCH","reason":"no employee matches email zz-p6-nobody@example.com"}
+
+── CLEANUP ─────────────────────────────────────────────
+PASS  7. every throwaway row removed
+        users=0 employees=0
+
+  Real accounts (3):
+    user_3Hol6ZdRzXg7z5ozEcfaNERgEjY  HR  employeeId=cmszjrqpn0001l104134ozykp
+    user_3GgiUDKaahfeNlMvfRfqhD6bQLS  SUPER_ADMIN  employeeId=NULL
+    user_3Hp92w6Hi21i1ZKn65BajiZzBxq  MANAGER  employeeId=cmtmqv0tj0001wgd0yrtd2tk4
+
+════════════════════════════════════════════════════════
+  52 passed, 0 failed
+════════════════════════════════════════════════════════

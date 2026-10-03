@@ -125,6 +125,21 @@ async function staticChecks() {
   check("awaits the now-async limiter", /await checkRateLimit\(/.test(route));
   check("still 429 + Retry-After", /status: 429/.test(route) && /Retry-After/.test(route));
   check("still the RATE_LIMITED code", route.includes('"RATE_LIMITED"'));
+
+  step("8", "agent heartbeat: same limiter, keyed by token, cap clears a full agent backlog");
+  const hb = fs.readFileSync(path.join(ROOT, "app/api/agent/heartbeat/route.ts"), "utf8");
+  const tracker = fs.readFileSync(path.join(ROOT, "agent/src/tracker.js"), "utf8");
+  const buffered = Number(/MAX_BUFFERED_BATCHES = (\d+)/.exec(tracker)?.[1]);
+  const hbMax = Number(/AGENT_HEARTBEAT_MAX = (\d+)/.exec(src)?.[1]);
+  // The installed agent DISCARDS a batch on any non-shouldPause 4xx, so a
+  // drained backlog (+ the normal 4/hour) must never reach the cap.
+  check("cap > agent backlog + 4/hour", hbMax > buffered + 4, `cap=${hbMax}, backlog=${buffered}`);
+  check("reuses checkRateLimit (no second limiter)", /await checkRateLimit\(\s*agent\.id/.test(hb));
+  check(
+    "limited AFTER the token check, keyed by row id not the secret",
+    hb.indexOf("!agent.active") < hb.indexOf("checkRateLimit(") && !/checkRateLimit\(\s*token/.test(hb),
+  );
+  check("same 429 + Retry-After + RATE_LIMITED", /status: 429/.test(hb) && /Retry-After/.test(hb) && hb.includes('"RATE_LIMITED"'));
 }
 
 async function exhaust() {

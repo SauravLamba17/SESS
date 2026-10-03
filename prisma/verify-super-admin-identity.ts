@@ -32,12 +32,15 @@
  * Run:  node --env-file=.env prisma/verify-super-admin-identity.ts
  *       node --env-file=.env prisma/verify-super-admin-identity.ts --email=admin@example.com
  */
+import fs from "node:fs";
+import path from "node:path";
 import { PrismaClient } from "@prisma/client";
 import { changeUserRole, type UpdateClerkRoleFn } from "../lib/admin/user-role.ts";
 import { notifyUsers, notifyEmployee } from "../lib/notify.ts";
 
 const db = new PrismaClient();
 
+const ROOT = path.resolve(import.meta.dirname, "..");
 const TAG = "ZZ-SAI";
 const ACTOR = "test-sai-actor";
 /** Throwaway second administrator, used ONLY for the allowed branch of (3). */
@@ -230,6 +233,40 @@ async function main() {
     check("3j with the spare demoted, the lock closes over the real admin again",
       !reblocked.ok && reblocked.code === "LAST_SUPER_ADMIN",
       JSON.stringify(reblocked));
+
+    // ── 3k: the guard is ATOMIC (Part 2 decision M2) ─────────────────
+    // Racing changeUserRole itself would need two demotable admins, and the
+    // real one must never be demoted — so the route's exact pattern (lock
+    // the admin rows FOR UPDATE, count, then demote) is raced on two
+    // THROWAWAY admins, scoped to them by clerkId.
+    const roleSrc = fs.readFileSync(path.join(ROOT, "lib/admin/user-role.ts"), "utf8");
+    const lockAt = roleSrc.indexOf(`WHERE "role" = 'SUPER_ADMIN' FOR UPDATE`);
+    check("3k changeUserRole locks the admin rows inside its transaction, before the update",
+      lockAt > roleSrc.indexOf("db.$transaction(async (tx)") &&
+        lockAt < roleSrc.indexOf("tx.user.update("));
+    const [r1, r2] = await Promise.all(
+      ["user_zzsai_race_a", "user_zzsai_race_b"].map((clerkId) =>
+        db.user.create({ data: { clerkId, role: "SUPER_ADMIN", employeeId: null } }),
+      ),
+    );
+    const demote = (id: string) =>
+      db.$transaction(async (tx) => {
+        const admins = await tx.$queryRaw<{ id: string }[]>`
+          SELECT "id" FROM "User" WHERE "role" = 'SUPER_ADMIN'
+            AND "clerkId" LIKE 'user_zzsai_race_%' FOR UPDATE
+        `;
+        if (admins.length <= 1) return "refused";
+        await new Promise((r) => setTimeout(r, 300)); // hold the lock so the other overlaps
+        await tx.user.update({ where: { id }, data: { role: "HR" } });
+        return "demoted";
+      });
+    const outcomes = await Promise.all([demote(r1.id), demote(r2.id)]);
+    check("3l two concurrent demotions of the last two admins: exactly one wins",
+      outcomes.sort().join(",") === "demoted,refused", outcomes.join(","));
+    check("3m …and one of the pair is still SUPER_ADMIN",
+      (await db.user.count({
+        where: { role: "SUPER_ADMIN", clerkId: { startsWith: "user_zzsai_race_" } },
+      })) === 1);
 
     // ── 4: ROLE-DISTRIBUTION REPORTING ──────────────────────────────
     step("4", "role distribution counts them");

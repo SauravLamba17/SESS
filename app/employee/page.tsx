@@ -109,6 +109,7 @@ async function loadMetrics() {
         appraisalScore: appraisal?.finalScore ?? null,
         appraisalPeriod: appraisal?.cycle.period ?? null,
         today: own.today,
+        punchRow: own.punchRow,
         weekStart: own.weekStart,
         weekByDate: own.weekByDate,
         idle: latestConsent("IDLE_TRACKING"),
@@ -191,8 +192,8 @@ export default async function EmployeeDashboard() {
 
           <div className="mb-4">
             <ClockInWidget
-              initialCheckIn={today?.checkIn ? today.checkIn.toISOString() : null}
-              initialCheckOut={today?.checkOut ? today.checkOut.toISOString() : null}
+              initialCheckIn={m?.punchRow?.checkIn ? m.punchRow.checkIn.toISOString() : null}
+              initialCheckOut={m?.punchRow?.checkOut ? m.punchRow.checkOut.toISOString() : null}
             />
           </div>
 

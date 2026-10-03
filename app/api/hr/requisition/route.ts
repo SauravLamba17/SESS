@@ -69,9 +69,17 @@ export async function POST(req: NextRequest) {
       if (!id || (status !== "OPEN" && status !== "ON_HOLD"))
         return fail("BAD_INPUT", "id and status (OPEN|ON_HOLD) are required", 400);
 
-      const upd = await db.jobRequisition.updateMany({
-        where: { id },
-        data: { status, closedAt: null },
+      // Reopening makes a role public on /careers again — audited.
+      const upd = await db.$transaction(async (tx) => {
+        const u = await tx.jobRequisition.updateMany({
+          where: { id },
+          data: { status, closedAt: null },
+        });
+        if (u.count === 1)
+          await tx.auditLog.create({
+            data: { actorUserId: userId, action: `REQUISITION_STATUS_${status}`, targetEntity: id },
+          });
+        return u;
       });
       if (upd.count === 0) return fail("NOT_FOUND", "Requisition not found", 404);
       onRecruitmentChanged();
@@ -109,10 +117,15 @@ export async function POST(req: NextRequest) {
           409,
         );
 
-      await db.jobRequisition.update({
-        where: { id },
-        data: { title, department, description, openings },
-      });
+      await db.$transaction([
+        db.jobRequisition.update({
+          where: { id },
+          data: { title, department, description, openings },
+        }),
+        db.auditLog.create({
+          data: { actorUserId: userId, action: "REQUISITION_UPDATED", targetEntity: `${id} openings=${openings}` },
+        }),
+      ]);
       onRecruitmentChanged();
       return NextResponse.json({ ok: true, id });
     }

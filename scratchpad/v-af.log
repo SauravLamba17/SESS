@@ -1,0 +1,93 @@
+(node:16820) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/Saurav/Desktop/WORK/SESS/prisma/verify-audit-fixes.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to C:\Users\Saurav\Desktop\WORK\SESS\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+── 1: duplicate payroll run is blocked BY THE DATABASE 
+PASS  the partial unique index exists
+PASS  …and it is scoped to regular rows only
+        CREATE UNIQUE INDEX "Payroll_one_regular_run_per_employee_month" ON public."Payroll" USING btree ("employeeId", month) WHERE (("adjustmentForPayrollId" IS NULL) AND ("isFinalSettlement" = false))
+PASS  first regular run row inserted
+PASS  a SECOND regular run for the same employee+month is REJECTED (P2002)
+PASS  …and only one row exists
+PASS  two SIMULTANEOUS runs → exactly one succeeds
+PASS  …and exactly one is rejected
+PASS  …leaving exactly one payroll row (no double payment)
+PASS  a FINAL SETTLEMENT may still share the month (offboard after an early run)
+PASS  MULTIPLE adjustments may still share the month
+
+── 3: manager routes require the MANAGER ROLE, not just the position 
+PASS  client-mail/route.ts — role gate present
+PASS  client-mail/route.ts — gate runs BEFORE the scope check
+PASS  client-mail/route.ts — scope check RETAINED (added to, not replaced)
+PASS  expense/route.ts — role gate present
+PASS  expense/route.ts — gate runs BEFORE the scope check
+PASS  expense/route.ts — scope check RETAINED (added to, not replaced)
+PASS  leave/route.ts — role gate present
+PASS  leave/route.ts — gate runs BEFORE the scope check
+PASS  leave/route.ts — scope check RETAINED (added to, not replaced)
+PASS  quality/route.ts — role gate present
+PASS  quality/route.ts — gate runs BEFORE the scope check
+PASS  quality/route.ts — scope check RETAINED (added to, not replaced)
+PASS  shift/route.ts — role gate present
+PASS  shift/route.ts — gate runs BEFORE the scope check
+PASS  shift/route.ts — scope check RETAINED (added to, not replaced)
+PASS  target/route.ts — role gate present
+PASS  target/route.ts — gate runs BEFORE the scope check
+PASS  target/route.ts — scope check RETAINED (added to, not replaced)
+PASS  warning/route.ts — role gate present
+PASS  warning/route.ts — gate runs BEFORE the scope check
+PASS  warning/route.ts — scope check RETAINED (added to, not replaced)
+PASS  appraisal/feedback/route.ts — role gate present
+PASS  appraisal/feedback/route.ts — gate runs BEFORE the scope check
+PASS  appraisal/feedback/route.ts — scope check RETAINED (added to, not replaced)
+PASS  an EMPLOYEE-role user CAN hold a manager position (the exploit precondition is real)
+        role=EMPLOYEE, manages ZZ-AUDITFIX-REPORT
+PASS  …and the manager role gate rejects that role
+        role=EMPLOYEE, admitted=MANAGER/HR/SUPER_ADMIN
+
+── 4: double-publish is blocked, and writes after publish are refused 
+PASS  two SIMULTANEOUS publishes → exactly ONE claims the cycle
+PASS  …the other reports count 0 (so it notifies nobody)
+PASS  …and the cycle is published exactly once
+PASS  lockCycleForWrite() refuses a PUBLISHED cycle
+PASS  …with reason PUBLISHED
+PASS  …and NOT_FOUND for a missing cycle
+PASS  …and permits an UNPUBLISHED cycle
+PASS  compute routes its write through lockCycleForWrite
+PASS  exclude routes its write through lockCycleForWrite
+PASS  feedback routes its write through lockCycleForWrite
+PASS  publish claims atomically via updateMany with published:false in the WHERE
+
+── 2+5: search keeps its own role scoping; toISOString date bugs are gone 
+PASS  search exports a plain GET again
+PASS  search has no MFA wrapper left
+PASS  search still authenticates in-route
+PASS  search still resolves the caller's role in-route
+PASS  search still branches org-wide reads on HR/SUPER_ADMIN
+PASS  search still has a MANAGER-scoped branch
+PASS  lib/payroll/pdf.tsx uses the shared ymd()
+PASS  app/api/hr/employee/bulk-import/route.ts uses the shared ymd()
+PASS  app/hr/salary-structure/page.tsx uses the shared ymd()
+PASS  app/api/hr/salary-structure/route.ts uses the shared ymd()
+PASS  app/api/hr/employee/bulk-import/route.ts has no toISOString().slice(0, 10) left
+PASS  app/hr/salary-structure/page.tsx has no toISOString().slice(0, 10) left
+PASS  app/api/hr/salary-structure/route.ts has no toISOString().slice(0, 10) left
+PASS  README no longer advertises camera-verified attendance
+PASS  README no longer advertises per-machine averages
+
+── 6: two concurrent offboards: exactly one wins (no double settlement) 
+PASS  offboard route claims with updateMany WHERE { id, active: true }
+PASS  exactly one of two concurrent claims succeeds
+        counts=0,1
+
+── 7: offboard refuses a F&F settlement for a month already paid by a regular row 
+PASS  the regular-row check runs BEFORE the settlement is created
+PASS  …and tells HR to use a payroll adjustment instead
+PASS  a regular row for the month is found → settlement refused
+PASS  an existing SETTLEMENT alone is not a regular row (no false refusal)
+
+── CLEANUP ───────────────────────────────────────────
+PASS  every test row removed
+
+══ RESULT: 69 passed, 0 failed ══

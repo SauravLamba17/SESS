@@ -11,6 +11,8 @@ import {
 } from "@/lib/employees/retention";
 import { ymd } from "@/lib/reports/range";
 import { onEmployeeRosterChanged } from "@/lib/invalidation/employee";
+import { revokePendingInvitation } from "@/lib/employees/invite";
+import { clerkRevokeInvitation } from "@/lib/employees/invite-clerk";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -75,6 +77,7 @@ export async function POST(req: NextRequest) {
         offboardedAt: true,
         scheduledRedactionAt: true,
         redactedAt: true,
+        pendingInvitationId: true,
       },
     });
     if (!employee) return fail("NOT_FOUND", "Employee not found", 404);
@@ -149,6 +152,15 @@ export async function POST(req: NextRequest) {
         },
       });
     });
+
+    // The patch nulled pendingInvitationId; revoke the invitation itself too,
+    // after commit, best-effort and audited (an offboard usually got it first).
+    if (employee.pendingInvitationId)
+      await revokePendingInvitation(
+        db,
+        { employeeId, invitationId: employee.pendingInvitationId, actorUserId: userId, reason: "redaction" },
+        clerkRevokeInvitation,
+      ).catch((err) => console.error("[hr/employee/retention] invitation revoke failed:", err));
 
     // §5: redaction rewrites the employee's identifying fields, so every
     // cached display copy of them — roster rows, this employee's own profile

@@ -5,6 +5,12 @@ import { idleThresholdSeconds } from "@/lib/idle/settings";
 import { idleTrackingEnabled } from "@/lib/system-settings";
 import { fail } from "@/lib/api/response";
 import { ymd } from "@/lib/reports/range";
+import { startOfDay } from "@/lib/period";
+import {
+  checkRateLimit,
+  AGENT_HEARTBEAT_ACTION,
+  AGENT_HEARTBEAT_MAX,
+} from "@/lib/recruitment/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -104,6 +110,25 @@ export async function POST(req: NextRequest) {
         { shouldPause: true },
       );
 
+    // ── Abuse cap, per token. After the token check so unknown tokens cost no
+    // row, and keyed by the token's row id so the secret is never copied.
+    // Same 429 + Retry-After shape as /api/careers/apply. No shouldPause: a
+    // legitimate agent never reaches the cap (see AGENT_HEARTBEAT_MAX).
+    const rate = await checkRateLimit(
+      agent.id,
+      AGENT_HEARTBEAT_ACTION,
+      new Date(),
+      AGENT_HEARTBEAT_MAX,
+    );
+    if (!rate.allowed)
+      return NextResponse.json(
+        {
+          error: `Too many heartbeats for this agent token. Please try again in about ${Math.ceil(rate.retryAfterSeconds / 60)} minute(s).`,
+          code: "RATE_LIMITED",
+        },
+        { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } },
+      );
+
     if (!agent.employee.active)
       return fail(
         "INACTIVE_EMPLOYEE",
@@ -129,11 +154,7 @@ export async function POST(req: NextRequest) {
       );
 
     // ── Store ────────────────────────────────────────────────────────
-    const day = new Date(
-      windowEnd.getFullYear(),
-      windowEnd.getMonth(),
-      windowEnd.getDate(),
-    );
+    const day = startOfDay(windowEnd);
 
     // ATOMIC INCREMENT, not read-then-write.
     //

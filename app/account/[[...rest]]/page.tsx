@@ -22,7 +22,7 @@ export default async function AccountPage() {
   const home = realRole ? ROLE_HOME[realRole] : "/";
 
   return (
-    <main className="min-h-screen bg-background px-4 py-8">
+    <main className="min-h-dvh bg-background px-4 py-8">
       <div className="mx-auto flex max-w-4xl flex-col items-center gap-6">
         <div className="flex w-full items-center justify-between gap-4">
           <Logo size={28} />

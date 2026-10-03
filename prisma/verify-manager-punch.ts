@@ -193,8 +193,11 @@ async function main() {
   for (const c of ["ShiftBanner", "TodayAttendanceCard", "WeekAttendancePanel"]) {
     check(`both dashboards share ${c}`, mgrPage.includes(c) && empPage.includes(c));
   }
+  // punchRow, not today: the widget is seeded from the punch route's own
+  // open-row lookup so the night shift's after-midnight button is right
+  // (verify-night-shift step 8). Still the manager's OWN attendance.
   check("manager passes its OWN attendance to the widget",
-    /initialCheckIn=\{data\.own\.today/.test(mgrPage));
+    /initialCheckIn=\{data\.own\.punchRow/.test(mgrPage));
   check("manager's own load is scoped to manager.id",
     /loadOwnAttendance\(manager\.id/.test(mgrPage));
 }

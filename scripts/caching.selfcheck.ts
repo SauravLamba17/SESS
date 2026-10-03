@@ -18,12 +18,15 @@
  * issues is counted at the driver.
  *
  * WHAT IT WRITES TO THE DATABASE
- * Two disposable things, both removed in a finally block that runs even on
- * failure, and both reported line by line as they happen:
- *   · one Holiday row named "ZZ-CACHE-SELFCHECK" (created, then deleted);
- *   · one LeaveRequest for an existing employee, plus a temporary managerId on
- *     that same employee (restored to its original value afterwards).
- * It writes nothing to payroll, salary, audit or Clerk.
+ * Only its own disposable rows, all removed in a finally block that runs even
+ * on failure, and reported line by line as they happen:
+ *   · two fixture employees, TEST-CACHE-MGR and TEST-CACHE-EMP (the second
+ *     reports to the first), department "TEST-CACHE-DEPT";
+ *   · one Holiday row named "ZZ-CACHE-SELFCHECK";
+ *   · one LeaveRequest for TEST-CACHE-EMP.
+ * It never touches a real employee: an earlier version borrowed the first
+ * active employee and temporarily rewrote their department and managerId on
+ * the live database. It writes nothing to payroll, salary, audit or Clerk.
  */
 import { PrismaClient } from "@prisma/client";
 
@@ -52,7 +55,9 @@ const { db } = await import("@/lib/db");
 const { request, forceCold } = await import("./cache-harness.ts");
 
 const { getDepartments, TAG_DEPARTMENTS } = await import("@/lib/cache/departments.ts");
-const { getHolidayCalendar, TAG_HOLIDAYS, TAG_SHIFTS } = await import("@/lib/cache/shifts.ts");
+const { getHolidayCalendar, getShiftsWithAssignedCounts, TAG_HOLIDAYS, TAG_SHIFTS } = await import(
+  "@/lib/cache/shifts.ts"
+);
 const {
   getHrDashboardTotals,
   getPendingLeaveCount,
@@ -64,7 +69,7 @@ const {
   approvalsTag,
 } = await import("@/lib/cache/dashboard.ts");
 const { TAG_ROSTER } = await import("@/lib/cache/employees.ts");
-const { onEmployeeRosterChanged, onHolidayCalendarChanged } = await import(
+const { onEmployeeRosterChanged, onHolidayCalendarChanged, onEmployeeShiftAssigned } = await import(
   "@/lib/invalidation/employee.ts"
 );
 const { onLeaveDecided } = await import("@/lib/invalidation/leave.ts");
@@ -186,11 +191,33 @@ const ALL_TAGS = [
 // Scratch state, torn down in the finally block.
 let scratchHolidayId: string | null = null;
 let scratchLeaveId: string | null = null;
-let subjectId: string | null = null;
-let originalManagerId: string | null | undefined;
-let originalDepartment: string | null = null;
+const FIXTURE_CODES = ["TEST-CACHE-EMP", "TEST-CACHE-MGR"]; // delete order: report first
+const FIXTURE_DEPT = "TEST-CACHE-DEPT";
+
+/** Removes this script's own rows only — by fixture code / scratch marker. */
+async function removeFixtures() {
+  await db.leaveRequest.deleteMany({
+    where: { reason: "ZZ-CACHE-SELFCHECK", employee: { employeeCode: { in: FIXTURE_CODES } } },
+  });
+  for (const code of FIXTURE_CODES) await db.employee.deleteMany({ where: { employeeCode: code } });
+}
 
 try {
+  // A crashed earlier run may have left fixtures behind; start clean.
+  await removeFixtures();
+  const manager = await db.employee.create({
+    data: { employeeCode: "TEST-CACHE-MGR", name: "TEST-CACHE Manager", department: FIXTURE_DEPT, joiningDate: new Date(2020, 0, 1) },
+  });
+  const subject = await db.employee.create({
+    data: {
+      employeeCode: "TEST-CACHE-EMP",
+      name: "TEST-CACHE Employee",
+      department: FIXTURE_DEPT,
+      joiningDate: new Date(2020, 0, 1),
+      managerId: manager.id,
+    },
+  });
+  console.log(`  [write] created fixtures ${manager.employeeCode}, ${subject.employeeCode}`);
   // A previous run's entries live on disk under .next/cache. Drop every tag
   // first so "the first read is a miss" is a fact rather than a hope.
   await forceCold(ALL_TAGS);
@@ -211,16 +238,7 @@ try {
   // Now change the underlying data. `department` is a column on Employee in
   // this schema (there is no Department table), so changing an employee's
   // department IS a change to the department list.
-  const subject = await db.employee.findFirst({
-    where: { active: true },
-    select: { id: true, department: true, managerId: true, employeeCode: true },
-    orderBy: { employeeCode: "asc" },
-  });
-  if (!subject) throw new Error("No active employee in the database — cannot run the write tests.");
-  subjectId = subject.id;
-  originalDepartment = subject.department;
-  originalManagerId = subject.managerId;
-  console.log(`\n  subject: ${subject.employeeCode}, department "${subject.department}"\n`);
+  const originalDepartment = subject.department;
 
   const probeDept = "ZZ-CACHE-SELFCHECK";
   await db.employee.update({ where: { id: subject.id }, data: { department: probeDept } });
@@ -310,21 +328,15 @@ try {
   // ══════════════════════════════════════════════════════════════════════════
   heading("4 · ORANGE TIER — pending approvals: TTL expiry AND §5 invalidation");
 
-  // The count is scoped by managerId. This database has one active employee
-  // and no manager, so the employee is briefly pointed at themselves: the
-  // cached reader's where-clause is `employee.managerId = <id>`, and what is
-  // under test is the caching and invalidation of that count, not the
-  // org chart. Restored in the finally block.
-  await db.employee.update({ where: { id: subjectId }, data: { managerId: subjectId } });
-  console.log(`  [write] temporary managerId on ${subject.employeeCode}`);
-
-  const p0 = await request(() => getPendingLeaveCount(subjectId!));
+  // The count is scoped by managerId: TEST-CACHE-EMP reports to TEST-CACHE-MGR.
+  const managerId = manager.id;
+  const p0 = await request(() => getPendingLeaveCount(managerId));
   await queries();
   console.log(`  baseline pending count: ${p0}`);
 
   const leave = await db.leaveRequest.create({
     data: {
-      employeeId: subjectId!,
+      employeeId: subject.id,
       startDate: new Date(2099, 0, 1),
       endDate: new Date(2099, 0, 2),
       reason: "ZZ-CACHE-SELFCHECK",
@@ -334,32 +346,32 @@ try {
   scratchLeaveId = leave.id;
   console.log(`  [write] created PENDING leave request ${leave.id}`);
 
-  const p1 = await request(() => getPendingLeaveCount(subjectId!));
+  const p1 = await request(() => getPendingLeaveCount(managerId));
   await queries();
   eq("no invalidation yet — the cached count is still the old one", p1, p0);
 
   console.log(`  ... waiting ${DASHBOARD_TTL + 2}s for the ORANGE TTL to lapse`);
   await new Promise((r) => setTimeout(r, (DASHBOARD_TTL + 2) * 1000));
 
-  await request(() => getPendingLeaveCount(subjectId!)); // stale-while-revalidate refill
+  await request(() => getPendingLeaveCount(managerId)); // stale-while-revalidate refill
   await queries();
-  const p2 = await request(() => getPendingLeaveCount(subjectId!));
+  const p2 = await request(() => getPendingLeaveCount(managerId));
   await queries();
   eq(`ORANGE value updates on its own within the ${DASHBOARD_TTL}s window`, p2, p0 + 1);
 
   // ── §5: "Employee leave approved → invalidate ... manager approvals and
   //        affected dashboard" — the EXACT atomic update the route performs.
   const upd = await db.leaveRequest.updateMany({
-    where: { id: leave.id, status: "PENDING", employee: { managerId: subjectId! } },
+    where: { id: leave.id, status: "PENDING", employee: { managerId } },
     data: { status: "APPROVED", approvedBy: "selfcheck" },
   });
   console.log(`  [write] approved via the route's atomic where-clause (${upd.count} row)`);
   eq("the approval actually transitioned exactly one row", upd.count, 1);
 
-  await request(async () => onLeaveDecided(subjectId!));
+  await request(async () => onLeaveDecided(managerId));
   console.log("  [invalidate] onLeaveDecided()");
 
-  const p3 = await request(() => getPendingLeaveCount(subjectId!));
+  const p3 = await request(() => getPendingLeaveCount(managerId));
   const pq3 = await queries();
   eq("next read reflects the approval IMMEDIATELY, not after a TTL", p3, p0);
   check("...and it came from the database, not the cache", pq3 >= 1, `${pq3} queries`);
@@ -376,6 +388,22 @@ try {
   console.log("  [invalidate] onAttendanceRecorded()  (as app/api/attendance/punch calls it)");
   await request(() => getHrDashboardTotals(period, todayYmd));
   check("'Present Today' aggregate is re-read after a punch", (await queries()) >= 1);
+
+  // ══════════════════════════════════════════════════════════════════════════
+  heading("5b · §5 shift assignment refreshes the /hr/shifts assigned counts");
+
+  await request(() => getShiftsWithAssignedCounts());
+  await queries();
+  await request(() => getShiftsWithAssignedCounts());
+  check("assigned counts warm (served from cache)", (await queries()) === 0);
+
+  // What app/api/hr/employee/shift and app/api/manager/shift call after
+  // assigning. It used to leave TAG_SHIFTS alone, so the counts stayed stale
+  // for up to the shift cache's hour.
+  await request(async () => onEmployeeShiftAssigned({ employeeId: subject.id }));
+  console.log("  [invalidate] onEmployeeShiftAssigned()");
+  await request(() => getShiftsWithAssignedCounts());
+  check("assigned counts are re-read after an assignment", (await queries()) >= 1);
 
   // ══════════════════════════════════════════════════════════════════════════
   heading("6 · RED TIER — no caching anywhere in the call path (§3)");
@@ -570,6 +598,21 @@ try {
     );
   }
 
+  // Emergency contact is a third party's personal data: never in a shared
+  // cache entry, where a redaction could only mark it stale.
+  for (const f of cacheFiles) {
+    const code = readFileSync(nodePath.join(ROOT, "lib/cache", f), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/(^|[^:])\/\/.*$/gm, "$1");
+    check(`lib/cache/${f} caches no emergencyContact`, !/emergencyContact/.test(code));
+  }
+  check(
+    "the profile page reads emergencyContact from the uncached row",
+    readFileSync(nodePath.join(ROOT, "app/employee/profile/page.tsx"), "utf8").includes(
+      "emergencyContact: me.emergencyContact",
+    ),
+  );
+
   // ══════════════════════════════════════════════════════════════════════════
   heading("8 · §11 — Redis was not added");
 
@@ -599,15 +642,8 @@ try {
       await db.holiday.delete({ where: { id: scratchHolidayId } });
       console.log(`  removed scratch holiday ${scratchHolidayId}`);
     }
-    if (subjectId) {
-      await db.employee.update({
-        where: { id: subjectId },
-        data: { managerId: originalManagerId ?? null, department: originalDepartment ?? undefined },
-      });
-      console.log(
-        `  restored employee ${subjectId}: department "${originalDepartment}", managerId ${originalManagerId ?? "null"}`,
-      );
-    }
+    await removeFixtures();
+    console.log(`  removed fixture employees ${FIXTURE_CODES.join(", ")}`);
     await forceCold(ALL_TAGS);
     console.log("  dropped every cache tag");
   } catch (err) {

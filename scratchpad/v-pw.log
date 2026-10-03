@@ -1,0 +1,107 @@
+(node:20492) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/Saurav/Desktop/WORK/SESS/prisma/verify-payroll-workflow.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to C:\Users\Saurav\Desktop\WORK\SESS\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+══ PHASE 7 FULL PAYROLL WORKFLOW VERIFICATION ══════════
+
+── STEP 1: employee + salary structure + approved expense 
+PASS  1a SalaryStructure stored as exact Decimal
+        basic=30000.00 hra=15000.00 sa=5000.00
+PASS  1b PF UAN recorded on the employee
+        uan=100123456789
+PASS  1c APPROVED expense claim created, not yet reimbursed
+        amount=2500.75 includedInPayrollId=null
+
+── STEP 2: issue a salary advance ──────────────────────
+PASS  2a advance ACTIVE, balance = principal
+        principal=24000.00 monthly=4000.00 balance=24000.00
+
+── STEP 3: create payroll run (expense + loan aware, pro-rated) 
+PASS  3a full month → no pro-ration (30/30 days)
+        daysWorked=30 daysInMonth=30
+PASS  3b gross = 30000+15000+5000, unaffected by expense/loan
+        gross=50000.00
+PASS  3c expense folded in as reimbursement
+        reimbursements=2500.75
+PASS  3d loan installment applied (min(4000, 24000))
+        loanDeduction=4000.00
+PASS  3e deductions = 0 statutory + 4000 loan
+        deductions=4000.00
+PASS  3f net = 50000 - 4000 + 2500.75
+        net=48500.75
+PASS  3g claim stamped with payroll id (cannot be double-counted)
+        includedInPayrollId=cmurql9xl000awgt8u6tgg2u1
+PASS  3h stored figures match computeGrossNet exactly
+        recomputed net=48500.75 stored net=48500.75
+
+── STEP 4: submit the run ──────────────────────────────
+PASS  4a exactly 1 row DRAFT→SUBMITTED
+        count=1
+PASS  4b HR edit guard already rejects a SUBMITTED row (→ 409)
+        rows matched=0
+
+── STEP 5: finalize as Super Admin (loan reduced + notification) 
+PASS  5a advance balance reduced 24000 → 20000
+        remainingBalance=20000.00
+PASS  5b advance still ACTIVE (balance remains)
+        status=ACTIVE
+
+── STEP 5.5: a loan deduction with no matching advance REFUSES finalize 
+PASS  5x-a finalize throws LoanUnmatchedError naming the row
+        Payroll row cmurqlavc000dwgt8otzlyqda (ZZ-WORKFLOW-TEST Workflow Test) deducts ₹999999.00 as loan recovery, but their ACTIVE salary advance has only ₹20000.00 outstanding.
+PASS  5x-b …and the whole transition rolled back (row still SUBMITTED)
+PASS  5x-c …and the advance ledger is untouched
+PASS  5x-d the finalize route uses recoverLoans and maps the refusal to 409 LOAN_UNMATCHED
+
+── STEP 6: attempt to edit the FINALIZED row ───────────
+PASS  6a route's status guard → 409 LOCKED
+        status=FINALIZED → 409 "This payroll row is FINALIZED and permanently immutable."
+PASS  6b atomic write guard matched 0 rows
+        rows matched=0
+PASS  6c figures byte-identical after tamper attempt
+        gross=50000.00 net=48500.75 status=FINALIZED
+
+── STEP 7: offboard mid-month → F&F settlement ─────────
+PASS  7a payable days = 12 of 30 (exit on the 12th)
+        daysWorked=12 daysInMonth=30
+PASS  7b F&F pro-rated: basic 30000*12/30 = 12000
+        basic=12000.00
+PASS  7c F&F gross = 12000+6000+2000
+        gross=20000.00
+PASS  7d F&F deducts the FULL remaining loan (20000), not one 4000 installment
+        loanDeduction=20000.00
+PASS  7e F&F swept up the outstanding expense claim
+        reimbursements=500.25
+PASS  7f F&F net = 20000 - 20000 + 500.25
+        net=500.25
+PASS  7g F&F row is DRAFT — not auto-finalized
+        status=DRAFT isFinalSettlement=true
+PASS  7h employee soft-deleted with an exit date recorded
+        active=false offboardedAt=2019-04-11
+PASS  7i FULL_FINAL_SETTLEMENT_CREATED audit row written
+PASS  7j advance NOT yet reduced — F&F is still DRAFT (recovery happens at finalize)
+        balance=20000.00 status=ACTIVE
+PASS  7k on F&F finalize the advance is fully repaid and CLOSED
+        balance=0.00 status=CLOSED
+
+── STEP 8: generate a salary slip PDF ──────────────────
+PASS  8a payslip payload complete, FINALIZED, every figure an exact decimal string
+        {"employeeName":"Workflow Test","employeeCode":"ZZ-WORKFLOW-TEST","pfUan":"100123456789","period":"2019-04","daysWorked":30,"daysInMonth":30,"loanDeduction":"4000.00","gross":"50000.00","net":"48500.75","isFinalSettlement":false}
+PASS  8b only FINALIZED rows reachable by the employee payslip query
+        FINALIZED rows=2 (regular + F&F)
+
+── STEP 9: notifications ───────────────────────────────
+PASS  9a PAYSLIP_READY notification created on finalize
+        notifications=2
+PASS  9b notifications start unread
+        unread=2/2
+PASS  9c settlement notification names the settlement
+        "Your payslip for April 2019 is ready to download." | "Your full & final settlement for April 2019 is ready to download."
+PASS  9d addressed to the employee's User, employee kept as context
+        recipientUserId=cmurql9ph0002wgt88xf3plh1,cmurql9ph0002wgt88xf3plh1
+
+── CLEANUP ───────────────────────────────────────────
+PASS  10. every test row removed
+        employees=0 payroll=0 notifications=0
+
+══ ALL 41 CHECKS PASSED ══

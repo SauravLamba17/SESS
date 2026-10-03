@@ -1,3 +1,66 @@
+/**
+ * Clerk's Frontend API host, read from the publishable key itself
+ * (pk_<env>_<base64("host$")>) so the policy follows the key if the Clerk
+ * instance ever changes — today a dev instance on *.clerk.accounts.dev.
+ */
+const clerkHost = (() => {
+  try {
+    const b64 = (process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "").split("_")[2] ?? "";
+    const host = Buffer.from(b64, "base64").toString().replace(/\$$/, "");
+    return /^[a-z0-9.-]+$/i.test(host) ? `https://${host}` : "https://*.clerk.accounts.dev";
+  } catch {
+    return "https://*.clerk.accounts.dev";
+  }
+})();
+
+/**
+ * REPORT-ONLY ON PURPOSE. This header never blocks anything — the browser only
+ * logs "[Report Only] Refused to …" to the console. Watch the console on every
+ * portal (sign-in, sign-up, landing, PDF download, each role's pages) for a
+ * full working cycle BEFORE renaming this to Content-Security-Policy; one
+ * missing source in enforcing mode silently breaks sign-in.
+ *
+ * Every source and why:
+ *  default-src 'self'           — everything not listed below is same-origin only.
+ *  script-src 'unsafe-inline'   — Next 14 App Router streams RSC payload in inline
+ *                                 <script> tags, and THEME_INIT_SCRIPT in
+ *                                 app/layout.tsx must run inline before first paint.
+ *                                 No nonce plumbing exists yet; that is the upgrade
+ *                                 path before enforcing. No 'unsafe-eval': only dev
+ *                                 (React Refresh) needs it, and dev is not shipped.
+ *  script-src clerkHost         — clerk-js is loaded from Clerk's Frontend API.
+ *  challenges.cloudflare.com    — Clerk's bot protection (Turnstile) on sign-up:
+ *                                 script + iframe.
+ *  style-src 'unsafe-inline'    — Clerk components and Next/React inline styles.
+ *  img-src img.clerk.com        — Clerk avatars/logos; data: for inline SVG icons;
+ *                                 blob: for avatar previews in <UserProfile>.
+ *  font-src 'self' data:        — Space Grotesk/Inter/IBM Plex Mono come from
+ *                                 next/font/google, which SELF-HOSTS them under
+ *                                 /_next/static/media at build time, so
+ *                                 fonts.googleapis.com/gstatic are NOT needed.
+ *  connect-src clerkHost        — Clerk session/token API calls.
+ *  connect-src clerk-telemetry  — Clerk dev instances post SDK telemetry.
+ *  worker-src 'self' blob:      — Clerk spins up a blob: worker for token refresh.
+ *  three.js / lenis             — bundled npm chunks served from /_next: 'self'.
+ *  Vercel Analytics             — not installed, so nothing allowed for it.
+ *  object-src 'none', base-uri 'self', frame-ancestors 'none' (mirrors
+ *  X-Frame-Options DENY), form-action 'self'.
+ */
+const cspReportOnly = [
+  "default-src 'self'",
+  `script-src 'self' 'unsafe-inline' ${clerkHost} https://challenges.cloudflare.com`,
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https://img.clerk.com",
+  "font-src 'self' data:",
+  `connect-src 'self' ${clerkHost} https://clerk-telemetry.com`,
+  "frame-src 'self' https://challenges.cloudflare.com",
+  "worker-src 'self' blob:",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+].join("; ");
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
@@ -17,13 +80,9 @@ const nextConfig = {
    * The app previously sent NONE of these — confirmed against a live response
    * during the security audit, which is what prompted this.
    *
-   * Content-Security-Policy is DELIBERATELY ABSENT. It is the one header here
-   * that can silently break the app: the theme script in app/layout.tsx is
-   * inline (it must run before first paint) and Clerk loads from its own
-   * domains, so a policy has to carry a nonce or hash and an accurate
-   * allow-list. That belongs in its own change, rolled out via
-   * Content-Security-Policy-Report-Only first. The four below cannot break a
-   * working page, which is exactly why they ship separately and first.
+   * Content-Security-Policy ships as REPORT-ONLY (see cspReportOnly above).
+   * It is the one header here that can silently break the app, so it observes
+   * first and never enforces until its console reports have been watched.
    */
   async headers() {
     return [
@@ -58,7 +117,25 @@ const nextConfig = {
           // `self` permits it for our own pages while denying it to any
           // embedded third-party context.
           { key: "Permissions-Policy", value: "geolocation=(self)" },
+
+          // Observe-only. NEVER rename to Content-Security-Policy without first
+          // watching the browser console for violations — see cspReportOnly.
+          { key: "Content-Security-Policy-Report-Only", value: cspReportOnly },
         ],
+      },
+      {
+        // Every API response is per-user or per-request. `dynamic =
+        // "force-dynamic"` stops prerendering but emits NO Cache-Control on a
+        // route handler (measured on a production build — see
+        // app/api/health/route.ts), so JSON GETs like /api/attendance/month and
+        // /api/search went out with none and an intermediary could
+        // heuristically cache employee data. Pages need nothing here: Next
+        // already sends `private, no-cache, no-store` on every dynamic render.
+        // Routes that ALSO set Cache-Control by hand (health, the PDF routes)
+        // send both lines; every value involved is no-store, so whichever a
+        // cache reads, or the comma-joined union, means the same thing.
+        source: "/api/:path*",
+        headers: [{ key: "Cache-Control", value: "private, no-store" }],
       },
     ];
   },

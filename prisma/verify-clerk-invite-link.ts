@@ -24,6 +24,7 @@
  *
  * Run:  node --env-file=.env prisma/verify-clerk-invite-link.ts
  */
+import fs from "node:fs";
 import { PrismaClient } from "@prisma/client";
 import { onboardEmployee } from "../lib/employees/onboard.ts";
 import {
@@ -36,6 +37,12 @@ import {
 const db = new PrismaClient();
 
 const TAG = "ZZ-INV";
+
+/** Records revocations instead of calling Clerk. */
+const revokeCalls: string[] = [];
+const stubRevoke = async (invitationId: string) => {
+  revokeCalls.push(invitationId);
+};
 const ACTOR = "test-inv-actor";
 const EMAIL = "zz-inv-employee@example.invalid";
 const CLERK_ID = "user_zzinvtest_0001";
@@ -130,9 +137,10 @@ async function main() {
   };
   const sent = await sendEmployeeInvitation(
     db,
-    { employeeId: empId, role: "MANAGER", actorUserId: ACTOR },
+    { employeeId: empId, role: "MANAGER", actorUserId: ACTOR, actorRole: "HR" },
     stubOk,
     stubNoClerkUser,
+    stubRevoke,
   );
   check("invitation reported sent", sent.ok, JSON.stringify(sent));
   check("reported as an invitation, not an immediate link", sent.ok && sent.linked === false);
@@ -157,9 +165,10 @@ async function main() {
   // Temporarily clear the pending id so we can see it is NOT overwritten on failure.
   const failRes = await sendEmployeeInvitation(
     db,
-    { employeeId: empId, role: "EMPLOYEE", actorUserId: ACTOR },
+    { employeeId: empId, role: "EMPLOYEE", actorUserId: ACTOR, actorRole: "HR" },
     stubFail,
     stubNoClerkUser,
+    stubRevoke,
   );
   check(
     "failure surfaced as CLERK_ERROR with Clerk's message",
@@ -201,9 +210,10 @@ async function main() {
 
   const existing = await sendEmployeeInvitation(
     db,
-    { employeeId: empId2, role: "HR", actorUserId: ACTOR },
+    { employeeId: empId2, role: "HR", actorUserId: ACTOR, actorRole: "HR" },
     stubShouldNotRun,
     stubHasClerkUser,
+    stubRevoke,
   );
   check("reported ok + linked", existing.ok && existing.linked === true, JSON.stringify(existing));
   check("NO invitation was created", inviteCalls2.length === 0, JSON.stringify(inviteCalls2));
@@ -243,12 +253,13 @@ async function main() {
   };
   const outage = await sendEmployeeInvitation(
     db,
-    { employeeId: empId, role: "EMPLOYEE", actorUserId: ACTOR },
+    { employeeId: empId, role: "EMPLOYEE", actorUserId: ACTOR, actorRole: "HR" },
     async (p) => {
       inviteCalls3.push(p);
       return { id: "inv_zzstub_outage" };
     },
     lookupBroken,
+    stubRevoke,
   );
   check(
     "surfaced as CLERK_ERROR",
@@ -297,6 +308,127 @@ async function main() {
   check("not linked, reason given", noMatch.linked === false && noMatch.reason.length > 0, JSON.stringify(noMatch));
   const usersAfter = await db.user.count();
   check("no User row created for the stranger", usersAfter === usersBefore);
+
+  // ── 5: only a Super Admin may grant SUPER_ADMIN (Part 2 decision 1) ──
+  step("5", "HR cannot invite a SUPER_ADMIN; a Super Admin can");
+  const target = await db.$transaction((tx) =>
+    onboardEmployee(
+      tx,
+      { employeeCode: `${TAG}-0005`, name: `${TAG} Grant Target`, department: "Testing", joiningDate: new Date(2026, 6, 1), email: "zz-inv-grant@example.invalid" },
+      ACTOR,
+    ),
+  );
+  if (!target.ok) throw new Error("cannot continue");
+  let grantCalls = 0;
+  const countingInvite: CreateInvitationFn = async () => {
+    grantCalls++;
+    return { id: `inv_zzgrant_${grantCalls}` };
+  };
+  const hrGrant = await sendEmployeeInvitation(
+    db,
+    { employeeId: target.employee.id, role: "SUPER_ADMIN", actorUserId: ACTOR, actorRole: "HR" },
+    countingInvite,
+    stubNoClerkUser,
+    stubRevoke,
+  );
+  check(
+    "5a HR → SUPER_ADMIN refused with FORBIDDEN_ROLE, Clerk never called",
+    !hrGrant.ok && hrGrant.code === "FORBIDDEN_ROLE" && grantCalls === 0,
+    JSON.stringify(hrGrant),
+  );
+  check(
+    "5b …and nothing was written to the employee",
+    (await db.employee.findUnique({ where: { id: target.employee.id } }))?.pendingInvitationId === null,
+  );
+  for (const allowed of ["HR", "MANAGER", "EMPLOYEE"] as const) {
+    const ok = await sendEmployeeInvitation(
+      db,
+      { employeeId: target.employee.id, role: allowed, actorUserId: ACTOR, actorRole: "HR" },
+      countingInvite,
+      stubNoClerkUser,
+      stubRevoke,
+    );
+    check(`5c HR may still invite as ${allowed}`, ok.ok === true, JSON.stringify(ok));
+  }
+  const saGrant = await sendEmployeeInvitation(
+    db,
+    { employeeId: target.employee.id, role: "SUPER_ADMIN", actorUserId: ACTOR, actorRole: "SUPER_ADMIN" },
+    countingInvite,
+    stubNoClerkUser,
+    stubRevoke,
+  );
+  check("5d a Super Admin may invite as SUPER_ADMIN", saGrant.ok === true, JSON.stringify(saGrant));
+
+  // The three HTTP routes refuse BEFORE writing, and the HR UI never offers it.
+  for (const f of [
+    "app/api/hr/employee/invite/route.ts",
+    "app/api/hr/employee/route.ts",
+    "app/api/hr/offer/status/route.ts",
+  ]) {
+    const src = fs.readFileSync(f, "utf8");
+    check(
+      `5e ${f} refuses SUPER_ADMIN for a non-Super-Admin and passes actorRole`,
+      /"SUPER_ADMIN" &&\s*role !== "SUPER_ADMIN"/.test(src) && src.includes("actorRole: role"),
+    );
+  }
+  for (const f of ["components/hr/invite-button.tsx", "components/hr/onboard-form.tsx"]) {
+    check(`5f ${f} drops SUPER_ADMIN from its dropdown`, fs.readFileSync(f, "utf8").includes('ROLES.filter((r) => r !== "SUPER_ADMIN")'));
+  }
+
+  // ── 6: resend revokes the superseded invitation (Part 2 decision 4) ──
+  step("6", "a resend revokes the previous invitation; a FAILED resend revokes nothing");
+  // Each successful send above superseded the one before it.
+  check(
+    "6a every superseded invitation was revoked, in order",
+    JSON.stringify(revokeCalls) === JSON.stringify(["inv_zzgrant_1", "inv_zzgrant_2", "inv_zzgrant_3"]),
+    JSON.stringify(revokeCalls),
+  );
+  check(
+    "6b the employee now points at the latest invitation",
+    (await db.employee.findUnique({ where: { id: target.employee.id } }))?.pendingInvitationId === "inv_zzgrant_4",
+  );
+  check(
+    "6c each revocation is audited",
+    (await db.auditLog.count({
+      where: { action: "EMPLOYEE_INVITATION_REVOKED", targetEntity: { contains: target.employee.id } },
+    })) === 3,
+  );
+  const revokedBefore = revokeCalls.length;
+  const failedResend = await sendEmployeeInvitation(
+    db,
+    { employeeId: target.employee.id, role: "EMPLOYEE", actorUserId: ACTOR, actorRole: "HR" },
+    async () => {
+      throw { errors: [{ longMessage: "Clerk is down (simulated)." }] };
+    },
+    stubNoClerkUser,
+    stubRevoke,
+  );
+  check(
+    "6d a failed resend leaves the previous invitation alone",
+    !failedResend.ok &&
+      revokeCalls.length === revokedBefore &&
+      (await db.employee.findUnique({ where: { id: target.employee.id } }))?.pendingInvitationId === "inv_zzgrant_4",
+  );
+  const failingRevoke = await sendEmployeeInvitation(
+    db,
+    { employeeId: target.employee.id, role: "EMPLOYEE", actorUserId: ACTOR, actorRole: "HR" },
+    countingInvite,
+    stubNoClerkUser,
+    async () => {
+      throw { errors: [{ longMessage: "invitation is not pending" }] };
+    },
+  );
+  check(
+    "6e a revoke Clerk refuses (already expired) does not block the resend, and is audited",
+    failingRevoke.ok === true &&
+      (await db.auditLog.count({
+        where: { action: "EMPLOYEE_INVITATION_REVOKE_FAILED", targetEntity: { contains: target.employee.id } },
+      })) === 1,
+    JSON.stringify(failingRevoke),
+  );
+  for (const f of ["app/api/hr/employee/offboard/route.ts", "app/api/hr/employee/retention/route.ts"]) {
+    check(`6f ${f} revokes the pending invitation`, fs.readFileSync(f, "utf8").includes("revokePendingInvitation("));
+  }
 
   console.log(`\n══ RESULT: ${pass} passed, ${fail} failed ══`);
   if (fail > 0) process.exitCode = 1;

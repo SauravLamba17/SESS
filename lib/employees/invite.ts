@@ -39,6 +39,9 @@ export type CreateInvitationFn = (params: {
  */
 export type FindClerkUserByEmailFn = (email: string) => Promise<{ id: string } | null>;
 
+/** Revoke a still-pending Clerk invitation. Injected like the two above. */
+export type RevokeInvitationFn = (invitationId: string) => Promise<void>;
+
 export type InviteResult =
   /** An invitation was created and emailed. */
   | { ok: true; linked: false; invitationId: string; message: string }
@@ -46,7 +49,14 @@ export type InviteResult =
   | { ok: true; linked: true; userId: string; employeeId: string; message: string }
   | {
       ok: false;
-      code: "NOT_FOUND" | "ALREADY_LINKED" | "NO_EMAIL" | "CLERK_ERROR" | "INACTIVE" | "REDACTED";
+      code:
+        | "NOT_FOUND"
+        | "ALREADY_LINKED"
+        | "NO_EMAIL"
+        | "CLERK_ERROR"
+        | "INACTIVE"
+        | "REDACTED"
+        | "FORBIDDEN_ROLE";
       message: string;
     };
 
@@ -60,10 +70,33 @@ function clerkErrorMessage(err: unknown): string {
 
 export async function sendEmployeeInvitation(
   db: PrismaClient,
-  args: { employeeId: string; email?: string | null; role: Role; actorUserId: string },
+  args: {
+    employeeId: string;
+    email?: string | null;
+    role: Role;
+    actorUserId: string;
+    /** EFFECTIVE role of whoever is sending — gates which roles they may grant. */
+    actorRole: Role;
+  },
   createInvitation: CreateInvitationFn,
   findClerkUserByEmail: FindClerkUserByEmailFn,
+  revokeInvitation: RevokeInvitationFn,
 ): Promise<InviteResult> {
+  // ─── WHO MAY GRANT SUPER_ADMIN ─────────────────────────────────────────
+  // All three invite paths admit HR, and the role travels into the Clerk
+  // invitation's publicMetadata — which IS the role the account signs in with.
+  // Without this, HR could invite an address they control as SUPER_ADMIN and
+  // gain payroll finalize, role changes and impersonation. Only a Super Admin
+  // may grant Super Admin (the same rule /api/admin/user-role enforces); HR may
+  // still invite HR, MANAGER and EMPLOYEE. Checked first: nothing is read,
+  // written or sent for a refused grant.
+  if (args.role === "SUPER_ADMIN" && args.actorRole !== "SUPER_ADMIN")
+    return {
+      ok: false,
+      code: "FORBIDDEN_ROLE",
+      message: "Only a Super Admin can invite someone as Super Admin.",
+    };
+
   const emp = await db.employee.findUnique({
     where: { id: args.employeeId },
     select: {
@@ -71,6 +104,7 @@ export async function sendEmployeeInvitation(
       email: true,
       active: true,
       redactedAt: true,
+      pendingInvitationId: true,
       user: { select: { id: true } },
     },
   });
@@ -130,6 +164,19 @@ export async function sendEmployeeInvitation(
   // person HAS an account, the Employee row is theirs, and there is nothing
   // HR could do differently. This lives in the shared function so all three
   // invite paths (manual onboarding, roster resend, hire-conversion) get it.
+  // A RESEND supersedes the previous invitation, which may have gone to a
+  // different (mistyped) address and would otherwise stay acceptable until it
+  // expires. Revoked only AFTER the new invitation or link has succeeded, so a
+  // failed resend leaves the employee exactly as they were.
+  const supersede = async () => {
+    if (emp.pendingInvitationId)
+      await revokePendingInvitation(
+        db,
+        { employeeId: emp.id, invitationId: emp.pendingInvitationId, actorUserId: args.actorUserId, reason: "resend" },
+        revokeInvitation,
+      );
+  };
+
   let existingClerkUser: { id: string } | null;
   try {
     existingClerkUser = await findClerkUserByEmail(email);
@@ -158,6 +205,7 @@ export async function sendEmployeeInvitation(
         code: "ALREADY_LINKED",
         message: `That email already has a SESS login, and it could not be attached to this employee: ${link.reason}`,
       };
+    await supersede();
 
     await db.auditLog.create({
       data: {
@@ -167,11 +215,8 @@ export async function sendEmployeeInvitation(
       },
     });
 
-    // ponytail: any invitation already pending in Clerk for this address is
-    // left alone — it is unacceptable-by-construction and simply expires. Add
-    // a revokeInvitation injection here if stale pending invitations in the
-    // Clerk dashboard become confusing. prisma/backfill-clerk-links.ts revokes
-    // the ones that already accumulated.
+    // The employee's own pending invitation (if any) was revoked by
+    // supersede(), and a successful link clears pendingInvitationId.
     return {
       ok: true,
       linked: true,
@@ -195,6 +240,7 @@ export async function sendEmployeeInvitation(
   } catch (err) {
     return { ok: false, code: "CLERK_ERROR", message: clerkErrorMessage(err) };
   }
+  await supersede();
 
   // The invitation went out — record it. If THIS write fails the invitation
   // still exists in Clerk and the webhook link still works (it matches by
@@ -216,6 +262,39 @@ export async function sendEmployeeInvitation(
     invitationId,
     message: `Login invitation sent to ${email}.`,
   };
+}
+
+/**
+ * Revoke an outstanding invitation — on resend, offboard and redaction.
+ *
+ * BEST-EFFORT and audited either way: Clerk refuses to revoke an invitation
+ * that already expired, was accepted, or was revoked, and none of those should
+ * block a resend or an offboard. It is safe to be best-effort because it is
+ * not the only guard: an invitation accepted by an address that matches no
+ * Employee can no longer become an account unless it carries SUPER_ADMIN
+ * (ensureUserForClerkIdentity), and only a Super Admin can issue that.
+ */
+export async function revokePendingInvitation(
+  db: PrismaClient,
+  args: { employeeId: string; invitationId: string; actorUserId: string; reason: "resend" | "offboard" | "redaction" },
+  revokeInvitation: RevokeInvitationFn,
+): Promise<boolean> {
+  let ok = true;
+  let detail = "";
+  try {
+    await revokeInvitation(args.invitationId);
+  } catch (err) {
+    ok = false;
+    detail = ` error=${clerkErrorMessage(err)}`;
+  }
+  await db.auditLog.create({
+    data: {
+      actorUserId: args.actorUserId,
+      action: ok ? "EMPLOYEE_INVITATION_REVOKED" : "EMPLOYEE_INVITATION_REVOKE_FAILED",
+      targetEntity: `employee=${args.employeeId} invitation=${args.invitationId} reason=${args.reason}${detail}`,
+    },
+  });
+  return ok;
 }
 
 export type LinkResult =
@@ -313,6 +392,8 @@ export type EnsureRefusal =
   | "NO_EMAIL"
   /** Refused: the matching Employee belongs to a different Clerk account. */
   | "AMBIGUOUS"
+  /** Refused: no Employee matches and the role is not SUPER_ADMIN. */
+  | "NO_EMPLOYEE"
   /** Refused: the database rejected the write for a reason other than the race. */
   | "CONFLICT";
 
@@ -409,9 +490,22 @@ export async function ensureUserForClerkIdentity(
   if (link.code === "EMPLOYEE_TAKEN")
     return { created: false, code: "AMBIGUOUS", reason: link.reason };
 
-  // NO_EMPLOYEE_MATCH — the legitimate employee-less account. Create the User
-  // with employeeId NULL and audit it in the SAME transaction: an unaudited
-  // account appearing in the identity table is precisely what must not happen.
+  // NO_EMPLOYEE_MATCH. Only a SUPER_ADMIN may exist without an Employee row
+  // (the administrator with no HR profile). Every other role is staff, and
+  // staff always have an Employee — so a MANAGER/HR/EMPLOYEE identity that
+  // matches none is a stale or mistyped invitation accepted by someone else,
+  // and minting it an employee-less account would hand a stranger that role
+  // org-wide. Refuse, like every other ambiguity here.
+  if (args.role !== "SUPER_ADMIN")
+    return {
+      created: false,
+      code: "NO_EMPLOYEE",
+      reason: `no employee matches ${email} and role ${args.role} requires one`,
+    };
+
+  // The legitimate employee-less account. Create the User with employeeId NULL
+  // and audit it in the SAME transaction: an unaudited account appearing in
+  // the identity table is precisely what must not happen.
   try {
     const [user] = await db.$transaction([
       db.user.create({ data: { clerkId: args.clerkId, role: args.role, employeeId: null } }),

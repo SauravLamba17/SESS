@@ -1,11 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { Prisma } from "@prisma/client";
 import { getEffectiveUserId, getCurrentRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { isPeriod } from "@/lib/period";
 import { periodLabel } from "@/lib/payroll/format";
 import { fail } from "@/lib/api/response";
 import { notifyEach } from "@/lib/notify";
+import { recoverLoans, LoanUnmatchedError } from "@/lib/payroll/loan-recovery";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -69,6 +69,7 @@ export async function POST(req: NextRequest) {
         loanDeduction: true,
         isFinalSettlement: true,
         adjustmentForPayrollId: true,
+        employee: { select: { employeeCode: true, name: true } },
       },
     });
     if (pending.length === 0)
@@ -91,39 +92,10 @@ export async function POST(req: NextRequest) {
         }
 
         // ── Loan recovery, inside the same transaction ──
-        // Only rows that actually recovered something touch a balance. The
-        // `remainingBalance: { gte: … }` guard means a concurrent finalize
-        // can never drive a balance negative.
-        let advancesClosed = 0;
-        let advancesReduced = 0;
-        const withLoan = pending.filter((p) => p.loanDeduction.greaterThan(0));
-        for (const row of withLoan) {
-          const advance = await tx.salaryAdvance.findFirst({
-            where: { employeeId: row.employeeId, status: "ACTIVE" },
-            orderBy: { issuedAt: "asc" },
-          });
-          if (!advance) continue;
-
-          const reduced = await tx.salaryAdvance.updateMany({
-            where: {
-              id: advance.id,
-              status: "ACTIVE",
-              remainingBalance: { gte: row.loanDeduction },
-            },
-            data: { remainingBalance: { decrement: row.loanDeduction } },
-          });
-          if (reduced.count === 0) continue;
-          advancesReduced += 1;
-
-          const after = advance.remainingBalance.minus(row.loanDeduction);
-          if (after.lessThanOrEqualTo(new Prisma.Decimal(0))) {
-            await tx.salaryAdvance.update({
-              where: { id: advance.id },
-              data: { status: "CLOSED" },
-            });
-            advancesClosed += 1;
-          }
-        }
+        // A row whose deduction cannot be applied THROWS (rolling back the
+        // status transition above) rather than being skipped — see
+        // lib/payroll/loan-recovery.ts.
+        const { advancesReduced, advancesClosed } = await recoverLoans(tx, pending);
 
         // ── Payslip-ready notifications ──
         // Routed through notifyEach() rather than an inline createMany so the
@@ -158,6 +130,12 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, period, ...result });
   } catch (err) {
+    if (err instanceof LoanUnmatchedError)
+      return fail(
+        "LOAN_UNMATCHED",
+        `Cannot finalize ${period}. ${err.message} Nothing was finalized — correct that row's loan deduction and resubmit.`,
+        409,
+      );
     if (err instanceof Error && err.message.startsWith("PARTIAL:")) {
       console.error("[admin/payroll/finalize] partial transition, rolled back:", err.message);
       return fail(

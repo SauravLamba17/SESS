@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getEffectiveUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { getEmployeeByClerkId } from "@/lib/data/scope";
+import { getEmployeeByClerkId, OFFBOARDED_READ_ONLY } from "@/lib/data/scope";
 import { checkAttestation, attestationIp } from "@/lib/attestation";
 import { fail } from "@/lib/api/response";
 
@@ -36,6 +36,7 @@ export async function POST(req: NextRequest) {
     const employee = await getEmployeeByClerkId(userId);
     if (!employee)
       return fail("NO_EMPLOYEE", "No employee record linked to this account", 403);
+    if (!employee.active) return fail("OFFBOARDED", OFFBOARDED_READ_ONLY, 403);
 
     // Name check BEFORE any write — a mismatched attestation must leave no
     // trace of a partial acknowledgement.
@@ -45,14 +46,21 @@ export async function POST(req: NextRequest) {
     // Owner + RELEASED enforced in the where-clause: a letter that isn't this
     // employee's, or isn't released yet, matches zero rows. `acknowledged`
     // also guards re-attestation — the first attestation is the record.
-    const upd = await db.warningLetter.updateMany({
-      where: { id, employeeId: employee.id, status: "RELEASED", acknowledged: false },
-      data: {
-        acknowledged: true,
-        attestedName: att.attestedName,
-        attestedAt: new Date(),
-        attestedIp: attestationIp(req.headers),
-      },
+    const upd = await db.$transaction(async (tx) => {
+      const u = await tx.warningLetter.updateMany({
+        where: { id, employeeId: employee.id, status: "RELEASED", acknowledged: false },
+        data: {
+          acknowledged: true,
+          attestedName: att.attestedName,
+          attestedAt: new Date(),
+          attestedIp: attestationIp(req.headers),
+        },
+      });
+      if (u.count === 1)
+        await tx.auditLog.create({
+          data: { actorUserId: userId, action: "WARNING_ACKNOWLEDGED", targetEntity: `${id} employee=${employee.id}` },
+        });
+      return u;
     });
     if (upd.count === 0)
       return fail(

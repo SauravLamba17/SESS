@@ -1,0 +1,168 @@
+(node:29496) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/Saurav/Desktop/WORK/SESS/scripts/caching.selfcheck.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to C:\Users\Saurav\Desktop\WORK\SESS\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  [write] created fixtures TEST-CACHE-MGR, TEST-CACHE-EMP
+
+──────────────────────────────────────────────────────────────────────────
+1 · GREEN TIER — department list (§2/§4, 1 hr TTL, tag 'departments')
+──────────────────────────────────────────────────────────────────────────
+PASS  cold read hits the database
+        1 query: ["tech","TEST-CACHE-DEPT"]
+PASS  second read inside the TTL is served from cache
+        0 queries
+PASS  ...and returns the identical value
+  [write] TEST-CACHE-EMP.department -> "ZZ-CACHE-SELFCHECK"
+PASS  before invalidation the stale list is still served (proving it was cached)
+        ["tech","TEST-CACHE-DEPT"]
+  [invalidate] onEmployeeRosterChanged()
+PASS  after invalidation the NEXT read reflects the change immediately
+        1 queries: ["tech","TEST-CACHE-DEPT","ZZ-CACHE-SELFCHECK"]
+  [restore] TEST-CACHE-EMP.department -> "TEST-CACHE-DEPT"
+PASS  restored department list matches the original
+
+──────────────────────────────────────────────────────────────────────────
+2 · GREEN TIER — holiday calendar (§2/§4, 6 hr TTL, tag 'holidays')
+──────────────────────────────────────────────────────────────────────────
+PASS  second read is served from cache
+        0 holidays
+  [write] created holiday cmurqz9420003wgrc5qw2cdjv
+PASS  stale calendar still served before invalidation
+  [invalidate] onHolidayCalendarChanged()
+PASS  next read shows the new holiday immediately
+        1 holidays
+PASS  cached dates survive the Data Cache round-trip as YYYY-MM-DD strings
+
+──────────────────────────────────────────────────────────────────────────
+3 · ORANGE TIER — HR dashboard totals (§2/§4, 30 s TTL)
+──────────────────────────────────────────────────────────────────────────
+PASS  cold read runs the aggregate batch
+        7 queries, headcount 4
+PASS  second read inside the 30 s window is a cache hit
+PASS  ...same headcount
+PASS  only counts are cached — no money value appears in the totals object
+        {"draft":0,"submitted":0,"finalized":0}
+PASS  §5 'HR dashboard source data changed' drops the aggregate
+        headcount 4
+
+──────────────────────────────────────────────────────────────────────────
+4 · ORANGE TIER — pending approvals: TTL expiry AND §5 invalidation
+──────────────────────────────────────────────────────────────────────────
+  baseline pending count: 0
+  [write] created PENDING leave request cmurqzb1q0005wgrcq7q92foe
+PASS  no invalidation yet — the cached count is still the old one
+  ... waiting 32s for the ORANGE TTL to lapse
+PASS  ORANGE value updates on its own within the 30s window
+  [write] approved via the route's atomic where-clause (1 row)
+PASS  the approval actually transitioned exactly one row
+  [invalidate] onLeaveDecided()
+PASS  next read reflects the approval IMMEDIATELY, not after a TTL
+PASS  ...and it came from the database, not the cache
+        4 queries
+
+──────────────────────────────────────────────────────────────────────────
+5 · §5 attendance mapping — punch invalidates the attendance aggregates
+──────────────────────────────────────────────────────────────────────────
+PASS  HR totals warm before the punch
+  [invalidate] onAttendanceRecorded()  (as app/api/attendance/punch calls it)
+PASS  'Present Today' aggregate is re-read after a punch
+
+──────────────────────────────────────────────────────────────────────────
+5b · §5 shift assignment refreshes the /hr/shifts assigned counts
+──────────────────────────────────────────────────────────────────────────
+PASS  assigned counts warm (served from cache)
+  [invalidate] onEmployeeShiftAssigned()
+PASS  assigned counts are re-read after an assignment
+
+──────────────────────────────────────────────────────────────────────────
+6 · RED TIER — no caching anywhere in the call path (§3)
+──────────────────────────────────────────────────────────────────────────
+PASS  Payroll preview (draft run) — 11 files on its call path, zero shared caching
+        React cache() per-render memo only (§1-permitted): lib/auth.ts
+PASS  Payroll preview display — 25 files on its call path, zero shared caching
+        React cache() per-render memo only (§1-permitted): lib/auth.ts
+PASS  Payroll finalization — 11 files on its call path, zero shared caching
+        React cache() per-render memo only (§1-permitted): lib/auth.ts
+PASS  Payroll submit — 8 files on its call path, zero shared caching
+        React cache() per-render memo only (§1-permitted): lib/auth.ts
+PASS  Payroll row edit (payslip values) — 9 files on its call path, zero shared caching
+        React cache() per-render memo only (§1-permitted): lib/auth.ts
+PASS  Payroll adjustment — 7 files on its call path, zero shared caching
+        React cache() per-render memo only (§1-permitted): lib/auth.ts
+PASS  Finalized payroll records — 20 files on its call path, zero shared caching
+        React cache() per-render memo only (§1-permitted): lib/auth.ts
+PASS  Payslip financial values — 12 files on its call path, zero shared caching
+        React cache() per-render memo only (§1-permitted): lib/auth.ts
+PASS  Employee net salary / payslips — 22 files on its call path, zero shared caching
+        React cache() per-render memo only (§1-permitted): lib/auth.ts
+PASS  Tax / deduction values (Form 16) — 12 files on its call path, zero shared caching
+        React cache() per-render memo only (§1-permitted): lib/auth.ts
+PASS  Employee salary structure (write) — 11 files on its call path, zero shared caching
+        React cache() per-render memo only (§1-permitted): lib/auth.ts
+PASS  Employee salary structure (read) — 24 files on its call path, zero shared caching
+        React cache() per-render memo only (§1-permitted): lib/auth.ts
+PASS  Salary advance (payroll input) — 8 files on its call path, zero shared caching
+        React cache() per-render memo only (§1-permitted): lib/auth.ts
+PASS  Audit logs — 21 files on its call path, zero shared caching
+        React cache() per-render memo only (§1-permitted): lib/auth.ts
+PASS  Permissions / role scope — 5 files on its call path, zero shared caching
+        React cache() per-render memo only (§1-permitted): lib/auth.ts
+PASS  Authorization scope resolution — 2 files on its call path, zero shared caching
+PASS  Secrets / tokens — 1 files on its call path, zero shared caching
+PASS  Agent token issuance — 11 files on its call path, zero shared caching
+        React cache() per-render memo only (§1-permitted): lib/auth.ts
+PASS  lib/auth.ts uses React cache() — per-request memo only, never a shared cache
+PASS  payroll preview's authoritative input read executes on EVERY call
+        queries per call: 2, 2, 2 — a cached reader returned 0 on its second call above
+PASS  finalized payroll records are re-read from the database every time
+        0 rows read across 2 calls
+PASS  the reports route calls runReport exactly once
+        1 call(s)
+PASS  the reports route imports nothing from lib/cache/
+PASS  every report format renders from the same `run` binding
+PASS  lib/cache/reports.ts no longer exists — nothing to cache a report with
+PASS  RED report payroll-cost (payroll financial values) — 1 files on call path, zero caching
+PASS  RED report board-summary (embeds payroll cost) — 10 files on call path, zero caching
+PASS  RED report my-data (personal manifest) — 3 files on call path, zero caching
+PASS  RED report the reports route itself — 43 files on call path, zero caching
+
+──────────────────────────────────────────────────────────────────────────
+7 · SECURITY (§8) — what may and may not enter a cache
+──────────────────────────────────────────────────────────────────────────
+PASS  lib/cache/dashboard.ts selects no secret, session or money field
+PASS  lib/cache/departments.ts selects no secret, session or money field
+PASS  lib/cache/employees.ts selects no secret, session or money field
+PASS  lib/cache/shifts.ts selects no secret, session or money field
+PASS  no cached reader is imported by lib/auth.ts or middleware.ts (no cached authority)
+PASS  app/hr/page.tsx is force-dynamic (never CDN-cacheable)
+PASS  app/hr/payroll/page.tsx is force-dynamic (never CDN-cacheable)
+PASS  app/manager/page.tsx is force-dynamic (never CDN-cacheable)
+PASS  app/employee/profile/page.tsx is force-dynamic (never CDN-cacheable)
+PASS  app/api/payslip/[id]/route.ts is force-dynamic (never CDN-cacheable)
+PASS  app/api/reports/[report]/route.ts is force-dynamic (never CDN-cacheable)
+PASS  lib/cache/dashboard.ts caches no emergencyContact
+PASS  lib/cache/departments.ts caches no emergencyContact
+PASS  lib/cache/employees.ts caches no emergencyContact
+PASS  lib/cache/shifts.ts caches no emergencyContact
+PASS  the profile page reads emergencyContact from the uncached row
+
+──────────────────────────────────────────────────────────────────────────
+8 · §11 — Redis was not added
+──────────────────────────────────────────────────────────────────────────
+PASS  no redis / ioredis / upstash dependency
+PASS  lib/cache/dashboard.ts contains no Redis scaffolding
+PASS  lib/cache/departments.ts contains no Redis scaffolding
+PASS  lib/cache/employees.ts contains no Redis scaffolding
+PASS  lib/cache/shifts.ts contains no Redis scaffolding
+
+──────────────────────────────────────────────────────────────────────────
+TEARDOWN
+──────────────────────────────────────────────────────────────────────────
+  removed scratch leave request cmurqzb1q0005wgrcq7q92foe
+  removed scratch holiday cmurqz9420003wgrc5qw2cdjv
+  removed fixture employees TEST-CACHE-EMP, TEST-CACHE-MGR
+  dropped every cache tag
+
+══════════════════════════════════════════════════════════════════════════
+ALL CHECKS PASSED
+══════════════════════════════════════════════════════════════════════════

@@ -213,6 +213,25 @@ async function main() {
       audit2?.targetEntity ?? "none",
     );
 
+    // ── 2b: STALE INVITATION — staff roles need an Employee ─────────
+    step("2b", "no Employee match + a non-SUPER_ADMIN role → refused, nothing created");
+    for (const staffRole of ["MANAGER", "HR", "EMPLOYEE"] as const) {
+      const cid = `user_zzp6_stale_${staffRole.toLowerCase()}`;
+      const r = await ensureUserForClerkIdentity(db, {
+        clerkId: cid,
+        email: `${TAG}-stale-${staffRole.toLowerCase()}@example.com`,
+        role: staffRole,
+        source: "verify",
+      });
+      check(
+        `2b ${staffRole} with no Employee is refused (NO_EMPLOYEE) and no User row exists`,
+        r.created === false &&
+          r.code === "NO_EMPLOYEE" &&
+          (await db.user.count({ where: { clerkId: cid } })) === 0,
+        JSON.stringify(r),
+      );
+    }
+
     // ── 3: RACE — TWO SIMULTANEOUS RESOLUTIONS ──────────────────────
     step("3", "two concurrent resolutions create exactly ONE row");
 
@@ -225,13 +244,17 @@ async function main() {
       ensureUserForClerkIdentity(db, {
         clerkId: raceId,
         email: raceEmail,
-        role: "MANAGER",
+        // SUPER_ADMIN: the only role that may still provision employee-less
+        // (Part 2 decision 4), so the race is still exercised end to end.
+        role: "SUPER_ADMIN",
         source: "verify",
       }),
       ensureUserForClerkIdentity(db, {
         clerkId: raceId,
         email: raceEmail,
-        role: "MANAGER",
+        // SUPER_ADMIN: the only role that may still provision employee-less
+        // (Part 2 decision 4), so the race is still exercised end to end.
+        role: "SUPER_ADMIN",
         source: "verify",
       }),
     ]);

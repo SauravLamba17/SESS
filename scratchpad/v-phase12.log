@@ -1,0 +1,152 @@
+(node:15816) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/Saurav/Desktop/WORK/SESS/prisma/verify-phase12.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to C:\Users\Saurav\Desktop\WORK\SESS\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+── 0: date-range utility ────────────────────────────
+PASS  June 2026 spans 30 days
+PASS  endExclusive is 1 July
+PASS  June 2026 has 22 weekdays
+PASS  range touches exactly one month
+PASS  reversed range refused
+PASS  rolled-over date (Feb 30) refused
+PASS  over-long range refused
+
+── 1: Headcount & Org Summary ───────────────────────
+PASS  total active
+PASS  departments
+PASS  headcount at range start
+PASS  headcount at range end
+PASS  net change
+PASS  by department
+PASS  headcountOn mid-range (15 June: A, B, C)
+PASS  last working day still counts as employed
+PASS  day after last working day
+
+── 2: Attendance & Punctuality — average punch-in ───
+PASS  09:15 → 555 minutes
+PASS  09:45 → 585 minutes
+PASS  10:00 → 600 minutes
+PASS  mean of 555, 585, 600 = 580
+PASS  580 minutes → 09:40
+PASS  round-trip 00:00
+PASS  round-trip 23:59
+PASS  no punches → null, never a fake midnight
+PASS  total punch days
+PASS  late count
+PASS  on-time count
+PASS  late %
+PASS  org avg punch-in minutes
+PASS  org avg punch-in clock
+PASS  employee A avg punch-in = 09:40
+PASS  employee A avg late minutes (late days only)
+PASS  employee with no punches → null avg
+PASS  Assembly dept avg punch-in = 09:15 (punch-weighted)
+PASS  expected employee-weekdays
+PASS  days with no punch
+
+── 3: New Hires & Exits ─────────────────────────────
+PASS  hires in June (B only)
+PASS  exits in June (C only)
+PASS  net change
+PASS  hire is Bravo
+PASS  exit is Charlie
+PASS  avg headcount
+PASS  attrition %
+PASS  D (joins in July) is not counted as a June hire
+
+── 4: Production vs Target ──────────────────────────
+PASS  total actual
+PASS  total target
+PASS  achievement % (190/210)
+PASS  variance
+PASS  met target (A exactly 160/160)
+PASS  below target (B)
+PASS  A achievement 100%
+PASS  no production → null %, not 0%
+
+── 5: Appraisal Score Distribution ──────────────────
+PASS  scored count — excluded and unpublished dropped
+PASS  average (92+71+35)/3 = 66
+PASS  median of 35,71,92
+PASS  min
+PASS  max
+PASS  band counts [0-40, 40-60, 60-80, 80-100]
+PASS  band boundaries are half-open: 40 → band 1
+PASS  39.9 → band 0
+PASS  80 → band 3
+PASS  100 lands in the top band, not off the end
+
+── 6: Payroll Cost Summary — FINALIZED only ─────────
+PASS  4 rows fetched, only 2 FINALIZED counted
+PASS  DRAFT + SUBMITTED excluded and reported
+PASS  distinct employees
+PASS  total gross = 2 × 50000
+PASS  total net = 2 × 47125
+PASS  basic component = 2 × 30000
+PASS  TDS component = 2 × 2000
+PASS  cost to company = 2 × 53300
+PASS  a DRAFT-only dataset produces a ZERO total, never a provisional number
+
+── 7: Recruitment Funnel ────────────────────────────
+PASS  total applications
+PASS  reached per stage [APPLIED, SCREENING, INTERVIEW, OFFER, HIRED]
+PASS  rejected reported separately, not folded into the funnel
+PASS  hired
+PASS  overall conversion 1/5
+PASS  conversion APPLIED→SCREENING
+PASS  avg time to hire (1 June → 11 June)
+
+── 8: Idle Time Summary ─────────────────────────────
+PASS  total active minutes
+PASS  total idle minutes
+PASS  active % (160/240)
+PASS  employees with data
+PASS  employees in scope
+PASS  B active % (60/120)
+
+── 9: Warning Letters & Disciplinary Trend ──────────
+PASS  released letters
+PASS  employees affected
+PASS  repeat cases (A has 2)
+PASS  repeat case is Alpha with 2
+PASS  all three in Assembly
+PASS  single-month range has no trend
+PASS  DRAFT dropped by the pure function itself
+PASS  and reported as excluded
+
+── 10: Board Summary — identical to the standalone reports 
+PASS  headcount sub-result identical
+PASS  hires/exits sub-result identical
+PASS  appraisal sub-result identical
+PASS  payroll sub-result identical
+PASS  recruitment sub-result identical
+PASS  headline headcount matches report
+PASS  headline attrition matches report
+PASS  headline avg appraisal matches report (formatted /5)
+PASS  the sub-result itself is still raw 0-100
+PASS  headline payroll matches report
+PASS  headline hired matches report
+PASS  every headline names the report it came from
+
+── 11: Scoping table matches the Phase 12 spec, cell for cell 
+PASS  ten org reports plus the self-service export are registered
+PASS  every cell of the scoping table matches the spec
+PASS  MANAGER denied: payroll-cost
+PASS  MANAGER denied: hires-exits
+PASS  MANAGER denied: warning-letters
+PASS  MANAGER denied: board-summary
+PASS  Manager sees exactly 6 reports
+PASS  HR sees all 10
+PASS  Super Admin sees all 10
+PASS  EMPLOYEE sees none
+PASS  EMPLOYEE is denied every ORGANISATION report
+PASS  the only thing EMPLOYEE may run is their own data export
+PASS  a null role (signed out) is denied every report
+
+── 12: Server-side gate — unauthenticated HTTP is refused 
+FAIL  HTTP gate test ran (is `npm run dev` up on :3005?)
+        fetch failed
+
+══ RESULT: 117 passed, 1 failed ══
+cleanup complete

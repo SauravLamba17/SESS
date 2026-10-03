@@ -37,6 +37,15 @@ export function parseDateOnly(value: unknown): Date | null {
 }
 
 /**
+ * Local midnight of `d`'s calendar day — the one copy. Seven identical
+ * private copies (startOfDay / todayMidnight) used to live in pages, actions
+ * and loaders. Local, never UTC, for the same reason as parseDateOnly().
+ */
+export function startOfDay(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+/**
  * Strict "YYYY-MM-DD" shape AND calendar check, for the call sites that keep
  * the string rather than the Date. Same validation as parseDateOnly(), so a
  * regex-only `.test()` can be swapped for this without letting 2026-02-30 in.

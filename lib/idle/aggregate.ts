@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "@/lib/db";
+import { startOfDay } from "@/lib/period";
 import { idleConsentStates, type ConsentState } from "./consent";
 
 /**
@@ -53,7 +54,7 @@ export function monthBounds(now = new Date()) {
 }
 
 export function dayBounds(now = new Date()) {
-  const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dayStart = startOfDay(now);
   return {
     dayStart,
     dayEnd: new Date(dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate() + 1),

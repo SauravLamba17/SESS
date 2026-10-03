@@ -7,6 +7,7 @@
 
 import { Prisma } from "@prisma/client";
 import type { Money } from "./compute.ts";
+import { startOfDay } from "../period.ts";
 
 function d(v: Money): Prisma.Decimal {
   return v instanceof Prisma.Decimal ? v : new Prisma.Decimal(v ?? 0);
@@ -107,11 +108,9 @@ export function payableDays(
   const periodStart = new Date(y, m - 1, 1);
   const periodEnd = new Date(y, m - 1, daysInMonth); // inclusive last day
 
-  const dayOnly = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate());
-
-  const start = dayOnly(joiningDate) > periodStart ? dayOnly(joiningDate) : periodStart;
+  const start = startOfDay(joiningDate) > periodStart ? startOfDay(joiningDate) : periodStart;
   const end =
-    offboardedAt && dayOnly(offboardedAt) < periodEnd ? dayOnly(offboardedAt) : periodEnd;
+    offboardedAt && startOfDay(offboardedAt) < periodEnd ? startOfDay(offboardedAt) : periodEnd;
 
   if (end < start) return { daysWorked: 0, daysInMonth };
 

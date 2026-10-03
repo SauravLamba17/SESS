@@ -2,7 +2,11 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getEffectiveUserId, getCurrentRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { sendEmployeeInvitation } from "@/lib/employees/invite";
-import { clerkCreateInvitation, clerkFindUserByEmail } from "@/lib/employees/invite-clerk";
+import {
+  clerkCreateInvitation,
+  clerkFindUserByEmail,
+  clerkRevokeInvitation,
+} from "@/lib/employees/invite-clerk";
 import { ROLES, type Role } from "@/lib/auth-types";
 import { fail } from "@/lib/api/response";
 
@@ -34,6 +38,9 @@ export async function POST(req: NextRequest) {
     ? (body.role as Role)
     : "EMPLOYEE";
   if (!employeeId) return fail("BAD_INPUT", "employeeId is required", 400);
+  // Refused BEFORE anything is written — see sendEmployeeInvitation().
+  if (inviteRole === "SUPER_ADMIN" && role !== "SUPER_ADMIN")
+    return fail("FORBIDDEN_ROLE", "Only a Super Admin can invite someone as Super Admin.", 403);
 
   try {
     // Email uniqueness guard when HR supplies a NEW email from the roster —
@@ -53,9 +60,10 @@ export async function POST(req: NextRequest) {
 
     const result = await sendEmployeeInvitation(
       db,
-      { employeeId, email: email || null, role: inviteRole, actorUserId: userId },
+      { employeeId, email: email || null, role: inviteRole, actorUserId: userId, actorRole: role },
       clerkCreateInvitation,
       clerkFindUserByEmail,
+      clerkRevokeInvitation,
     );
     if (!result.ok) {
       // INACTIVE/REDACTED are 409: the request is well-formed, it conflicts
@@ -64,6 +72,8 @@ export async function POST(req: NextRequest) {
       const status =
         result.code === "NOT_FOUND"
           ? 404
+          : result.code === "FORBIDDEN_ROLE"
+            ? 403
           : result.code === "CLERK_ERROR"
             ? 502
             : result.code === "INACTIVE" || result.code === "REDACTED"

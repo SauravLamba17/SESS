@@ -41,6 +41,13 @@ export async function POST(req: NextRequest) {
         create: { employeeId, cycleId, excluded },
         update: { excluded },
       });
+      await tx.auditLog.create({
+        data: {
+          actorUserId: userId,
+          action: excluded ? "APPRAISAL_EMPLOYEE_EXCLUDED" : "APPRAISAL_EMPLOYEE_INCLUDED",
+          targetEntity: `cycle=${cycleId} employee=${employeeId}`,
+        },
+      });
       return { ok: true as const };
     });
 

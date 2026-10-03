@@ -5,7 +5,11 @@ import { parseDateOnly } from "@/lib/period";
 import { getCurrentRole } from "@/lib/auth";
 import { onboardEmployee } from "@/lib/employees/onboard";
 import { sendEmployeeInvitation } from "@/lib/employees/invite";
-import { clerkCreateInvitation, clerkFindUserByEmail } from "@/lib/employees/invite-clerk";
+import {
+  clerkCreateInvitation,
+  clerkFindUserByEmail,
+  clerkRevokeInvitation,
+} from "@/lib/employees/invite-clerk";
 import { ROLES, type Role } from "@/lib/auth-types";
 import { fail } from "@/lib/api/response";
 import { onEmployeeRosterChanged } from "@/lib/invalidation/employee";
@@ -45,6 +49,9 @@ export async function POST(req: NextRequest) {
   const inviteRole = (ROLES as string[]).includes(str(body.inviteRole))
     ? (str(body.inviteRole) as Role)
     : "EMPLOYEE";
+  // Refused BEFORE anything is written — see sendEmployeeInvitation().
+  if (sendInvitation && inviteRole === "SUPER_ADMIN" && role !== "SUPER_ADMIN")
+    return fail("FORBIDDEN_ROLE", "Only a Super Admin can invite someone as Super Admin.", 403);
 
   if (!employeeCode || !name || !department || !joiningDate) {
     return fail(
@@ -92,9 +99,10 @@ export async function POST(req: NextRequest) {
     if (sendInvitation) {
       const inv = await sendEmployeeInvitation(
         db,
-        { employeeId: result.employee.id, email, role: inviteRole, actorUserId: userId },
+        { employeeId: result.employee.id, email, role: inviteRole, actorUserId: userId, actorRole: role },
         clerkCreateInvitation,
         clerkFindUserByEmail,
+        clerkRevokeInvitation,
       );
       invitation = inv.ok
         ? { sent: !inv.linked, linked: inv.linked, message: inv.message }

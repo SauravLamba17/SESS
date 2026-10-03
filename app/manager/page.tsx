@@ -158,8 +158,8 @@ export default async function ManagerDashboard() {
               attendance like anyone else. */}
           <div className="mb-4">
             <ClockInWidget
-              initialCheckIn={data.own.today?.checkIn ? data.own.today.checkIn.toISOString() : null}
-              initialCheckOut={data.own.today?.checkOut ? data.own.today.checkOut.toISOString() : null}
+              initialCheckIn={data.own.punchRow?.checkIn ? data.own.punchRow.checkIn.toISOString() : null}
+              initialCheckOut={data.own.punchRow?.checkOut ? data.own.punchRow.checkOut.toISOString() : null}
             />
           </div>
 

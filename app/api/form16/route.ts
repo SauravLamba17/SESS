@@ -78,6 +78,7 @@ export async function GET(req: NextRequest) {
       select: {
         month: true,
         gross: true,
+        bonus: true,
         tds: true,
         tdsSource: true,
         pfEmployee: true,
@@ -94,8 +95,15 @@ export async function GET(req: NextRequest) {
         409,
       );
 
+    // BONUS IS PART OF GROSS SALARY HERE. Payroll's `gross` column is
+    // basic + hra + special only (bonus is added to net separately — see
+    // lib/payroll/compute.ts), but a bonus is taxable salary under s.17(1) of
+    // the Income-tax Act, so Form 16 Part B's gross must include it.
+    // Confirmed as taxable salary by the product owner on 2026-10-03; should
+    // be reviewed by a CA before Form 16s are issued.
+    const taxableGross = (r: (typeof rows)[number]) => r.gross.plus(r.bonus);
     const zero = new Prisma.Decimal(0);
-    const totalGross = rows.reduce((a, r) => a.plus(r.gross), zero);
+    const totalGross = rows.reduce((a, r) => a.plus(taxableGross(r)), zero);
     const totalTds = rows.reduce((a, r) => a.plus(r.tds), zero);
     const totalPf = rows.reduce((a, r) => a.plus(r.pfEmployee), zero);
     const totalPt = rows.reduce((a, r) => a.plus(r.professionalTax), zero);
@@ -111,7 +119,7 @@ export async function GET(req: NextRequest) {
       // entries for the same month.
       months: rows.map((r) => ({
         month: r.month,
-        gross: r.gross.toFixed(2),
+        gross: taxableGross(r).toFixed(2),
         tds: r.tds.toFixed(2),
         isAdjustment: r.adjustmentForPayrollId !== null,
       })),

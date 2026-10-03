@@ -87,7 +87,10 @@ export interface ProfileBasics {
   designation: string | null;
   /** "YYYY-MM-DD" — see the note on CachedHoliday.date in ./shifts.ts. */
   joiningDate: string;
-  emergencyContact: string | null;
+  // emergencyContact is deliberately NOT here: it is a third party's name and
+  // phone — personal data, so never in the shared Data Cache, where redaction
+  // could only mark it stale. The profile page reads it from the uncached
+  // getEmployeeByClerkId() row it already holds.
   active: boolean;
 }
 
@@ -112,7 +115,6 @@ export function getEmployeeProfileBasics(employeeId: string): Promise<ProfileBas
           department: true,
           designation: true,
           joiningDate: true,
-          emergencyContact: true,
           active: true,
         },
       });

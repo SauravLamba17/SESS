@@ -3,18 +3,13 @@
 import { getEffectiveUserId } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { parseDateOnly } from "@/lib/period";
-import { getEmployeeByClerkId } from "@/lib/data/scope";
+import { parseDateOnly, startOfDay } from "@/lib/period";
+import { getEmployeeByClerkId, OFFBOARDED_READ_ONLY } from "@/lib/data/scope";
 
 export interface ProductionFormState {
   ok: boolean;
   error?: string;
   fieldErrors?: Partial<Record<"date" | "unitsProduced", string>>;
-}
-
-function todayMidnight(): Date {
-  const n = new Date();
-  return new Date(n.getFullYear(), n.getMonth(), n.getDate());
 }
 
 /**
@@ -32,7 +27,7 @@ export async function logProduction(input: {
   const fieldErrors: ProductionFormState["fieldErrors"] = {};
   const date = parseDateOnly(input.date);
   const units = Number(input.unitsProduced);
-  const today = todayMidnight();
+  const today = startOfDay(new Date());
 
   if (!date) fieldErrors.date = "Enter a valid date.";
   if (!Number.isInteger(units) || units < 0)
@@ -47,6 +42,7 @@ export async function logProduction(input: {
         error: "No employee record is linked to your account. Contact HR.",
       };
     }
+    if (!employee.active) return { ok: false, error: OFFBOARDED_READ_ONLY };
 
     // Can't log before joining.
     if (date) {

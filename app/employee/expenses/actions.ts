@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache";
 import { Prisma, type ExpenseCategory } from "@prisma/client";
 import { getEffectiveUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { parseDateOnly } from "@/lib/period";
-import { getEmployeeByClerkId } from "@/lib/data/scope";
+import { parseDateOnly, startOfDay } from "@/lib/period";
+import { getEmployeeByClerkId, OFFBOARDED_READ_ONLY } from "@/lib/data/scope";
 
 export const EXPENSE_CATEGORIES = [
   "TRAVEL",
@@ -21,11 +21,6 @@ export interface ExpenseFormState {
   ok: boolean;
   error?: string;
   fieldErrors?: Partial<Record<Field, string>>;
-}
-
-function todayMidnight(): Date {
-  const n = new Date();
-  return new Date(n.getFullYear(), n.getMonth(), n.getDate());
 }
 
 /**
@@ -59,7 +54,7 @@ export async function submitExpenseClaim(input: {
 
   const date = parseDateOnly(input.date);
   if (!date) fieldErrors.date = "Enter a valid date.";
-  else if (date > todayMidnight()) fieldErrors.date = "Date cannot be in the future.";
+  else if (date > startOfDay(new Date())) fieldErrors.date = "Date cannot be in the future.";
 
   const description =
     typeof input.description === "string" ? input.description.trim() : "";
@@ -82,6 +77,7 @@ export async function submitExpenseClaim(input: {
         error:
           "No employee record is linked to your account. Contact HR to complete onboarding.",
       };
+    if (!employee.active) return { ok: false, error: OFFBOARDED_READ_ONLY };
 
     await db.expenseClaim.create({
       data: {

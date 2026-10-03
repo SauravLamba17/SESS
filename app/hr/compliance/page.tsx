@@ -10,6 +10,9 @@ import { idleConsentStates, consentLabel } from "@/lib/idle/consent";
 import { ErrorPanel } from "@/components/ui/notice";
 import { ymd } from "@/lib/reports/range";
 
+// Tab title for this route; the root layout appends " · SESS".
+export const metadata = { title: "Compliance & Consent" };
+
 export const dynamic = "force-dynamic";
 
 async function load() {

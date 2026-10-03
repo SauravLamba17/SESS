@@ -13,6 +13,9 @@ import { inr, periodLabel, PAYROLL_STATUS_DOT } from "@/lib/payroll/format";
 import { linkAdjustments, adjustmentLabel } from "@/lib/payroll/adjustments";
 import { ErrorPanel } from "@/components/ui/notice";
 
+// Tab title for this route; the root layout appends " · SESS".
+export const metadata = { title: "Payroll & Financials" };
+
 export const dynamic = "force-dynamic";
 
 /**

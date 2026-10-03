@@ -10,6 +10,9 @@ import { formatStamp } from "@/lib/time-display";
 import { ymd } from "@/lib/reports/range";
 import { ATTESTATION_LABEL, ATTESTATION_DISCLAIMER } from "@/lib/attestation";
 
+// Tab title for this route; the root layout appends " · SESS".
+export const metadata = { title: "My Documents" };
+
 export const dynamic = "force-dynamic";
 
 async function load() {

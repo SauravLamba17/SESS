@@ -5,6 +5,9 @@ import { Logo } from "@/components/brand/logo";
 import { getRealIdentity } from "@/lib/auth";
 import { ROLE_HOME } from "@/lib/auth-types";
 
+// Tab title for this route; the root layout appends " · SESS".
+export const metadata = { title: "Account" };
+
 export const dynamic = "force-dynamic";
 
 /**

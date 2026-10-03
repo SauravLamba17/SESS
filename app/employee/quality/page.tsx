@@ -7,6 +7,9 @@ import { getEmployeeByClerkId } from "@/lib/data/scope";
 import { ErrorPanel, UnlinkedEmployeeNotice } from "@/components/ui/notice";
 import { ymd } from "@/lib/reports/range";
 
+// Tab title for this route; the root layout appends " · SESS".
+export const metadata = { title: "My Quality" };
+
 export const dynamic = "force-dynamic";
 
 function scoreState(score: number): StatusState {

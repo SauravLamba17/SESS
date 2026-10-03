@@ -9,6 +9,9 @@ import { buildSalaryTimeline } from "@/lib/payroll/salary-history";
 import { ErrorPanel } from "@/components/ui/notice";
 import { ymd } from "@/lib/reports/range";
 
+// Tab title for this route; the root layout appends " · SESS".
+export const metadata = { title: "Salary Structure" };
+
 export const dynamic = "force-dynamic";
 
 /**

@@ -3,6 +3,9 @@ import { getCurrentRole, getEffectiveUserId } from "@/lib/auth";
 import { ROLE_HOME } from "@/lib/auth-types";
 import CinematicLanding from "@/components/landing/landing-loader";
 
+// The public landing page carries the full product name, not "X · SESS".
+export const metadata = { title: { absolute: "SESS — Simplen Employee Self-Service" } };
+
 /**
  * The public landing page — the ONLY thing at "/", and the only surface in the
  * app that is deliberately outside the theme system (see

@@ -40,6 +40,11 @@ export interface ResolvedAuditQuery {
   take: number;
   page: number;
   pageSize: number;
+  /**
+   * Set when From is after To. Such a range can match nothing, and showing
+   * "0 entries" reads as "nothing happened" — so the page shows this instead.
+   */
+  rangeError: string | null;
 }
 
 /**
@@ -77,7 +82,12 @@ export function buildAuditQuery(f: AuditFilters): ResolvedAuditQuery {
   );
   const page = Math.max(1, Math.trunc(f.page ?? 1));
 
-  return { where, skip: (page - 1) * pageSize, take: pageSize, page, pageSize };
+  const rangeError =
+    from && to && from > to
+      ? "The From date is after the To date, so nothing can match. Swap the dates and apply again."
+      : null;
+
+  return { where, skip: (page - 1) * pageSize, take: pageSize, page, pageSize, rangeError };
 }
 
 export function totalPages(totalRows: number, pageSize: number): number {

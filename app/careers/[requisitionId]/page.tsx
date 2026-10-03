@@ -6,6 +6,9 @@ import { StatusDot } from "@/components/ui/status-dot";
 import { ApplicationForm } from "@/components/careers/application-form";
 import { db } from "@/lib/db";
 
+// Tab title for this route; the root layout appends " · SESS".
+export const metadata = { title: "Job Opening" };
+
 export const dynamic = "force-dynamic";
 
 export default async function JobListingPage({

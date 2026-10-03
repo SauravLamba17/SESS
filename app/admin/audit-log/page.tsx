@@ -10,6 +10,9 @@ import {
   AUDIT_PAGE_SIZE,
 } from "@/lib/audit-query";
 
+// Tab title for this route; the root layout appends " · SESS".
+export const metadata = { title: "Audit Log" };
+
 export const dynamic = "force-dynamic";
 
 /**
@@ -36,6 +39,18 @@ async function load(sp: Record<string, string | undefined>) {
   });
 
   try {
+    // A reversed range matches nothing by construction: say so, rather than
+    // render an empty log that reads as "nothing happened". The action list is
+    // still loaded so the filter form keeps working.
+    if (q.rangeError) {
+      const actions = await db.auditLog.findMany({
+        distinct: ["action"],
+        select: { action: true },
+        orderBy: { action: "asc" },
+      });
+      return { rows: [], total: 0, actions: actions.map((a) => a.action), q, error: q.rangeError };
+    }
+
     // THREE queries, none of them unbounded:
     //  1. the page of rows      — skip/take, server-side
     //  2. the matching count    — for pagination, computed in Postgres

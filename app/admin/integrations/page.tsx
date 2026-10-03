@@ -3,6 +3,9 @@ import { Panel, PanelHeader } from "@/components/ui/panel";
 import { StatusLabel } from "@/components/ui/status-dot";
 import { db } from "@/lib/db";
 
+// Tab title for this route; the root layout appends " · SESS".
+export const metadata = { title: "Integrations" };
+
 export const dynamic = "force-dynamic";
 
 /**

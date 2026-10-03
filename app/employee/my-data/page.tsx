@@ -4,6 +4,9 @@ import { StatusDot } from "@/components/ui/status-dot";
 import { MyDataDownload } from "@/components/reports/my-data-download";
 import { currentMonthRange } from "@/lib/reports/range";
 
+// Tab title for this route; the root layout appends " · SESS".
+export const metadata = { title: "My Data" };
+
 export const dynamic = "force-dynamic";
 
 /**

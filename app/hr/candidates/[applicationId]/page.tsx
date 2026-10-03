@@ -14,6 +14,9 @@ import { db } from "@/lib/db";
 import { resolveRecruitmentScope, canAccessApplication } from "@/lib/recruitment/access";
 import { ymd } from "@/lib/reports/range";
 
+// Tab title for this route; the root layout appends " · SESS".
+export const metadata = { title: "Candidate" };
+
 export const dynamic = "force-dynamic";
 
 

@@ -17,11 +17,17 @@ import { startOfDay } from "../period.ts";
  * Mon–Fri days in `range` on which `e` was actually employed: joining day
  * through last working day (offboardedAt is INCLUSIVE — payroll pays it).
  * Someone who left before the range, or joins after it, expects zero days.
+ *
+ * Also never past `asOf` (today, inclusive): days that have not happened yet
+ * cannot be "no punch". The default current-month range used to count every
+ * remaining weekday of the month as missed attendance.
  */
-function employedWeekdays(range: DateRange, e: ReportEmployee): number {
+function employedWeekdays(range: DateRange, e: ReportEmployee, asOf: Date): number {
   const joined = startOfDay(e.joiningDate);
   const start = joined > range.start ? joined : range.start;
-  let endExclusive = range.endExclusive;
+  const today = startOfDay(asOf);
+  const dayAfterToday = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+  let endExclusive = range.endExclusive < dayAfterToday ? range.endExclusive : dayAfterToday;
   if (e.offboardedAt) {
     const off = startOfDay(e.offboardedAt);
     const dayAfterLast = new Date(off.getFullYear(), off.getMonth(), off.getDate() + 1);
@@ -198,6 +204,8 @@ export function computeAttendance(
   rows: AttendanceRow[],
   employees: ReportEmployee[],
   range: DateRange,
+  /** "Today" for the expected-days cap. Injected so tests are deterministic. */
+  asOf: Date = new Date(),
 ): AttendanceResult {
   const empById = new Map(employees.map((e) => [e.id, e]));
 
@@ -307,7 +315,7 @@ export function computeAttendance(
   const lateCount = byEmployee.reduce((n, r) => n + r.lateCount, 0);
   // Per employee, clipped to their employment — NOT weekdays × headcount,
   // which counted leavers and future joiners as absent every day.
-  const expectedWeekdayCount = employees.reduce((n, e) => n + employedWeekdays(range, e), 0);
+  const expectedWeekdayCount = employees.reduce((n, e) => n + employedWeekdays(range, e, asOf), 0);
 
   return {
     totalPunchDays,

@@ -9,6 +9,9 @@ import { parseRange, currentMonthRange, ymd } from "@/lib/reports/range";
 import { clockHHMM } from "@/lib/time-display";
 import { ErrorPanel } from "@/components/ui/notice";
 
+// Tab title for this route; the root layout appends " · SESS".
+export const metadata = { title: "Attendance Oversight" };
+
 export const dynamic = "force-dynamic";
 
 const PAGE_SIZE = 50;

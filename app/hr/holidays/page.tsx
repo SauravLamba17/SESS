@@ -6,6 +6,9 @@ import { getHolidayCalendar } from "@/lib/cache/shifts";
 import { parseDateOnly, startOfDay } from "@/lib/period";
 import { ErrorPanel } from "@/components/ui/notice";
 
+// Tab title for this route; the root layout appends " · SESS".
+export const metadata = { title: "Holidays" };
+
 export const dynamic = "force-dynamic";
 
 async function load() {

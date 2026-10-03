@@ -6,6 +6,9 @@ import { ShiftActiveToggle } from "@/components/hr/shift-deactivate-button";
 import { getShiftsWithAssignedCounts } from "@/lib/cache/shifts";
 import { ErrorPanel } from "@/components/ui/notice";
 
+// Tab title for this route; the root layout appends " · SESS".
+export const metadata = { title: "Shifts" };
+
 export const dynamic = "force-dynamic";
 
 async function load() {

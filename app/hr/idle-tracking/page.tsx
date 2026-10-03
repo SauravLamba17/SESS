@@ -11,6 +11,9 @@ import { consentLabel } from "@/lib/idle/consent";
 import { idleThresholdSeconds } from "@/lib/idle/settings";
 import { ErrorPanel } from "@/components/ui/notice";
 
+// Tab title for this route; the root layout appends " · SESS".
+export const metadata = { title: "Idle Tracking" };
+
 export const dynamic = "force-dynamic";
 
 async function load() {

@@ -6,3 +6,6 @@
  * candidate outside their department is refused server-side.
  */
 export { default, dynamic } from "@/app/hr/candidates/[applicationId]/page";
+
+// Tab title for this route; the root layout appends " · SESS".
+export const metadata = { title: "Candidate" };

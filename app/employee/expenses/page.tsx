@@ -12,6 +12,9 @@ import {
   EXPENSE_STATUS_DOT,
 } from "@/lib/payroll/format";
 
+// Tab title for this route; the root layout appends " · SESS".
+export const metadata = { title: "Expense Claims" };
+
 export const dynamic = "force-dynamic";
 
 function fmtDate(d: Date): string {

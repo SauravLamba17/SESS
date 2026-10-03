@@ -6,6 +6,9 @@ import { db } from "@/lib/db";
 import { inr, periodLabel } from "@/lib/payroll/format";
 import { ErrorPanel } from "@/components/ui/notice";
 
+// Tab title for this route; the root layout appends " · SESS".
+export const metadata = { title: "Payroll Finalization" };
+
 export const dynamic = "force-dynamic";
 
 /**

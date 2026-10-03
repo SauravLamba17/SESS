@@ -11,6 +11,9 @@ import {
   SCALE_DIVISOR,
 } from "@/lib/appraisal/display";
 
+// Tab title for this route; the root layout appends " · SESS".
+export const metadata = { title: "My Appraisal" };
+
 export const dynamic = "force-dynamic";
 
 // Shape of AppraisalScore.componentScoresJson written by the compute route.

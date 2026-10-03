@@ -6,6 +6,9 @@ import { db } from "@/lib/db";
 import { ROLE_LABEL, type Role } from "@/lib/auth-types";
 import { ErrorPanel } from "@/components/ui/notice";
 
+// Tab title for this route; the root layout appends " · SESS".
+export const metadata = { title: "Roles & Permissions" };
+
 export const dynamic = "force-dynamic";
 
 /**

@@ -14,6 +14,9 @@ import { engagementEnabled } from "@/lib/system-settings";
 import { ErrorPanel } from "@/components/ui/notice";
 import { DELETE_WINDOW_MINUTES } from "@/lib/engagement/logic";
 
+// Tab title for this route; the root layout appends " · SESS".
+export const metadata = { title: "Community" };
+
 export const dynamic = "force-dynamic";
 
 function relativeTime(d: Date, now: Date): string {

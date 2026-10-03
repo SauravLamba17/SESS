@@ -461,10 +461,71 @@ async function main() {
   }
   const cycleSrc = fs.readFileSync(path.join(ROOT, "app/api/hr/appraisal/cycle/route.ts"), "utf8");
   check(
-    "the cycle route rejects an uncomputable period BEFORE creating anything",
+    "the cycle route rejects an uncomputable period BEFORE creating anything (step 11)",
     cycleSrc.indexOf("!resolvePeriodRange(period)") > 0 &&
       cycleSrc.indexOf("!resolvePeriodRange(period)") < cycleSrc.indexOf("appraisalCycle.create("),
   );
+
+  // ── 12: follow-up batch — confirmations, self-service nav, titles ──
+  step("12", "confirm steps before role/shift changes; self-service nav; a title on every page");
+  /** The body of the JSX onChange handler on the first <select> in a file. */
+  const selectOnChange = (src: string) => {
+    const at = src.indexOf("onChange=", src.indexOf("<select"));
+    return src.slice(at, src.indexOf("}}", at) + 2);
+  };
+  const roleSel = fs.readFileSync(path.join(ROOT, "components/admin/role-select.tsx"), "utf8");
+  check(
+    "role dropdown: changing it only PROPOSES (no save/fetch in onChange)",
+    /setProposed\(/.test(selectOnChange(roleSel)) && !/save\(|fetch\(/.test(selectOnChange(roleSel)),
+    selectOnChange(roleSel).replace(/\s+/g, " "),
+  );
+  check(
+    "role dropdown: the save happens only from Confirm, and Cancel clears the proposal",
+    /Confirm role change/.test(roleSel) && /setProposed\(null\);\s*save\(next\)/.test(roleSel) &&
+      /onClick=\{\(\) => setProposed\(null\)\}/.test(roleSel),
+  );
+  const shiftSel = fs.readFileSync(path.join(ROOT, "components/shifts/shift-assign-select.tsx"), "utf8");
+  const shiftOnChange = shiftSel.slice(shiftSel.indexOf("function onChange("), shiftSel.indexOf("function assign("));
+  check(
+    "roster shift dropdown: onChange proposes only; the POST lives in assign(), called from Confirm",
+    !/fetch\(/.test(shiftOnChange) && /setProposed\(/.test(shiftOnChange) &&
+      /onClick=\{\(\) => assign\(proposed\)\}/.test(shiftSel),
+  );
+  const deact = fs.readFileSync(path.join(ROOT, "components/hr/shift-deactivate-button.tsx"), "utf8");
+  check(
+    "Deactivate opens a confirmation (Reactivate stays one click)",
+    /onClick=\{active \? \(\) => setConfirming\(true\) : toggle\}/.test(deact) && /Confirm deactivation/.test(deact),
+  );
+
+  const { crossPortalNavFor, canAccessPath } = await import("../lib/auth-types.ts");
+  const hrefs = (p: Parameters<typeof crossPortalNavFor>[0], r: Parameters<typeof crossPortalNavFor>[1]) =>
+    crossPortalNavFor(p, r).map((i) => i.href);
+  const SELF = ["/employee", "/employee/payslips", "/employee/profile", "/employee/expenses"];
+  check("HR portal, HR user: the 4 self-service links, no /admin",
+    JSON.stringify(hrefs("hr", "HR")) === JSON.stringify(SELF), JSON.stringify(hrefs("hr", "HR")));
+  check("Manager portal, Manager: the 4 self-service links",
+    JSON.stringify(hrefs("manager", "MANAGER")) === JSON.stringify(SELF));
+  check("HR portal, Super Admin: way home only — no self-service (employee-less by design)",
+    JSON.stringify(hrefs("hr", "SUPER_ADMIN")) === JSON.stringify(["/admin"]));
+  check("employee portal: HR → back to /hr, Manager → /manager, Employee → nothing",
+    JSON.stringify(hrefs("employee", "HR")) === JSON.stringify(["/hr"]) &&
+      JSON.stringify(hrefs("employee", "MANAGER")) === JSON.stringify(["/manager"]) &&
+      hrefs("employee", "EMPLOYEE").length === 0);
+  check("every shown link is one the middleware would let that role open",
+    (["HR", "MANAGER"] as const).every((r) => hrefs(r === "HR" ? "hr" : "manager", r).every((h) => canAccessPath(r, h))));
+
+  const pages: string[] = [];
+  const walkPages = (dir: string) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) walkPages(p);
+      else if (e.name === "page.tsx") pages.push(p);
+    }
+  };
+  walkPages(path.join(ROOT, "app"));
+  const untitled = pages.filter((p) => !/export const metadata|export (async )?function generateMetadata/.test(fs.readFileSync(p, "utf8")));
+  check(`every page sets its own tab title (${pages.length} pages)`, untitled.length === 0,
+    untitled.map((p) => path.relative(ROOT, p)).join(", "));
 }
 
 main()

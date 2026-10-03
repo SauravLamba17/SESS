@@ -7,6 +7,9 @@ import { idleRowsFor, hm } from "@/lib/idle/aggregate";
 import { consentLabel } from "@/lib/idle/consent";
 import { ErrorPanel, UnlinkedEmployeeNotice } from "@/components/ui/notice";
 
+// Tab title for this route; the root layout appends " · SESS".
+export const metadata = { title: "Team Activity" };
+
 export const dynamic = "force-dynamic";
 
 async function load() {

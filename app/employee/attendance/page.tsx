@@ -10,6 +10,9 @@ import { db } from "@/lib/db";
 import { getEmployeeByClerkId } from "@/lib/data/scope";
 import { UnlinkedEmployeeNotice } from "@/components/ui/notice";
 
+// Tab title for this route; the root layout appends " · SESS".
+export const metadata = { title: "My Attendance" };
+
 export const dynamic = "force-dynamic";
 
 const LEAVE_STATE: Record<LeaveStatus, StatusState> = {

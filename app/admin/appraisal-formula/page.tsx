@@ -4,6 +4,9 @@ import { AppraisalFormulaForm } from "@/components/admin/appraisal-formula-form"
 import { db } from "@/lib/db";
 import { resolveFormula, ZERO_WEIGHTS, type ResolvedFormula } from "@/lib/appraisal/formula-config";
 
+// Tab title for this route; the root layout appends " · SESS".
+export const metadata = { title: "Appraisal Formula" };
+
 export const dynamic = "force-dynamic";
 
 /**

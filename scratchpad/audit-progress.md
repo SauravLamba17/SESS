@@ -126,7 +126,22 @@ HR pass DONE: themes x4 on /hr/payroll PASS (default restored), user menu PASS (
   MANAGER PASS DONE: / -> /manager PASS | dashboard PASS (0 reports; clock-in dialog opened, Confirm disabled w/o comment, CANCELLED, no punch) | all 13 sidebar pages 200 + no console errors | reports: 6 visible = 6 allowed (team/department/self), 4 forbidden 403 | warnings + client-mail validation (no request; pre-hydration click reloads page LOW) | boundary: /hr,/admin redirect to /manager; HR/admin APIs 403; IDOR target on non-report -> 403 NOT_DIRECT_REPORT; search scoped | themes x4 PASS | user menu PASS | own /employee reachable; /employee/expenses 500 (same bug, fixed locally); no nav link to own portal (same as HR).
   FINAL (2026-10-03): tsc 0, build6 OK, 33 suites 1631 passed 0 failed (+compute 53), suite snapshot identical.
   vs pre-Part-3 DB: +1 RateLimitAttempt (careers probe, auto-swept 24h), +2 AuditLog (HOLIDAY_ADDED/REMOVED for TEST- holiday; append-only by design). Nothing else.
-  PART 3 REPORTED. Pending: user commit+deploy of 3 local fixes (expenses crash, Form16 list, appraisal period) then live recheck. -> Manager pass -> final tsc/build/suite/snapshot -> report. -> Manager pass -> signed-out landing + /careers ->
+  PART 3 REPORTED. User deployed the 3 fixes; LIVE RECHECK DONE (2026-10-03):
+    /employee/expenses 200 as Manager, 5 categories render, no console error, empty-submit validation, no request.
+    /hr/payroll Form16: hint 'No finalized payroll in FY 2026-27 yet', list empty (0 finalized payroll in DB = correct), FY follows period (2026-02 -> 2025-26, 2026-04 -> 2026-27).
+    /hr/appraisal: 'TEST-not-a-period' -> POST 400 + message shown, no cycle created; DB snapshot identical (AppraisalCycle 0).
+  ALL THREE PARTS COMPLETE.
+
+## Follow-up batch (user 2026-10-03) — standing rules apply, NO commit/push
+  [x] F1 (role-select proposed+Confirm/Cancel) role dropdown confirm step (components/admin/role-select.tsx)
+  [x] F2 (computeAttendance asOf cap; phase12 +3) attendance report: clip expected days to today when range includes future
+  [x] F3 (CROSS_PORTAL SELF_SERVICE_NAV hr+manager; back link in employee portal; SA excluded) sidebar link for HR + Manager to own employee pages (clock-in, payslips, profile, expenses)
+  [x] F4 (shift assign propose+Confirm; deactivate confirm) confirm before roster shift assignment change + before shift deactivate
+  [x] F5 (buildAuditQuery rangeError; page shows it; phase10 +3) audit log reversed date range -> clear error
+  [x] F6 (61/61 pages export metadata) per-page <title> on every page
+  SKIP: pre-hydration forms, Clerk dev instance.
+  Checks: verify-audit-fixes step 12 (+10) -> 112/112. FINAL: tsc 0, build7 OK, 33 suites 1647 passed 0 failed (+compute 53), snapshot identical. REPORTED. Not committed. UI confirm steps need a live browser check after user deploys.
+  Then: check per fix, tsc, build, full suite, before/after snapshots, report. -> Manager pass -> final tsc/build/suite/snapshot -> report. -> Manager pass -> signed-out landing + /careers ->
     apply fix candidates (Form16 list, appraisal period validation) only if user agrees -> final tsc/build/suite/snapshot -> Part 3 report.
 HR pass detail: / -> /hr PASS | /hr PASS | /hr/employees PASS (D1 live HR: roles Emp/Mgr/HR; API HR->SA 403 FORBIDDEN_ROLE) | retention-review PASS | /hr/requisitions PASS (client validation, no request) | /hr/candidates PASS | candidates retention PASS | /hr/onboarding PASS | /hr/shifts PASS (edit prefill ok; deactivate no-confirm LOW) | /hr/attendance PASS (filters, reversed msg) | /hr/salary-structure PASS (not exercised) | /hr/payroll PASS w/ BUG (Form16 list) | /hr/appraisal PASS (period validation gap, not probed) | /hr/warnings PASS | /hr/reports PASS (10, all 200) | /hr/compliance PASS (validation, no request) | /hr/idle-tracking PASS | /hr/holidays PASS (TEST- add+remove)
 Roles: SA lsaurav.1702@gmail.com (DONE) -> HR 1002lambasaurav@gmail.com (NEXT — waiting for user to switch) -> Manager saurav@simplenbilling.co.in

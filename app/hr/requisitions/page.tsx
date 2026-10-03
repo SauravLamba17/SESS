@@ -8,6 +8,9 @@ import { RequisitionStatusButton } from "@/components/hr/requisition-status-butt
 import { getRecruitmentDashboard } from "@/lib/cache/dashboard";
 import { ErrorPanel } from "@/components/ui/notice";
 
+// Tab title for this route; the root layout appends " · SESS".
+export const metadata = { title: "Job Requisitions" };
+
 export const dynamic = "force-dynamic";
 
 const DOT = { OPEN: "good", ON_HOLD: "warn", CLOSED: "idle" } as const;

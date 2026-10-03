@@ -12,6 +12,9 @@ import {
   RETENTION_DAYS_WITH_CONSENT,
 } from "@/lib/recruitment/retention";
 
+// Tab title for this route; the root layout appends " · SESS".
+export const metadata = { title: "Candidate Retention Review" };
+
 export const dynamic = "force-dynamic";
 
 /** Local-date formatter with a dash for null. Delegates to the shared ymd()

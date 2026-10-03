@@ -10,6 +10,9 @@ import { getTeamRoster } from "@/lib/cache/employees";
 import { currentPeriod } from "@/lib/period";
 import { ErrorPanel, UnlinkedEmployeeNotice } from "@/components/ui/notice";
 
+// Tab title for this route; the root layout appends " · SESS".
+export const metadata = { title: "Team Attendance" };
+
 export const dynamic = "force-dynamic";
 
 function fmtDate(d: Date): string {

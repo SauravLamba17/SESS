@@ -8,6 +8,9 @@ import { getAppraisalCycleSummaries } from "@/lib/cache/dashboard";
 import { PrintButton } from "@/components/ui/print-button";
 import { ErrorPanel } from "@/components/ui/notice";
 
+// Tab title for this route; the root layout appends " · SESS".
+export const metadata = { title: "Appraisal Cycles" };
+
 export const dynamic = "force-dynamic";
 
 async function load() {

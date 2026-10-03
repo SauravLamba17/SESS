@@ -13,6 +13,9 @@ import {
 } from "@/lib/employees/retention";
 import { ymd as localYmd } from "@/lib/reports/range";
 
+// Tab title for this route; the root layout appends " · SESS".
+export const metadata = { title: "Employee Data Retention" };
+
 export const dynamic = "force-dynamic";
 
 /** Rows per page — this list is worked through, not browsed. */

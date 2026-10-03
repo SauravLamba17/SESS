@@ -166,6 +166,19 @@ async function main() {
     check("1j pageSize is capped (100000 → 200), so no request can full-scan",
       qmax.take === 200, `take=${qmax.take}`);
 
+    // A reversed range is reported, not silently answered with 0 rows.
+    const qrev = buildAuditQuery({ from: "2026-09-10", to: "2026-09-01" });
+    check("1k From after To → rangeError set", typeof qrev.rangeError === "string" && qrev.rangeError.length > 0,
+      String(qrev.rangeError));
+    check("1l a normal / same-day / open-ended range has no rangeError",
+      buildAuditQuery({ from: "2026-09-01", to: "2026-09-10" }).rangeError === null &&
+        buildAuditQuery({ from: "2026-09-01", to: "2026-09-01" }).rangeError === null &&
+        buildAuditQuery({ from: "2026-09-01" }).rangeError === null);
+    const auditPage = (await import("node:fs")).readFileSync("app/admin/audit-log/page.tsx", "utf8");
+    check("1m the audit page shows rangeError instead of querying rows",
+      auditPage.indexOf("if (q.rangeError)") > 0 &&
+        auditPage.indexOf("if (q.rangeError)") < auditPage.indexOf("db.auditLog.count("));
+
     // ── STEP 2: NOTIFICATIONS ───────────────────────────────────────
     step("2", "notifications on status transitions");
 

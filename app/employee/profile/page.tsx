@@ -7,6 +7,9 @@ import { getEmployeeProfileBasics } from "@/lib/cache/employees";
 import { parseDateOnly } from "@/lib/period";
 import { ErrorPanel, UnlinkedEmployeeNotice } from "@/components/ui/notice";
 
+// Tab title for this route; the root layout appends " · SESS".
+export const metadata = { title: "My Profile" };
+
 export const dynamic = "force-dynamic";
 
 function fmtDate(d: Date): string {

@@ -4,6 +4,9 @@ import { db } from "@/lib/db";
 import { departmentSummary } from "@/lib/admin/organization";
 import { ErrorPanel } from "@/components/ui/notice";
 
+// Tab title for this route; the root layout appends " · SESS".
+export const metadata = { title: "Organization" };
+
 export const dynamic = "force-dynamic";
 
 /**

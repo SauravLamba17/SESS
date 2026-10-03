@@ -205,13 +205,29 @@ export const NAV: Record<PortalKey, NavItem[]> = {
  * existing one-source-of-truth pattern in this file rather than a new
  * role-equality check invented for the sidebar.
  */
+/**
+ * A Manager or HR user is ALSO an employee (EMP-xxxx): they clock in, get
+ * payslips and claim expenses like anyone else. Their own portal's sidebar had
+ * no way to reach those pages — /employee was URL-only for them. These four
+ * links are the self-service shortcuts, shown under the same "Other Portals"
+ * group and filtered by the same canAccessPath() gate as everything here.
+ */
+const SELF_SERVICE_NAV: NavItem[] = [
+  { label: "My Clock-in", href: "/employee", icon: "Clock" },
+  { label: "My Payslips", href: "/employee/payslips", icon: "Wallet" },
+  { label: "My Profile", href: "/employee/profile", icon: "UserCircle" },
+  { label: "My Expenses", href: "/employee/expenses", icon: "ReceiptText" },
+];
+
 export const CROSS_PORTAL_NAV: Record<PortalKey, NavItem[]> = {
+  // The way BACK for a Manager/HR/Super Admin who followed a self-service link
+  // is added per-role in crossPortalNavFor() (it depends on whose home it is).
   employee: [],
-  manager: [],
+  manager: SELF_SERVICE_NAV,
   // An HR user sees nothing here (canAccessPath filters /admin out); a Super
   // Admin working inside the HR portal gets their way home, so following the
   // link below is not a one-way trip.
-  hr: [{ label: "Super Admin Portal", href: "/admin", icon: "ArrowRightLeft" }],
+  hr: [{ label: "Super Admin Portal", href: "/admin", icon: "ArrowRightLeft" }, ...SELF_SERVICE_NAV],
   admin: [
     // Named and iconed exactly as HR's own nav names it, so it is recognisably
     // the same page. Listed FIRST and linked directly rather than via /hr,
@@ -229,5 +245,16 @@ export const CROSS_PORTAL_NAV: Record<PortalKey, NavItem[]> = {
  */
 export function crossPortalNavFor(portal: PortalKey, role: Role | null | undefined): NavItem[] {
   if (!role) return [];
-  return CROSS_PORTAL_NAV[portal].filter((item) => canAccessPath(role, item.href));
+  // Inside the employee portal, anyone whose home is elsewhere gets one link
+  // back to it, so the self-service links are not a one-way trip.
+  if (portal === "employee")
+    return role === "EMPLOYEE"
+      ? []
+      : [{ label: `${ROLE_LABEL[role]} Portal`, href: ROLE_HOME[role], icon: "ArrowRightLeft" }];
+  return CROSS_PORTAL_NAV[portal].filter(
+    (item) =>
+      canAccessPath(role, item.href) &&
+      // Super Admin has no Employee record by design — nothing to self-serve.
+      !(role === "SUPER_ADMIN" && item.href.startsWith("/employee")),
+  );
 }

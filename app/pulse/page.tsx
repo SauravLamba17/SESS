@@ -12,6 +12,9 @@ import { engagementEnabled } from "@/lib/system-settings";
 import { ErrorPanel, UnlinkedEmployeeNotice } from "@/components/ui/notice";
 import { ymd } from "@/lib/reports/range";
 
+// Tab title for this route; the root layout appends " · SESS".
+export const metadata = { title: "Pulse Surveys" };
+
 export const dynamic = "force-dynamic";
 
 async function load() {

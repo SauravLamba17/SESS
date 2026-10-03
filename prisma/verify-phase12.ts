@@ -253,6 +253,17 @@ async function main() {
   // absent all June before joining and Charlie absent after leaving.)
   eq("expected employee-weekdays", attendance.expectedWeekdayCount, 52);
   eq("days with no punch", attendance.noPunchDays, 48);
+  // Days that have not happened yet are never "no punch": with "today" = Mon
+  // 15 Jun the range is capped there. Alpha 11 (1–15 Jun) · Bravo 4 (10–15) ·
+  // Charlie 11 (still employed on the 15th) · Delta 0 → 26; 4 punched → 22.
+  const midJune = computeAttendance(attRows, employees, range, new Date(2026, 5, 15, 14, 0));
+  eq("expected employee-weekdays stop at today (asOf 15 Jun)", midJune.expectedWeekdayCount, 26);
+  eq("…so no-punch days stop there too", midJune.noPunchDays, 22);
+  eq(
+    "a past range is unaffected by asOf",
+    computeAttendance(attRows, employees, range, new Date(2026, 9, 3)).expectedWeekdayCount,
+    52,
+  );
 
   // ── 3: HIRES & EXITS ────────────────────────────────────────────
   step("3", "New Hires & Exits");

@@ -5,6 +5,9 @@ import { IdleThresholdForm } from "@/components/admin/idle-threshold-form";
 import { moduleToggleValues, MODULE_KEYS } from "@/lib/system-settings";
 import { idleThresholdSeconds } from "@/lib/idle/settings";
 
+// Tab title for this route; the root layout appends " · SESS".
+export const metadata = { title: "Module Toggles" };
+
 export const dynamic = "force-dynamic";
 
 /**

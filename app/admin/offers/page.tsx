@@ -8,6 +8,9 @@ import { inr } from "@/lib/payroll/format";
 import { ErrorPanel } from "@/components/ui/notice";
 import { ymd as toYmd } from "@/lib/reports/range";
 
+// Tab title for this route; the root layout appends " · SESS".
+export const metadata = { title: "Offer Approvals" };
+
 export const dynamic = "force-dynamic";
 
 /** Local-date formatter with a dash for null. Delegates to the shared ymd()

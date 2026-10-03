@@ -4,6 +4,9 @@ import { Panel } from "@/components/ui/panel";
 import { getOpenRoles } from "@/lib/cache/dashboard";
 import { ErrorPanel } from "@/components/ui/notice";
 
+// Tab title for this route; the root layout appends " · SESS".
+export const metadata = { title: "Careers" };
+
 export const dynamic = "force-dynamic";
 
 async function load() {

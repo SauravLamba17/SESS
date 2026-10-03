@@ -7,6 +7,9 @@ import { getEmployeeByClerkId } from "@/lib/data/scope";
 import { inr, periodLabel, PAYROLL_STATUS_DOT } from "@/lib/payroll/format";
 import { ErrorPanel, UnlinkedEmployeeNotice } from "@/components/ui/notice";
 
+// Tab title for this route; the root layout appends " · SESS".
+export const metadata = { title: "Team Payroll" };
+
 export const dynamic = "force-dynamic";
 
 /**

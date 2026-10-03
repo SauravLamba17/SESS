@@ -7,13 +7,7 @@ import { db } from "@/lib/db";
 import { parseDateOnly, startOfDay } from "@/lib/period";
 import { getEmployeeByClerkId, OFFBOARDED_READ_ONLY } from "@/lib/data/scope";
 
-export const EXPENSE_CATEGORIES = [
-  "TRAVEL",
-  "FOOD",
-  "ACCOMMODATION",
-  "COMMUNICATION",
-  "MISCELLANEOUS",
-] as const satisfies readonly ExpenseCategory[];
+import { EXPENSE_CATEGORIES } from "@/lib/expense-categories";
 
 type Field = "category" | "amount" | "date" | "description" | "receiptUrl";
 

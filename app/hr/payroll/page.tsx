@@ -8,7 +8,7 @@ import { PayrollRowEditor } from "@/components/hr/payroll-row-editor";
 import { CreateAdjustmentButton } from "@/components/hr/create-adjustment-button";
 import { PrintButton } from "@/components/ui/print-button";
 import { db } from "@/lib/db";
-import { currentPeriod, isPeriod, financialYearOf } from "@/lib/period";
+import { currentPeriod, isPeriod, financialYearOf, financialYearMonths } from "@/lib/period";
 import { inr, periodLabel, PAYROLL_STATUS_DOT } from "@/lib/payroll/format";
 import { linkAdjustments, adjustmentLabel } from "@/lib/payroll/adjustments";
 import { ErrorPanel } from "@/components/ui/notice";
@@ -32,7 +32,7 @@ async function load(period: string) {
   try {
     // Two queries for the whole run — rows (with employee joined) and the set
     // of active employees still missing a salary structure. No per-row lookups.
-    const [rows, unpayable] = await Promise.all([
+    const [rows, unpayable, form16Employees] = await Promise.all([
       db.payroll.findMany({
         where: { month: period },
         include: {
@@ -47,11 +47,33 @@ async function load(period: string) {
         select: { id: true, name: true, employeeCode: true },
         orderBy: { employeeCode: "asc" },
       }),
+      // Form 16 covers a whole FINANCIAL YEAR, so its picker lists everyone
+      // with any FINALIZED payroll in the FY of the period on screen —
+      // including people who have since left. It used to be built from this
+      // month's rows, so it was empty (and Download disabled) whenever the
+      // viewed month had no run, and a leaver could not be selected at all.
+      db.employee.findMany({
+        where: {
+          payrolls: {
+            some: {
+              status: "FINALIZED",
+              month: { in: financialYearMonths(financialYearOf(period)) ?? [] },
+            },
+          },
+        },
+        select: { id: true, name: true, employeeCode: true },
+        orderBy: { employeeCode: "asc" },
+      }),
     ]);
-    return { rows, unpayable, error: null };
+    return { rows, unpayable, form16Employees, error: null };
   } catch (err) {
     console.error("[hr/payroll] failed:", err);
-    return { rows: [], unpayable: [], error: "Payroll data is unavailable right now." };
+    return {
+      rows: [],
+      unpayable: [],
+      form16Employees: [],
+      error: "Payroll data is unavailable right now.",
+    };
   }
 }
 
@@ -205,7 +227,7 @@ export default async function HRPayrollPage({
     ? searchParams.period.trim()
     : currentPeriod().period;
 
-  const { rows, unpayable, error } = await load(period);
+  const { rows, unpayable, form16Employees, error } = await load(period);
 
   const drafts = rows.filter((r) => r.status === "DRAFT").length;
   const submitted = rows.filter((r) => r.status === "SUBMITTED").length;
@@ -423,9 +445,7 @@ export default async function HRPayrollPage({
                 required
                 className="rounded border border-border bg-background px-3 py-2 text-sm text-text focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               >
-                {Array.from(
-                  new Map(rows.map((r) => [r.employee.id, r.employee])).values(),
-                ).map((e) => (
+                {form16Employees.map((e) => (
                   <option key={e.id} value={e.id}>
                     {e.name} · {e.employeeCode}
                   </option>
@@ -449,12 +469,18 @@ export default async function HRPayrollPage({
             </div>
             <button
               type="submit"
-              disabled={rows.length === 0}
+              disabled={form16Employees.length === 0}
               className="inline-flex items-center gap-1.5 rounded border border-border px-3 py-2 text-xs text-text hover:bg-surface-raised focus:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
             >
               <Download size={13} /> Download Form 16
             </button>
           </form>
+          {form16Employees.length === 0 && (
+            <p className="mt-2 text-xs text-text-muted">
+              No finalized payroll in FY {financialYearOf(period)} yet — Form 16 can only be
+              generated from finalized runs.
+            </p>
+          )}
         </div>
       </Panel>
     </>

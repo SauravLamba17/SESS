@@ -4,11 +4,8 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Loader2 } from "lucide-react";
 import { StatusDot } from "@/components/ui/status-dot";
-import {
-  submitExpenseClaim,
-  EXPENSE_CATEGORIES,
-  type ExpenseFormState,
-} from "@/app/employee/expenses/actions";
+import { submitExpenseClaim, type ExpenseFormState } from "@/app/employee/expenses/actions";
+import { EXPENSE_CATEGORIES } from "@/lib/expense-categories";
 
 const inputClass =
   "w-full rounded border border-border bg-background px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:border-accent";

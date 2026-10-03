@@ -403,6 +403,68 @@ async function main() {
       at > 0 && txAt > 0 && !src.slice(txAt, at).includes("NextResponse.json("),
     );
   }
+
+  // ── 10: "use server" modules export only async functions ──────
+  // A client component importing a plain VALUE from a "use server" file gets a
+  // server-reference proxy, not the value: EXPENSE_CATEGORIES.map threw and
+  // /employee/expenses crashed for every employee (found live in Part 3).
+  step("10", '"use server" files export nothing but async functions and types');
+  const serverFiles: string[] = [];
+  const walk = (dir: string) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (/\.tsx?$/.test(e.name) && /^\s*["']use server["']/.test(fs.readFileSync(p, "utf8")))
+        serverFiles.push(p);
+    }
+  };
+  for (const d of ["app", "lib", "components"]) walk(path.join(ROOT, d));
+  check("found the server-action modules", serverFiles.length > 0, `${serverFiles.length} files`);
+  for (const f of serverFiles) {
+    const bad = (fs.readFileSync(f, "utf8").match(/^export\s+(const|let|var|class|enum|default\s+(?!async))\b[^\n]*/gm) ?? []);
+    check(`${path.relative(ROOT, f)} exports no plain values`, bad.length === 0, bad.join(" | "));
+  }
+
+  // ── 11: Part 3 fixes — Form 16 picker + appraisal period validation ──
+  step("11", "Form 16 lists the FY's finalized employees; cycle periods must be computable");
+  const payPage = fs.readFileSync(path.join(ROOT, "app/hr/payroll/page.tsx"), "utf8");
+  check(
+    "the Form 16 picker is built from form16Employees, not the month's rows",
+    payPage.includes("{form16Employees.map((e) =>") &&
+      payPage.includes("disabled={form16Employees.length === 0}") &&
+      !payPage.includes("new Map(rows.map((r) => [r.employee.id, r.employee]))"),
+  );
+  const { financialYearMonths, financialYearOf } = await import("../lib/period.ts");
+  const fyMonths = financialYearMonths(financialYearOf("2098-05"))!; // FY 2098-99
+  const leaverF16 = await db.employee.create({
+    data: { employeeCode: `${TAG}-F16-LEAVER`, name: `${TAG} F16 Leaver`, department: "Assembly", joiningDate: new Date(2020, 0, 1), active: false },
+  });
+  const draftOnly = await db.employee.create({
+    data: { employeeCode: `${TAG}-F16-DRAFT`, name: `${TAG} F16 Draft`, department: "Assembly", joiningDate: new Date(2020, 0, 1) },
+  });
+  await db.payroll.create({ data: { employeeId: leaverF16.id, month: "2098-06", status: "FINALIZED", processedBy: TAG } });
+  await db.payroll.create({ data: { employeeId: draftOnly.id, month: "2098-07", status: "DRAFT", processedBy: TAG } });
+  // The page's exact predicate.
+  const listed = await db.employee.findMany({
+    where: { id: { in: [leaverF16.id, draftOnly.id] }, payrolls: { some: { status: "FINALIZED", month: { in: fyMonths } } } },
+    select: { id: true },
+  });
+  check(
+    "a LEAVER with finalized FY payroll is listed; a draft-only employee is not",
+    listed.length === 1 && listed[0].id === leaverF16.id,
+    JSON.stringify(listed),
+  );
+
+  const { resolvePeriodRange } = await import("../lib/appraisal/period-range.ts");
+  for (const [p, ok] of [["2026-07", true], ["2026-Q3", true], ["abc", false], ["2026-13", false], ["2026-Q5", false], ["2026", false]] as const) {
+    check(`appraisal period "${p}" ${ok ? "accepted" : "rejected"}`, (resolvePeriodRange(p) !== null) === ok);
+  }
+  const cycleSrc = fs.readFileSync(path.join(ROOT, "app/api/hr/appraisal/cycle/route.ts"), "utf8");
+  check(
+    "the cycle route rejects an uncomputable period BEFORE creating anything",
+    cycleSrc.indexOf("!resolvePeriodRange(period)") > 0 &&
+      cycleSrc.indexOf("!resolvePeriodRange(period)") < cycleSrc.indexOf("appraisalCycle.create("),
+  );
 }
 
 main()

@@ -8,7 +8,7 @@ SA rejected from manager actions, MFA removed, RED-tier never cached, TDS manual
 no AI in decisions, self-heal fails closed).
 
 ## Status
-- Current part: 2 (user said go 2026-10-02)
+- Current part: 3 (user: P2 fixes committed+pushed+deployed, Vercel Ready; go 2026-10-03)
 - Current step: P2b DONE + REPORTED (2026-10-03). WAITING for user go-ahead on Part 3.
   Final: tsc 0, build4 OK, 33 suites 1615 passed 0 failed (+compute.selfcheck 53 = 1668/34), DB snapshot identical.
   Assertions changed on purpose: phase12 88/84->52/48 (D5); manager-punch widget seed today->punchRow (M3);
@@ -108,3 +108,49 @@ no AI in decisions, self-heal fails closed).
 - verify-phase11 flips live IDLE_TRACKING kill switch temporarily -> live agents can latch stopped.
 - caching.selfcheck temporarily edits a REAL employee managerId + LeaveRequest.
 - Stopping a bg `npx next start` task leaves the node child holding the port; kill by port.
+
+
+## Part 3 — live browser verification (https://sess-sand.vercel.app, Claude in Chrome)
+Browser: Claude in Chrome NOT connected (no browsers) -> user chose built-in browser pane; user signs in themselves.
+Live signed-out header checks DONE (scratchpad headers-live.txt in session temp): all good.
+Rules: no irreversible actions on real data (open confirm dialogs then CANCEL); reversible actions only
+on TEST- records I create, all cleaned up; no real emails/invites. One role at a time; ask user to switch.
+HR pass DONE: themes x4 on /hr/payroll PASS (default restored), user menu PASS (1002lambasaurav@gmail.com).
+  DONE also: /hr/pulse-surveys PASS | /community PASS (TEST- shoutout add+delete) | boundary: /admin -> /hr redirect, admin APIs 403 FORBIDDEN | HR's own /employee portal: 9/10 pages 200
+  HIGH BUG FOUND+FIXED LOCALLY (NOT deployed, NOT browser-reverified): /employee/expenses 500 'u.map is not a function' —
+    EXPENSE_CATEGORIES exported from "use server" app/employee/expenses/actions.ts (pre-existing since Phase 8 3c43350).
+    Fix: moved to new lib/expense-categories.ts; actions.ts + components/employee/expense-form.tsx import it. tsc 0, build5 OK. Guard: verify-audit-fixes step 10 ("use server" files export only async fns) 93/93 — HEAD version would fail. Needs full suite + user deploy + live recheck.
+  SIGNED-OUT DONE: landing PASS (canvas, nav links + dots scroll inner container, 6 module tabs swap panels, Explore->Modules, Enter a portal->Portals, portal cards + header Sign in open Clerk modal, close works); /careers PASS (no open positions); /careers/terms 200; bad job id 404; empty apply 400 BAD_INPUT.
+  USER DECISIONS 2026-10-03: APPLY Form16-list fix + appraisal period validation fix. SKIP TEST- requisitions/shifts/surveys (verify to confirm, then cancel).
+  FIXES DONE LOCALLY (not deployed): Form16 picker = employees w/ FINALIZED payroll in FY of viewed period (+empty-state hint) in app/hr/payroll/page.tsx; appraisal cycle route rejects periods resolvePeriodRange can't parse. verify-audit-fixes step 11 (+9) -> 102/102, snapshot identical.
+  MANAGER PASS DONE: / -> /manager PASS | dashboard PASS (0 reports; clock-in dialog opened, Confirm disabled w/o comment, CANCELLED, no punch) | all 13 sidebar pages 200 + no console errors | reports: 6 visible = 6 allowed (team/department/self), 4 forbidden 403 | warnings + client-mail validation (no request; pre-hydration click reloads page LOW) | boundary: /hr,/admin redirect to /manager; HR/admin APIs 403; IDOR target on non-report -> 403 NOT_DIRECT_REPORT; search scoped | themes x4 PASS | user menu PASS | own /employee reachable; /employee/expenses 500 (same bug, fixed locally); no nav link to own portal (same as HR).
+  FINAL (2026-10-03): tsc 0, build6 OK, 33 suites 1631 passed 0 failed (+compute 53), suite snapshot identical.
+  vs pre-Part-3 DB: +1 RateLimitAttempt (careers probe, auto-swept 24h), +2 AuditLog (HOLIDAY_ADDED/REMOVED for TEST- holiday; append-only by design). Nothing else.
+  PART 3 REPORTED. Pending: user commit+deploy of 3 local fixes (expenses crash, Form16 list, appraisal period) then live recheck. -> Manager pass -> final tsc/build/suite/snapshot -> report. -> Manager pass -> signed-out landing + /careers ->
+    apply fix candidates (Form16 list, appraisal period validation) only if user agrees -> final tsc/build/suite/snapshot -> Part 3 report.
+HR pass detail: / -> /hr PASS | /hr PASS | /hr/employees PASS (D1 live HR: roles Emp/Mgr/HR; API HR->SA 403 FORBIDDEN_ROLE) | retention-review PASS | /hr/requisitions PASS (client validation, no request) | /hr/candidates PASS | candidates retention PASS | /hr/onboarding PASS | /hr/shifts PASS (edit prefill ok; deactivate no-confirm LOW) | /hr/attendance PASS (filters, reversed msg) | /hr/salary-structure PASS (not exercised) | /hr/payroll PASS w/ BUG (Form16 list) | /hr/appraisal PASS (period validation gap, not probed) | /hr/warnings PASS | /hr/reports PASS (10, all 200) | /hr/compliance PASS (validation, no request) | /hr/idle-tracking PASS | /hr/holidays PASS (TEST- add+remove)
+Roles: SA lsaurav.1702@gmail.com (DONE) -> HR 1002lambasaurav@gmail.com (NEXT — waiting for user to switch) -> Manager saurav@simplenbilling.co.in
+### TEST- records created (must be cleaned up)
+- (side effect) 1 RateLimitAttempt row for my IP from an empty /api/careers/apply probe (400, nothing else written); auto-swept by app after 24h
+- Holiday 'TEST-Audit Holiday' 2099-12-31 (HR, /hr/holidays) — CREATED (POST 200, shown 'Thu, Dec 31, 2099') then REMOVED (POST 200); reload shows Upcoming · 0 — CLEANED UP
+- ShoutOut 'TEST- audit check — deleting immediately' from HR to Manager (/community) — CREATED (POST 200, Wall·1) then DELETED via 'Delete my shout-out' (POST 200); reload shows Wall · 0 — CLEANED UP
+### Pages tested
+SA DONE (2026-10-03): /admin/modules PASS (toggles present, NOT flipped — live config) | /admin/integrations PASS | /admin/audit-log PASS (filters action/actor/date, print wired, Clear) | /community PASS (no-employee notice) | /pulse PASS | /hr/employees PASS (D1 live: invite roles Emp/Mgr/HR; Offboard confirm opened + CANCELLED, no request sent) | /hr PASS | search PASS | /employee,/manager graceful for employee-less SA | /account PASS | user menu PASS | signed-in Cache-Control confirmed live (pages private no-store; API private no-store) | boundary: SA -> /api/manager/leave,target 403 NO_EMPLOYEE (intentional)
+SA: /admin/organization PASS | /admin/payroll PASS (0 queued; finalize btn n/a) | /admin/offers PASS (0 awaiting) | /admin/appraisal-formula PASS (live validation: sev auto-balance, 110% disables Save; NOT saved, reload confirmed unchanged) | /admin/reports PASS (all 10 json/pdf/csv 200 no-store via in-page fetch; reversed range 400 REVERSED; D5 live: expected=44)
+SA: /admin PASS (themes x4 PASS, / -> /admin redirect PASS, counts consistent) | /admin/roles PASS (dropdowns not exercised)
+### Issues
+- MEDIUM /admin/roles role <select> saves on change, no confirm (components/admin/role-select.tsx:59) — decision
+- MEDIUM Attendance report counts FUTURE weekdays of current range as expected/no-punch (Oct default: 44 no-punch, only 4 elapsed) — decision (clip to today?)
+- LOW /hr/employees roster shift <select> saves on change, no confirm (components/shifts/shift-assign-select.tsx)
+- LOW audit-log reversed date range silently returns 0 rows (reports page rejects with REVERSED)
+- INFO/DECISION live site runs on a Clerk DEVELOPMENT instance (pk_test, 'Development mode' badge in Clerk UI)
+- MEDIUM (known A1) /api/attendance/punch error bodies lack `code` — confirmed live
+- HIGH BUG /employee/expenses crashes (see status) — FIXED LOCALLY
+- MEDIUM UX HR has no nav link to own employee portal (SA sidebar has 'Other portals'; HR/employee sidebars don't)
+- MEDIUM BUG /hr/payroll Form 16 employee <select> built from CURRENT MONTH rows (app/hr/payroll/page.tsx ~426, disabled={rows.length===0}) -> empty/disabled when month has no run; leavers unselectable. FIX CANDIDATE (safe, contained)
+- LOW /hr/shifts Deactivate acts on click, no confirm (components/hr/shift-deactivate-button.tsx)
+- UX HR account (also EMP-0002) has no sidebar link to its own employee portal (payslips/attendance) — verify
+- QUESTION: TEST- requisitions/shifts cannot be deleted (only closed/deactivated) — ask user before creating
+- LOW /api/hr/appraisal/cycle accepts any non-empty period (UI says YYYY-MM or YYYY-Qn) -> uncomputable cycle. FIX CANDIDATE
+- LOW forms clicked before hydration do a native submit/reload (seen on /manager/warnings first click)
+- LOW 56/61 pages lack own <title> (generic 'SESS — Simplen Employee Self-Service')

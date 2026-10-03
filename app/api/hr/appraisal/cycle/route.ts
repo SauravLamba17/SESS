@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { getCurrentRole } from "@/lib/auth";
 import { fail } from "@/lib/api/response";
 import { onAppraisalChanged } from "@/lib/invalidation/employee";
+import { resolvePeriodRange } from "@/lib/appraisal/period-range";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,6 +32,10 @@ export async function POST(req: NextRequest) {
   const period = typeof body.period === "string" ? body.period.trim() : "";
   const department = normalizeDepartment(body.department);
   if (!period) return fail("BAD_INPUT", "period is required", 400);
+  // The SAME parser compute uses, so a cycle that can be created can always be
+  // scored. Any other text used to create a cycle that compute then refused.
+  if (!resolvePeriodRange(period))
+    return fail("BAD_INPUT", "period must be YYYY-MM (e.g. 2026-07) or YYYY-Qn (e.g. 2026-Q3)", 400);
 
   try {
     // Resolve the formula: department-specific, else global. Never fabricate.

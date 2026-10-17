@@ -46,5 +46,25 @@ import { ORG_TIME_ZONE } from "./lib/time-display.ts";
 export function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
     process.env.TZ = ORG_TIME_ZONE;
+
+    // Open the database connection while a fresh Vercel instance boots,
+    // instead of on its first request. Measured on live (2026-10-17): the
+    // first query in a new instance paid ~180 ms just to connect to the
+    // pooler; every query after it takes 1–3 ms.
+    //  · Vercel only (VERCEL is set there) and never during `next build` — so
+    //    local runs, and the verify suite that calls register() under plain
+    //    Node, never open a connection.
+    //  · Fire-and-forget, fail-open: register() does not wait for it and a
+    //    failure is only logged. A slow or unreachable database must never stop
+    //    an instance from serving; the first query then connects on its own,
+    //    as it always did.
+    //  · The import must stay INSIDE this nodejs branch (Next's documented
+    //    pattern): the edge build replaces NEXT_RUNTIME with "edge", drops the
+    //    branch as dead code, and so never bundles Prisma into the middleware.
+    if (process.env.VERCEL && process.env.NEXT_PHASE !== "phase-production-build") {
+      import("./lib/db.ts")
+        .then(({ db }) => db.$connect())
+        .catch((err) => console.error("[instrumentation] database warm-up failed:", err));
+    }
   }
 }

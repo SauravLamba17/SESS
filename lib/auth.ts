@@ -10,7 +10,6 @@ import {
   type ImpersonationPayload,
 } from "@/lib/impersonation";
 import { db } from "@/lib/db";
-import { timed } from "@/lib/server-timing";
 import { ensureUserForClerkIdentity } from "@/lib/employees/invite";
 
 /**
@@ -45,7 +44,7 @@ async function realRoleOf(
   const fromClaims = coerceRole(sessionClaims?.metadata?.role);
   if (fromClaims) return fromClaims;
   // Fallback for sessions whose token isn't customized yet.
-  const user = await timed("clerk-currentUser-role", () => currentUser());
+  const user = await currentUser();
   return coerceRole(user?.publicMetadata?.role);
 }
 
@@ -87,13 +86,13 @@ async function ensureUserRow(clerkId: string, role: Role | null): Promise<void> 
   // Return BEFORE touching the database; this is the fail-closed default.
   if (!role) return;
   try {
-    if (await timed("self-heal-db", () => db.user.findUnique({ where: { clerkId }, select: { id: true } }))) {
+    if (await db.user.findUnique({ where: { clerkId }, select: { id: true } })) {
       provisioned.add(clerkId);
       return;
     }
     // Only now — on the rare healing path — pay for the Clerk round trip that
     // yields the address the Employee match needs.
-    const u = await timed("clerk-currentUser-heal", () => currentUser());
+    const u = await currentUser();
     const email =
       u?.emailAddresses.find((e) => e.id === u.primaryEmailAddressId)?.emailAddress ??
       u?.emailAddresses[0]?.emailAddress ??
@@ -142,22 +141,20 @@ export interface Identity {
  * corresponding write-protection guards that still apply to them.
  */
 export const resolveIdentity = cache(async (): Promise<Identity> => {
-  // timed() wrappers: TEMPORARY Server-Timing diagnostics (lib/server-timing.ts),
-  // pass-through on every normal request.
-  const { userId: realUserId, sessionClaims } = await timed("clerk-auth", () => auth());
+  const { userId: realUserId, sessionClaims } = await auth();
   if (!realUserId) {
     return { realUserId: null, realRole: null, userId: null, role: null, impersonation: null };
   }
-  const realRole = await timed("role-lookup", () => realRoleOf(sessionClaims));
+  const realRole = await realRoleOf(sessionClaims);
 
   // Safety net (see ensureUserRow above): guarantee this authenticated identity
   // has a User row. Deliberately on realUserId/realRole, BEFORE impersonation
   // is applied — an impersonated identity is an existing user by definition.
-  await timed("self-heal-check", () => ensureUserRow(realUserId, realRole));
+  await ensureUserRow(realUserId, realRole);
 
   if (realRole === "SUPER_ADMIN") {
     const token = cookies().get(IMP_COOKIE)?.value;
-    const imp = await timed("impersonation", () => verifyImpersonation(token, realUserId));
+    const imp = await verifyImpersonation(token, realUserId);
     if (imp) {
       // Act fully as the impersonated identity everywhere downstream.
       return { realUserId, realRole, userId: imp.cid, role: imp.role, impersonation: imp };

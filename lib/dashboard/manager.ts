@@ -5,8 +5,6 @@ import { getTeamRoster } from "@/lib/cache/employees";
 import { getPendingLeaveCount } from "@/lib/cache/dashboard";
 import { currentPeriod } from "@/lib/period";
 import { loadOwnAttendance } from "@/lib/attendance/own-summary";
-// TEMPORARY Server-Timing diagnostics — pass-through on normal requests.
-import { timed } from "@/lib/server-timing";
 
 /**
  * Everything the Team Dashboard (app/manager/page.tsx) needs for one manager.
@@ -21,7 +19,7 @@ import { timed } from "@/lib/server-timing";
  * descent. Nothing about any other team can enter this statement.
  */
 export async function loadManagerDashboard(clerkId: string) {
-  const manager = await timed("mgr-identity", () => getEmployeeByClerkId(clerkId));
+  const manager = await getEmployeeByClerkId(clerkId);
   if (!manager) return { manager: null, error: null };
 
   const { period, monthStart, monthEnd } = currentPeriod();
@@ -29,13 +27,13 @@ export async function loadManagerDashboard(clerkId: string) {
   // 60 s, dropped by tag on any roster or shift change. A display projection
   // of the SAME direct-reports-only query (managerId + active, single level,
   // no recursive descent) — not a wider one.
-  const reports = await timed("mgr-roster", () => getTeamRoster(manager.id));
+  const reports = await getTeamRoster(manager.id);
 
   const [team, pendingApprovals, own] = await Promise.all([
     // Per team member, this month: punches, late punches, units produced, the
     // month's target, and the LATEST quality score (newest date first, as the
     // Team Quality page reads it). One statement for the whole team — no N+1.
-    timed("mgr-team-metrics", () => db.$queryRaw<
+    db.$queryRaw<
       { id: string; total: number; late: number; actual: number; target: number | null; quality: number | null }[]
     >`
       SELECT e.id,
@@ -51,15 +49,15 @@ export async function loadManagerDashboard(clerkId: string) {
           WHERE q."employeeId" = e.id AND q.date >= ${monthStart} AND q.date < ${monthEnd}
           ORDER BY q.date DESC LIMIT 1) AS quality
       FROM "Employee" e
-      WHERE e."managerId" = ${manager.id}`),
+      WHERE e."managerId" = ${manager.id}`,
     // ORANGE TIER (§2/§4) — pending-approvals COUNT, 60 s, invalidated the
     // moment a decision is made. Only the number is cached; the list of
     // requests the manager acts on is read fresh on /manager/attendance, and
     // the decision itself is gated by the atomic where-clause in
     // app/api/manager/leave/route.ts, never by anything cached.
-    timed("mgr-pending", () => getPendingLeaveCount(manager.id)),
+    getPendingLeaveCount(manager.id),
     // The manager's own row — scoped to manager.id, never to a report's id.
-    timed("mgr-own-attendance", () => loadOwnAttendance(manager.id, manager.shiftId)),
+    loadOwnAttendance(manager.id, manager.shiftId),
   ]);
 
   const byId = new Map(team.map((t) => [t.id, t]));

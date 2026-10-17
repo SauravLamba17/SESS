@@ -3,7 +3,12 @@ import { unstable_cache } from "next/cache";
 import type { RequisitionStatus } from "@prisma/client";
 import { db } from "@/lib/db";
 import { parseDateOnly } from "@/lib/period";
-import { ymd } from "@/lib/reports/range";
+import { parseRange, ymd } from "@/lib/reports/range";
+import {
+  computeRecruitmentFunnel,
+  type PipelineStageLike,
+  type RecruitmentFunnelResult,
+} from "@/lib/reports/recruitment-funnel";
 
 /**
  * ORANGE + YELLOW TIERS — SESS_Caching_Strategy.docx §2/§4.
@@ -62,8 +67,8 @@ export interface HrDashboardTotals {
 }
 
 /**
- * Every figure on the HR dashboard, in ONE Promise.all — the identical set of
- * queries app/hr/page.tsx ran inline, moved here unchanged.
+ * Every figure on the HR dashboard, in ONE SQL statement — the same filters
+ * app/hr/page.tsx once ran inline as seven separate queries.
  *
  * @param period    "YYYY-MM", the payroll month being summarised.
  * @param todayYmd  "YYYY-MM-DD" local today, per lib/reports/range.ts#ymd.
@@ -94,63 +99,51 @@ export function getHrDashboardTotals(
         today.getDate() + RETENTION_WARNING_DAYS,
       );
 
-      const [
-        activeCount,
-        presentToday,
-        payrollByStatus,
-        openWarnings,
-        unreleasedWarnings,
-        idleConsent,
-        retentionExpiring,
-      ] = await Promise.all([
-        db.employee.count({ where: { active: true } }),
-        // Distinct employees with a punch today — a second punch must not count
-        // twice, so this is a distinct-employee count, not an attendance count.
-        db.attendance.findMany({
-          where: { date: { gte: today, lt: tomorrow } },
-          select: { employeeId: true },
-          distinct: ["employeeId"],
-        }),
-        // Row COUNTS per status. Nothing monetary is selected — §3.
-        db.payroll.groupBy({
-          by: ["status"],
-          where: { month: period },
-          _count: { _all: true },
-        }),
-        db.warningLetter.count({ where: { acknowledged: false } }),
-        db.warningLetter.count({ where: { status: "DRAFT" } }),
-        // IDLE_TRACKING is the ONLY consent type that exists — Phase 11 removed
-        // FACE_VERIFICATION along with the feature. Distinct by employee so a
-        // re-consent does not inflate the count.
-        db.consentRecord.findMany({
-          where: { consentType: "IDLE_TRACKING" },
-          select: { employeeId: true },
-          distinct: ["employeeId"],
-        }),
-        db.employee.count({
-          where: {
-            active: false,
-            redactedAt: null,
-            scheduledRedactionAt: { not: null, lte: retentionCutoff },
-          },
-        }),
-      ]);
-
-      const countFor = (s: "DRAFT" | "SUBMITTED" | "FINALIZED") =>
-        payrollByStatus.find((r) => r.status === s)?._count._all ?? 0;
+      // Every figure in ONE statement (it was seven queries). Each line is the
+      // same filter the separate Prisma query used:
+      //  · present = DISTINCT employees with a punch today — a second punch
+      //    must not count twice.
+      //  · payroll = row COUNTS per status. Nothing monetary is selected — §3.
+      //  · idle consent = DISTINCT employees, so a re-consent does not inflate
+      //    it. IDLE_TRACKING is the ONLY consent type that exists — Phase 11
+      //    removed FACE_VERIFICATION along with the feature.
+      const [r] = await db.$queryRaw<
+        {
+          activeCount: number;
+          presentCount: number;
+          draft: number;
+          submitted: number;
+          finalized: number;
+          openWarnings: number;
+          unreleasedWarnings: number;
+          idleConsentCount: number;
+          retentionExpiring: number;
+        }[]
+      >`
+        SELECT
+          (SELECT count(*) FROM "Employee" WHERE active)::int AS "activeCount",
+          (SELECT count(DISTINCT "employeeId") FROM "Attendance"
+            WHERE date >= ${today} AND date < ${tomorrow})::int AS "presentCount",
+          (SELECT count(*) FROM "Payroll" WHERE month = ${period} AND status = 'DRAFT')::int AS draft,
+          (SELECT count(*) FROM "Payroll" WHERE month = ${period} AND status = 'SUBMITTED')::int AS submitted,
+          (SELECT count(*) FROM "Payroll" WHERE month = ${period} AND status = 'FINALIZED')::int AS finalized,
+          (SELECT count(*) FROM "WarningLetter" WHERE NOT acknowledged)::int AS "openWarnings",
+          (SELECT count(*) FROM "WarningLetter" WHERE status = 'DRAFT')::int AS "unreleasedWarnings",
+          (SELECT count(DISTINCT "employeeId") FROM "ConsentRecord"
+            WHERE "consentType" = 'IDLE_TRACKING')::int AS "idleConsentCount",
+          (SELECT count(*) FROM "Employee"
+            WHERE NOT active AND "redactedAt" IS NULL
+              AND "scheduledRedactionAt" IS NOT NULL
+              AND "scheduledRedactionAt" <= ${retentionCutoff})::int AS "retentionExpiring"`;
 
       return {
-        activeCount,
-        presentCount: presentToday.length,
-        payroll: {
-          draft: countFor("DRAFT"),
-          submitted: countFor("SUBMITTED"),
-          finalized: countFor("FINALIZED"),
-        },
-        openWarnings,
-        unreleasedWarnings,
-        idleConsentCount: idleConsent.length,
-        retentionExpiring,
+        activeCount: r.activeCount,
+        presentCount: r.presentCount,
+        payroll: { draft: r.draft, submitted: r.submitted, finalized: r.finalized },
+        openWarnings: r.openWarnings,
+        unreleasedWarnings: r.unreleasedWarnings,
+        idleConsentCount: r.idleConsentCount,
+        retentionExpiring: r.retentionExpiring,
       };
     },
     ["dashboard:hr-totals", period, todayYmd],
@@ -226,6 +219,36 @@ export const getRecruitmentDashboard = unstable_cache(
   ["dashboard:requisitions"],
   { tags: [TAG_RECRUITMENT], revalidate: YELLOW_TTL },
 );
+
+/**
+ * YELLOW — the System Dashboard's recruitment funnel: applications created in
+ * [startYmd, endYmd] through Phase 12's computeRecruitmentFunnel(). Only the
+ * computed counts and percentages are cached — no candidate, application id
+ * or name survives into the entry. Keyed on both days, so an entry never
+ * outlives the range it describes; dropped by TAG_RECRUITMENT whenever an
+ * application is created or changes stage.
+ */
+export function getRecruitmentFunnel(startYmd: string, endYmd: string): Promise<RecruitmentFunnelResult> {
+  return unstable_cache(
+    async () => {
+      const range = parseRange(startYmd, endYmd);
+      if (!range.ok) throw new Error(`recruitment funnel range: ${range.message}`);
+      // One statement with the department joined in (Prisma's nested select
+      // was two).
+      const rows = await db.$queryRaw<
+        { id: string; stage: string; createdAt: Date; updatedAt: Date; department: string }[]
+      >`
+        SELECT a.id, a.stage::text AS stage, a."createdAt", a."updatedAt", r.department
+        FROM "Application" a JOIN "JobRequisition" r ON r.id = a."jobRequisitionId"
+        WHERE a."createdAt" >= ${range.range.start} AND a."createdAt" < ${range.range.endExclusive}`;
+      return computeRecruitmentFunnel(
+        rows.map((a) => ({ ...a, stage: a.stage as PipelineStageLike })),
+      );
+    },
+    ["dashboard:recruitment-funnel", startYmd, endYmd],
+    { tags: [TAG_RECRUITMENT], revalidate: YELLOW_TTL },
+  )();
+}
 
 export interface OpenRole {
   id: string;

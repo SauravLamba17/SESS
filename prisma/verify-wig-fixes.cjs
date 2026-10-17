@@ -52,6 +52,9 @@ function section(title) {
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
 
 const employee = read("app/employee/page.tsx");
+// The page's loadMetrics() delegates the data fetch to this loader; the
+// unlinked and success returns live here now.
+const employeeLoader = read("lib/dashboard/employee.ts");
 const manager = read("app/manager/page.tsx");
 const hr = read("app/hr/page.tsx");
 
@@ -65,7 +68,7 @@ try {
   );
   check(
     "no linked Employee returns m:null with NO error (an unlinked account is not a failure)",
-    /if \(!me \|\| !employee\) return \{ m: null, error: null \};/.test(employee),
+    /if \(!employee\) return \{ m: null, error: null \};/.test(employeeLoader),
   );
   const catchMatch = employee.match(
     /catch \(err\) \{[\s\S]*?return \{ m: null, error: "([^"]+)" \};/,
@@ -81,7 +84,8 @@ try {
   );
   check(
     "the success path returns the metrics under m, with error:null",
-    /return \{\s*m: \{/.test(employee) && /\},\s*error: null,\s*\};/.test(employee),
+    /return \{\s*m: \{/.test(employeeLoader) && /\},\s*error: null,\s*\};/.test(employeeLoader) &&
+      /return await loadEmployeeDashboard\(userId\);/.test(employee),
   );
 
   section("2: Employee renders the SAME three branches as Manager");

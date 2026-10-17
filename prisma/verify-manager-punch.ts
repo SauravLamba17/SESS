@@ -198,8 +198,12 @@ async function main() {
   // (verify-night-shift step 8). Still the manager's OWN attendance.
   check("manager passes its OWN attendance to the widget",
     /initialCheckIn=\{data\.own\.punchRow/.test(mgrPage));
+  // The page's data now comes from lib/dashboard/manager.ts.
+  const mgrLoader = fs.readFileSync(path.join(ROOT, "lib/dashboard/manager.ts"), "utf8");
+  check("manager page loads through the shared manager loader",
+    /return await loadManagerDashboard\(userId\);/.test(mgrPage));
   check("manager's own load is scoped to manager.id",
-    /loadOwnAttendance\(manager\.id/.test(mgrPage));
+    /loadOwnAttendance\(manager\.id/.test(mgrLoader));
 }
 
 main()

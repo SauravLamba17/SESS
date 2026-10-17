@@ -3,6 +3,7 @@ import type { PipelineStage } from "@prisma/client";
 import { getEffectiveUserId, getCurrentRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { scheduleRetentionOnRejection } from "@/lib/recruitment/retention";
+import { onRecruitmentChanged } from "@/lib/invalidation/employee";
 import { fail } from "@/lib/api/response";
 import { ymd } from "@/lib/reports/range";
 
@@ -115,6 +116,9 @@ export async function POST(req: NextRequest) {
         "This application moved while you were viewing it. Reload and try again.",
         409,
       );
+
+    // The System Dashboard's cached recruitment funnel counts stages.
+    onRecruitmentChanged();
 
     return NextResponse.json({
       ok: true,

@@ -4,8 +4,7 @@ import { StatusLabel } from "@/components/ui/status-dot";
 import { ErrorPanel } from "@/components/ui/notice";
 import { NotificationPanel } from "@/components/employee/notification-panel";
 import { getEffectiveUserId } from "@/lib/auth";
-import { db } from "@/lib/db";
-import { getUserByClerkId } from "@/lib/data/scope";
+import { loadRecentNotifications } from "@/lib/dashboard/notifications";
 import { TodayWidgets } from "@/components/engagement/today-widgets";
 import { loadToday } from "@/lib/engagement/today";
 import { currentPeriod } from "@/lib/period";
@@ -32,20 +31,7 @@ async function loadNotifications() {
   const userId = await getEffectiveUserId();
   if (!userId) return [];
   try {
-    const me = await getUserByClerkId(userId);
-    if (!me) return [];
-    const rows = await db.notification.findMany({
-      where: { recipientUserId: me.id },
-      orderBy: [{ read: "asc" }, { createdAt: "desc" }],
-      take: 10,
-    });
-    return rows.map((n) => ({
-      id: n.id,
-      type: n.type,
-      message: n.message,
-      read: n.read,
-      createdAt: n.createdAt.toISOString(),
-    }));
+    return await loadRecentNotifications(userId, 10);
   } catch (err) {
     console.error("[hr/dashboard] notifications failed:", err);
     return [];

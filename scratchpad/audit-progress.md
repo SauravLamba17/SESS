@@ -141,6 +141,7 @@ HR pass DONE: themes x4 on /hr/payroll PASS (default restored), user menu PASS (
   [x] F6 (61/61 pages export metadata) per-page <title> on every page
   SKIP: pre-hydration forms, Clerk dev instance.
   Checks: verify-audit-fixes step 12 (+10) -> 112/112. FINAL: tsc 0, build7 OK, 33 suites 1647 passed 0 failed (+compute 53), snapshot identical. REPORTED. Not committed. UI confirm steps need a live browser check after user deploys.
+  LIVE RECHECK (user deployed): HR sidebar 4 links PASS (all land, 'HR Portal' back link) | roster shift assign: prompt 'Assign Morning Shift?' -> Cancel reverts, no POST | shift Deactivate: prompt -> Cancel, no POST, both still active | titles: 45 HR-reachable + sign-in/up + careers + landing all PASS. SA: role-change prompt 'Change role from Manager to Employee? ...' -> Cancel reverted, NO /api/admin/user-role request, reload shows roles unchanged | 10 admin titles PASS | SA in HR portal: no self-service links (by design). DB identical. FOLLOW-UP BATCH FULLY VERIFIED LIVE.
   Then: check per fix, tsc, build, full suite, before/after snapshots, report. -> Manager pass -> final tsc/build/suite/snapshot -> report. -> Manager pass -> signed-out landing + /careers ->
     apply fix candidates (Form16 list, appraisal period validation) only if user agrees -> final tsc/build/suite/snapshot -> Part 3 report.
 HR pass detail: / -> /hr PASS | /hr PASS | /hr/employees PASS (D1 live HR: roles Emp/Mgr/HR; API HR->SA 403 FORBIDDEN_ROLE) | retention-review PASS | /hr/requisitions PASS (client validation, no request) | /hr/candidates PASS | candidates retention PASS | /hr/onboarding PASS | /hr/shifts PASS (edit prefill ok; deactivate no-confirm LOW) | /hr/attendance PASS (filters, reversed msg) | /hr/salary-structure PASS (not exercised) | /hr/payroll PASS w/ BUG (Form16 list) | /hr/appraisal PASS (period validation gap, not probed) | /hr/warnings PASS | /hr/reports PASS (10, all 200) | /hr/compliance PASS (validation, no request) | /hr/idle-tracking PASS | /hr/holidays PASS (TEST- add+remove)
@@ -169,3 +170,65 @@ SA: /admin PASS (themes x4 PASS, / -> /admin redirect PASS, counts consistent) |
 - LOW /api/hr/appraisal/cycle accepts any non-empty period (UI says YYYY-MM or YYYY-Qn) -> uncomputable cycle. FIX CANDIDATE
 - LOW forms clicked before hydration do a native submit/reload (seen on /manager/warnings first click)
 - LOW 56/61 pages lack own <title> (generic 'SESS — Simplen Employee Self-Service')
+
+## LOAD TEST task (user 2026-10-14) — separate disposable Supabase DB ONLY
+Rules: only .env.loadtest (never .env/.env.local/Vercel env); compare refs before ANY db cmd (STOP if match);
+no load on sess-sand.vercel.app; local `npm run build` + `npm start` against test DB; migrate deploy only;
+no commit/push; scripts under scripts/loadtest/; .env.loadtest gitignored (already covered by `.env*`).
+- 2026-10-14: STOPPED at gate — .env.loadtest does not exist. Live .env ref = ukjzcsvjbvlrhpmjwzfo.
+  No DB command run. Asked user to create .env.loadtest (DATABASE_URL txn 6543 pgbouncer, DATABASE_URL_SESSION 5432,
+  Clerk keys, NEXT_PUBLIC_APP_URL=http://localhost:3005, ATTENDANCE_VALIDATION_MODE=NONE) + decide load tool.
+- 2026-10-15: GATE PASSED. TEST ref dapvajclqsoaxcivlkwv (aws-0-ap-southeast-2 :6543 pgbouncer cl=1 / :5432 cl=5),
+  LIVE ref ukjzcsvjbvlrhpmjwzfo — differ. Clerk keys present (pk_test/sk_test). Remaining "<PLACEHOLDER>" is in a comment.
+  PLAN: isolated copy at <session scratchpad>/lt-app (no .env* files; node_modules junction) so next/prisma can't
+  auto-load .env/.env.local; env injected from .env.loadtest only; every script hard-refuses live ref.
+- STEP 1 DONE: isolated copy lt-app (0 .env files, node_modules junction); scripts/loadtest/lt-run.mjs guard (reads only
+  .env.loadtest, refuses live ref). migrate deploy: 5 repo migrations applied OK. FINDING: migrations-only DB drifts from
+  schema.prisma (Application.termsAcceptedAt/termsVersion missing; Notification FK onDelete differs) -> DR gap.
+  Synced TEST DB via migration that exists ONLY in lt-app copy (20261015000000_loadtest_only_drift_sync). Drift now empty.
+- STEP 2 DONE: seed.ts (lt copy) 145s, ~141k rows (Attendance 52207, Production 44033, IdleLog 20649, Payroll 2541 FINALIZED...).
+  stats in session scratchpad lt-stats-seed.json.
+- STEP 3 harness ready: scripts/loadtest/{hooks.mjs,register.mjs,db-proxy.ts,next-cache-stub.ts,harness.ts}. @/lib/db -> ALS proxy
+  (N clients cl=1 txn pooler), next/cache passthrough (cache OFF = worst case), lib/auth import forbidden. tsc 0. Smoke OK.
+  Run: LT_APP_DIR=<lt-app> node scripts/loadtest/lt-run.mjs -- node --import ./scripts/loadtest/register.mjs scripts/loadtest/harness.ts <a|b|c|d|e|f>
+  Results JSON written in lt-app cwd: loadtest-results-<x>.json
+- STEP 3 PAUSED (2026-10-15). Ran a (9am rush) + z diagnostics + b (5 min dashboards) on TEST DB.
+  a: 74 IN p50 11.4s p95 15.1s 93.2% ok (5x P1001 at start), 74 OUT 100% p50 11.3s; 12 ALREADY = night shift ended 03:00 (correct).
+  z: TCP RTT to Sydney pooler ~380ms; SELECT 1 warm = 1.9s (~5 RTT); cold connect x20 p50 4.9s.
+  b: 0% success — 830 P2024 (pool timeout 10s) + 2 P1001; dashboards fan out 17 queries p50 (max 34) on connection_limit=1.
+  DIAGNOSIS: geography (test DB ap-southeast-2 vs this machine ~380ms RTT) makes absolute timings meaningless.
+  REAL FINDING: dashboard Promise.all fan-out x connection_limit=1 x pool_timeout 10s -> total failure if per-query >~0.6s.
+  ASKED USER: recreate test project in ap-south-1 (Mumbai, same as live) & rerun; confirm Vercel function region (no pin in repo).
+  Test DB now has today's (2026-10-15) attendance from scenario a. Not yet run: c, d, e, f, HTTP, Step 4.
+
+### LOAD TEST — resumed 2026-10-16 (Sydney test ref dapvajclqsoaxcivlkwv, not recreated)
+- Ref gate re-run: test=dapvajclqsoaxcivlkwv, live=ukjzcsvjbvlrhpmjwzfo (live ref only in .env.loadtest comment line 1). OK.
+- .env.loadtest: pool_timeout=60 appended to both URLs (backup in session scratchpad).
+- Harness: per-request round trips from Prisma query events; wrappers (BEGIN/DEALLOCATE ALL/COMMIT)=1 RT, statements=2 RT.
+  Baseline: SELECT 1 = 5 RT, 1647 ms -> 329 ms/RT (TCP RTT 331-358). Est Mumbai = measured − RT×329 + RT×5.
+  would-fail@10s = a Prisma call that took >10 s beyond one call's cost (pool wait).
+- FINDING: pgbouncer=true makes Prisma send BEGIN; DEALLOCATE ALL; stmt; COMMIT for EVERY call = 5 RT/query (prod too).
+- Added scripts/loadtest/correctness.ts (snapshot/check, read-only) and http.mjs (localhost only).
+- Running: b (cl=1), b5 (cl=5). Next: snapshot, a,c,d,e,f, HTTP, check.
+- DONE 2026-10-17: b(cl=1) 100%/57s, b5(cl=5) 96.1% (9 P1001)/56s — cl=5 no help, pooler server pool (~23 backends) is the ceiling.
+  a 100%/100%; c1-c4 100% (no retry needed); d1/d2 100%; e P2028 at route 60s tx timeout from Sydney, retry 182s OK; f1 0% (80 P2024 @60s), f2 96.7%.
+  HTTP (local build :3105): / /careers /api/health 100% <0.4s p95; /ready 100% but p50 34s (20 queued on 1 conn).
+  Step 4: 16/17 pass; "orphan" fail = bulk import creates no onboarding checklist (only offer-accept does) — real behaviour, not orphan.
+  Loan recovery NOT exercised: seed left 0 ACTIVE advances. lt-app copy had been incomplete (components/types) — re-synced for build.
+  REPORT delivered; no app fixes applied.
+
+### MUST-FIX batch (2026-10-17) — applied in working tree, NOT committed; test project only
+1. prisma/migrations/20261017000000_catch_up_terms_and_notification_fk (idempotent; DO-block FK swap only if not SET NULL).
+   Test: lt-only migration + its _prisma_migrations row removed; deploy -> status clean, diff "No difference detected".
+   Rebuild proof in scratch schema lt_rebuild (dropped after): 5 migrations -> 3 gaps; +catch-up -> only the
+   recipientUserId FK artifact (20260904 guard checks conname w/o schema; real fresh DB unaffected; don't edit applied migration).
+2. Dashboards: lib/dashboard/{admin,manager,employee,notifications}.ts; loadToday 3->1, moduleToggleValues 3->1,
+   loadOwnAttendance 3->1, getEmployeeByClerkId 2->1, HR totals 7->1 (still ORANGE), funnel YELLOW-cached (+stage route invalidates).
+   Statements cache-off before->after: SA 23->8, HR 15->5, MGR 19->9, EMP 22->9; warm: 22->7, 6->2, 15->6, 21->8.
+   Parity vs HEAD loaders (scripts/loadtest/before/): 22/22 identical cold and warm.
+3. Vercel URL ending: ?pgbouncer=true&connection_limit=1&pool_timeout=30 (user changes it).
+4. Loan recovery (scenario l): 2 advances, 2026-11 + 2026-12: deductions exact, capped final installment closes. OK.
+5. b after: 533 loads (was 230), 100%, 9 q/42 RT (was 21/90), p50 25.7s (was 56.7). f1 100% (was 0%), f2 100%. Step4 28/28.
+6. tsc 0; build OK (lt-app copy, test env); DB-free 9 suites pass (wig-fixes, dashboard-fallback updated for moved code);
+   DB suites on TEST: all pass except self-healing-identity 47/52 + super-admin-identity 42/44 (assert LIVE accounts).
+   recruitment-pipeline needed lt-app-only tx timeout (Sydney). manager-punch source check updated.

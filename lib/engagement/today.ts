@@ -16,12 +16,14 @@ export type { PresenceRow, PresenceStatus };
 /**
  * The shared "today" data for the three engagement widgets.
  *
- * ONE call, FOUR queries in parallel — used identically by all four
+ * ONE call, TWO queries in parallel (roster + presence in one statement, and
+ * the cached holiday calendar) — used identically by all four
  * dashboards. Without it, the same three widgets across four portals would
  * mean twelve query paths to keep consistent.
  *
  * SCOPE DISCIPLINE (Phase 9's one principle):
- * The presence query selects ONLY `employeeId`. lateFlag, lateMinutes,
+ * The presence statement returns two booleans per person and nothing else
+ * from Attendance or LeaveRequest. lateFlag, lateMinutes,
  * checkIn, checkOut and checkInNote are never requested, so no punctuality
  * signal exists in this data at any point — there is nothing for the UI to
  * accidentally render. The derivation itself (lib/engagement/logic.ts) takes
@@ -40,29 +42,25 @@ export async function loadToday(now = new Date()): Promise<TodayData> {
   const dayStart = startOfDay(now);
   const dayEnd = new Date(dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate() + 1);
 
-  const [employees, attendance, leaves, holidays] = await Promise.all([
-    db.employee.findMany({
-      where: { active: true },
-      select: { id: true, name: true, department: true, dateOfBirth: true },
-      orderBy: [{ department: "asc" }, { name: "asc" }],
-    }),
-
-    // PRESENCE ONLY — `employeeId` is the entire select.
-    db.attendance.findMany({
-      where: { date: { gte: dayStart, lt: dayEnd }, checkIn: { not: null } },
-      select: { employeeId: true },
-    }),
-
-    // Approved leave overlapping today. Half-open on endDate so a leave
-    // ending today still counts as on-leave today.
-    db.leaveRequest.findMany({
-      where: {
-        status: "APPROVED",
-        startDate: { lt: dayEnd },
-        endDate: { gte: dayStart },
-      },
-      select: { employeeId: true },
-    }),
+  const [employees, holidays] = await Promise.all([
+    // The active roster with today's presence, in ONE statement (it was three:
+    // roster, attendance, leave). PRESENCE ONLY — each person carries two
+    // booleans and nothing else from Attendance, so no punctuality signal is
+    // ever fetched. Leave is approved leave overlapping today, half-open on
+    // endDate so a leave ending today still counts as on-leave today.
+    db.$queryRaw<
+      { id: string; name: string; department: string; dateOfBirth: Date | null; present: boolean; onLeave: boolean }[]
+    >`
+      SELECT e.id, e.name, e.department, e."dateOfBirth",
+        EXISTS (SELECT 1 FROM "Attendance" a
+                WHERE a."employeeId" = e.id AND a.date >= ${dayStart} AND a.date < ${dayEnd}
+                  AND a."checkIn" IS NOT NULL) AS present,
+        EXISTS (SELECT 1 FROM "LeaveRequest" l
+                WHERE l."employeeId" = e.id AND l.status = 'APPROVED'
+                  AND l."startDate" < ${dayEnd} AND l."endDate" >= ${dayStart}) AS "onLeave"
+      FROM "Employee" e
+      WHERE e.active
+      ORDER BY e.department ASC, e.name ASC`,
 
     // GREEN TIER (SESS_Caching_Strategy.docx §2/§4) — holiday calendar, 6 hr,
     // keyed on the day so an entry can never outlive the day it describes and
@@ -80,8 +78,8 @@ export async function loadToday(now = new Date()): Promise<TodayData> {
 
   const presence = derivePresence(
     employees,
-    new Set(attendance.map((a) => a.employeeId)),
-    new Set(leaves.map((l) => l.employeeId)),
+    new Set(employees.filter((e) => e.present).map((e) => e.id)),
+    new Set(employees.filter((e) => e.onLeave).map((e) => e.id)),
   );
 
   return {

@@ -54,7 +54,18 @@ export async function idleConsentState(
     orderBy: { givenOn: "desc" },
     select: { givenOn: true, retentionExpiry: true },
   });
+  return consentStateFrom(latest, now);
+}
 
+/**
+ * The rule itself, on an already-fetched LATEST IDLE_TRACKING record (or null).
+ * Pure, so a caller that already holds the employee's consent records (the
+ * Employee dashboard) resolves the same state without a second read.
+ */
+export function consentStateFrom(
+  latest: { givenOn: Date; retentionExpiry: Date | null } | null,
+  now = new Date(),
+): ConsentState {
   if (!latest) return { active: false, reason: "NEVER_GIVEN" };
 
   if (latest.retentionExpiry && latest.retentionExpiry < now)
@@ -82,16 +93,7 @@ export async function idleConsentStates(
   const latestBy = new Map<string, (typeof records)[0]>();
   for (const r of records) if (!latestBy.has(r.employeeId)) latestBy.set(r.employeeId, r);
 
-  for (const id of employeeIds) {
-    const latest = latestBy.get(id);
-    if (!latest) {
-      out.set(id, { active: false, reason: "NEVER_GIVEN" });
-    } else if (latest.retentionExpiry && latest.retentionExpiry < now) {
-      out.set(id, { active: false, reason: "EXPIRED", expiredOn: latest.retentionExpiry });
-    } else {
-      out.set(id, { active: true, givenOn: latest.givenOn, expiresOn: latest.retentionExpiry });
-    }
-  }
+  for (const id of employeeIds) out.set(id, consentStateFrom(latestBy.get(id) ?? null, now));
   return out;
 }
 

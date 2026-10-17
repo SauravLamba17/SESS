@@ -36,7 +36,7 @@ export interface EmployeeIdleRow {
   month: IdleTotals;
 }
 
-function totals(idle: number, active: number): IdleTotals {
+export function totals(idle: number, active: number): IdleTotals {
   const total = idle + active;
   return {
     idleMinutes: idle,

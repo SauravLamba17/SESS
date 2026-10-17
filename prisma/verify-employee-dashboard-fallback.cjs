@@ -10,7 +10,8 @@
  * ───────────────────────────
  * Reaching /employee over HTTP needs a Clerk session, and making the route
  * public to fake one would weaken the app's auth for the sake of a test. So
- * the two failure modes are induced at the MODULE BOUNDARY instead: "@/lib/db"
+ * the two failure modes are induced at the MODULE BOUNDARY instead: the identity
+ * lookup ("@/lib/data/scope"), "@/lib/db"
  * and "@/lib/auth" are swapped for stubs via require() interception, exactly
  * as verify-phase12-pdf.cjs swaps in a compiled module tree. The page's own
  * code — its try/catch, its branch conditions, its JSX — is the real thing and
@@ -54,8 +55,13 @@ async function main() {
 
   // Compile the page under test plus the two REAL components whose rendering
   // is the thing being verified. Everything else the page imports is stubbed.
+  // The page's data now comes from lib/dashboard/employee.ts (one combined
+  // metrics statement); that loader and its notifications helper are compiled
+  // for real too, so the branches under test are still the shipped code.
   const real = [
     "app/employee/page.tsx",
+    "lib/dashboard/employee.ts",
+    "lib/dashboard/notifications.ts",
     "components/ui/notice.tsx",
     "components/ui/panel.tsx",
     "components/ui/status-dot.tsx",
@@ -89,30 +95,46 @@ async function main() {
   const REAL_PREFIX = path.join(OUT, "components", "ui");
   const stubs = {
     "@/lib/auth": { getEffectiveUserId: async () => "user_probe" },
+    "server-only": {},
+    // The identity lookup: where path A (unlinked) and path B (a database
+    // failure) are induced.
+    "@/lib/data/scope": {
+      getEmployeeByClerkId: async () => {
+        if (scenario.mode === "throw") throw new Error("simulated database failure");
+        if (scenario.mode === "unlinked") return null;
+        return { id: "e1", shiftId: "s1" };
+      },
+    },
     "@/lib/db": {
       db: {
-        user: {
-          findUnique: async () => {
-            if (scenario.mode === "throw") throw new Error("simulated database failure");
-            if (scenario.mode === "unlinked") return { id: "u1", employee: null };
-            return { id: "u1", employee: { id: "e1", shiftId: "s1" } };
+        // The combined own-metrics statement (lib/dashboard/employee.ts).
+        $queryRaw: async () => [
+          {
+            actual: 5,
+            target: 10,
+            qualityAvg: 91,
+            qualityCount: 2,
+            appraisalScore: null,
+            appraisalPeriod: null,
+            idleToday: 0,
+            activeToday: 0,
+            idleMonth: 0,
+            activeMonth: 0,
           },
-        },
-        production: { aggregate: async () => ({ _sum: { unitsProduced: 5 } }) },
-        monthlyTarget: { findUnique: async () => ({ targetUnits: 10 }) },
-        qualityReport: { aggregate: async () => ({ _avg: { qualityScore: 91 }, _count: { _all: 2 } }) },
-        appraisalScore: { findFirst: async () => null },
+        ],
         consentRecord: { findMany: async () => [] },
         notification: { findMany: async () => [] },
       },
     },
     "@/lib/idle/aggregate": {
-      ownIdleTotals: async () => ({
-        consent: { active: false },
-        today: { totalMinutes: 0, idleMinutes: 0, activeMinutes: 0, activePct: null },
-        month: { totalMinutes: 0, activeMinutes: 0, activePct: null },
-      }),
+      dayBounds: () => ({ dayStart: new Date("2026-09-06"), dayEnd: new Date("2026-09-07") }),
+      monthBounds: () => ({ monthStart: new Date("2026-09-01"), monthEnd: new Date("2026-10-01") }),
+      totals: (idle, active) => ({ idleMinutes: idle, activeMinutes: active, totalMinutes: idle + active, activePct: null }),
       hm: (n) => `${n}m`,
+    },
+    "@/lib/idle/consent": {
+      IDLE_CONSENT_TYPE: "IDLE_TRACKING",
+      consentStateFrom: () => ({ active: false, reason: "NEVER_GIVEN" }),
     },
     "@/lib/period": {
       currentPeriod: () => ({
@@ -151,7 +173,7 @@ async function main() {
   };
   Module._resolveFilename = function (request, ...rest) {
     // The three components under test resolve to their real compiled output.
-    if (request.startsWith("@/components/ui/") || request === "@/lib/utils") {
+    if (request.startsWith("@/components/ui/") || request.startsWith("@/lib/dashboard/") || request === "@/lib/utils") {
       const rel = request.slice(2);
       return origResolve.call(this, path.join(OUT, rel), ...rest);
     }

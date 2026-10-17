@@ -15,7 +15,7 @@ import { MAX_OPEN_SHIFT_HOURS } from "@/lib/attendance/validation";
  * an Employee row (Employee has no role column — role lives on User), so the
  * same call serves both.
  *
- * Returns its three queries from ONE nested Promise.all so a caller can await
+ * Returns its two queries from ONE nested Promise.all so a caller can await
  * this inside its own Promise.all and keep everything in a single round trip,
  * which is how both dashboards already batch.
  */
@@ -54,27 +54,35 @@ export async function loadOwnAttendance(employeeId: string, shiftId: string | nu
 
   const openSince = new Date(now.getTime() - MAX_OPEN_SHIFT_HOURS * 3_600_000);
 
-  const [today, punchRow, weekAtt, shift] = await Promise.all([
-    db.attendance.findFirst({
-      where: { employeeId, date: { gte: todayStart, lt: tomorrowStart } },
-    }),
-    // What the NEXT punch will do — the punch route's own direction lookup
-    // (app/api/attendance/punch: most recent check-in within
-    // MAX_OPEN_SHIFT_HOURS), not "a row dated today". A night-shift worker at
-    // 01:00 has an open row dated YESTERDAY: `today` above is null for them,
-    // but the punch would record a check-out, so the clock-in widget is
-    // seeded from this instead and its button always matches the action.
-    db.attendance.findFirst({
-      where: { employeeId, checkIn: { not: null, gte: openSince } },
-      orderBy: { checkIn: "desc" },
-    }),
+  const [rows, shift] = await Promise.all([
+    // ONE read for all three views (it was three): this week's rows — which
+    // include today's, since today always falls in the current Monday-based
+    // week — plus any row checked in within MAX_OPEN_SHIFT_HOURS, which can be
+    // dated last week (a night shift that started on Sunday).
     db.attendance.findMany({
-      where: { employeeId, date: { gte: weekStart, lt: weekEnd } },
+      where: {
+        employeeId,
+        OR: [
+          { date: { gte: weekStart, lt: weekEnd } },
+          { checkIn: { not: null, gte: openSince } },
+        ],
+      },
+      orderBy: { checkIn: "desc" },
     }),
     // Drives what "late" means for THIS person — the same shift the punch
     // route reads when it stamps lateFlag/lateMinutes.
     shiftId ? db.shift.findUnique({ where: { id: shiftId } }) : Promise.resolve(null),
   ]);
+
+  const today = rows.find((a) => a.date >= todayStart && a.date < tomorrowStart) ?? null;
+  // What the NEXT punch will do — the punch route's own direction lookup
+  // (app/api/attendance/punch: most recent check-in within
+  // MAX_OPEN_SHIFT_HOURS), not "a row dated today". A night-shift worker at
+  // 01:00 has an open row dated YESTERDAY: `today` above is null for them,
+  // but the punch would record a check-out, so the clock-in widget is
+  // seeded from this instead and its button always matches the action.
+  const punchRow = rows.find((a) => a.checkIn !== null && a.checkIn >= openSince) ?? null;
+  const weekAtt = rows.filter((a) => a.date >= weekStart && a.date < weekEnd);
 
   return {
     today,

@@ -38,9 +38,10 @@ export const OFFBOARDED_READ_ONLY =
 
 /** Resolve the Employee record linked to a Clerk user. */
 export function getEmployeeByClerkId(clerkId: string) {
-  return db.user
-    .findUnique({ where: { clerkId }, include: { employee: true } })
-    .then((u) => u?.employee ?? null);
+  // One statement: the Employee whose linked User has this Clerk id. The old
+  // form (user.findUnique + include) cost two — this runs on every punch and
+  // every employee/manager page, so the second round trip added up.
+  return db.employee.findFirst({ where: { user: { is: { clerkId } } } });
 }
 
 /**

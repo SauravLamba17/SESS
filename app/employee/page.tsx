@@ -1,4 +1,5 @@
 import { getEffectiveUserId } from "@/lib/auth";
+import { loadEmployeeDashboard } from "@/lib/dashboard/employee";
 import { PageHeader } from "@/components/portal/portal-shell";
 import { Panel, PanelHeader, StatCard } from "@/components/ui/panel";
 import { StatusDot, StatusLabel, type StatusState } from "@/components/ui/status-dot";
@@ -7,15 +8,12 @@ import { ClockInWidget } from "@/components/employee/clock-in-widget";
 import { NotificationPanel } from "@/components/employee/notification-panel";
 import { TodayWidgets } from "@/components/engagement/today-widgets";
 import { loadToday } from "@/lib/engagement/today";
-import { db } from "@/lib/db";
-import { ownIdleTotals, hm } from "@/lib/idle/aggregate";
-import { currentPeriod } from "@/lib/period";
+import { hm } from "@/lib/idle/aggregate";
 import { scoreOutOfFive } from "@/lib/appraisal/display";
-// Own-attendance data + the three cards around the clock-in widget. Shared with
-// the Manager dashboard, which has the same widget — see the note in
-// lib/attendance/own-summary.ts.
-import { loadOwnAttendance } from "@/lib/attendance/own-summary";
 import { ymd } from "@/lib/reports/range";
+// The three cards around the clock-in widget. Shared with the Manager
+// dashboard, which has the same widget — see the note in
+// lib/attendance/own-summary.ts.
 import {
   ShiftBanner,
   TodayAttendanceCard,
@@ -37,95 +35,7 @@ async function loadMetrics() {
   const userId = await getEffectiveUserId();
   if (!userId) return { m: null, error: null };
   try {
-    // ONE lookup for both identities: the User (who receives notifications)
-    // and the Employee (whose production/attendance/appraisal rows the rest of
-    // this dashboard is built from). getEmployeeByClerkId() resolves through
-    // User anyway and discards it, so keeping both costs nothing extra.
-    //
-    // This page still requires an Employee — every metric below is
-    // employee-scoped — so the early return stays. It is the HR dashboard, not
-    // this one, that must render for an employee-less account.
-    const me = await db.user.findUnique({
-      where: { clerkId: userId },
-      include: { employee: true },
-    });
-    const employee = me?.employee;
-    if (!me || !employee) return { m: null, error: null };
-    const { period, monthStart, monthEnd } = currentPeriod();
-    const inMonth = { gte: monthStart, lt: monthEnd };
-
-    const [prod, target, qual, appraisal, own, consents, notifications, ownIdle] = await Promise.all([
-      db.production.aggregate({
-        where: { employeeId: employee.id, date: inMonth },
-        _sum: { unitsProduced: true },
-      }),
-      db.monthlyTarget.findUnique({
-        where: { employeeId_period: { employeeId: employee.id, period } },
-      }),
-      db.qualityReport.aggregate({
-        where: { employeeId: employee.id, date: inMonth },
-        _avg: { qualityScore: true },
-        _count: { _all: true },
-      }),
-      // Most recent PUBLISHED appraisal score.
-      db.appraisalScore.findFirst({
-        where: {
-          employeeId: employee.id,
-          excluded: false,
-          finalScore: { not: null },
-          cycle: { published: true },
-        },
-        include: { cycle: { select: { period: true } } },
-        orderBy: { cycle: { createdAt: "desc" } },
-      }),
-      // Today's row, this week's rows and the assigned shift — one nested
-      // Promise.all, so this stays a single concurrent round trip.
-      loadOwnAttendance(employee.id, employee.shiftId),
-      // Own consent records (latest per type derived below).
-      db.consentRecord.findMany({
-        where: { employeeId: employee.id },
-        orderBy: { givenOn: "desc" },
-      }),
-      // Phase 7: own notifications — unread first, then most recent.
-      // Addressed by recipient User, not by Employee.
-      db.notification.findMany({
-        where: { recipientUserId: me.id },
-        orderBy: [{ read: "asc" }, { createdAt: "desc" }],
-        take: 8,
-      }),
-      // Their OWN idle/active totals — batched into the same round trip.
-      ownIdleTotals(employee.id),
-    ]);
-
-    const latestConsent = (type: string) =>
-      consents.find((c) => c.consentType === type) ?? null;
-
-    return {
-      m: {
-        actual: prod._sum.unitsProduced ?? 0,
-        target: target?.targetUnits ?? null,
-        qualityAvg: qual._count._all > 0 ? qual._avg.qualityScore ?? null : null,
-        qualityCount: qual._count._all,
-        appraisalScore: appraisal?.finalScore ?? null,
-        appraisalPeriod: appraisal?.cycle.period ?? null,
-        today: own.today,
-        punchRow: own.punchRow,
-        weekStart: own.weekStart,
-        weekByDate: own.weekByDate,
-        idle: latestConsent("IDLE_TRACKING"),
-        shift: own.shift,
-        ownIdle,
-        // Serialize Dates — they don't cross the RSC boundary as Date objects.
-        notifications: notifications.map((n) => ({
-          id: n.id,
-          type: n.type,
-          message: n.message,
-          read: n.read,
-          createdAt: n.createdAt.toISOString(),
-        })),
-      },
-      error: null,
-    };
+    return await loadEmployeeDashboard(userId);
   } catch (err) {
     console.error("[employee/dashboard] metrics failed:", err);
     return { m: null, error: "Your dashboard figures are unavailable right now." };
@@ -201,7 +111,7 @@ export default async function EmployeeDashboard() {
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <TodayAttendanceCard today={today} />
-            {/* Real today totals from the same ownIdleTotals batch as the MTD card. */}
+            {/* Real today totals from the same own-metrics statement as the MTD card. */}
             <StatCard
               label="Idle Time (today)"
               value={

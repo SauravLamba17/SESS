@@ -34,21 +34,28 @@ export async function getSetting(key: string): Promise<string | null> {
   }
 }
 
-async function boolSetting(key: string, defaultValue: boolean): Promise<boolean> {
-  const v = await getSetting(key);
+function boolFrom(v: string | null, defaultValue: boolean): boolean {
   if (v === "true") return true;
   if (v === "false") return false;
   return defaultValue;
 }
 
+/** DB value → env var → NONE (see attendanceValidationMode). */
+function modeFrom(fromDb: string | null): ValidationMode {
+  if (fromDb && (VALIDATION_MODES as string[]).includes(fromDb)) return fromDb as ValidationMode;
+  const fromEnv = (process.env.ATTENDANCE_VALIDATION_MODE ?? "").trim().toUpperCase();
+  if ((VALIDATION_MODES as string[]).includes(fromEnv)) return fromEnv as ValidationMode;
+  return "NONE";
+}
+
 /** Default ON — the feature existed before the toggle did. */
-export function idleTrackingEnabled(): Promise<boolean> {
-  return boolSetting(MODULE_KEYS.idleTracking, true);
+export async function idleTrackingEnabled(): Promise<boolean> {
+  return boolFrom(await getSetting(MODULE_KEYS.idleTracking), true);
 }
 
 /** Default ON. */
-export function engagementEnabled(): Promise<boolean> {
-  return boolSetting(MODULE_KEYS.engagement, true);
+export async function engagementEnabled(): Promise<boolean> {
+  return boolFrom(await getSetting(MODULE_KEYS.engagement), true);
 }
 
 /**
@@ -57,27 +64,35 @@ export function engagementEnabled(): Promise<boolean> {
  * Super Admin deliberately sets it from the UI.
  */
 export async function attendanceValidationMode(): Promise<ValidationMode> {
-  const fromDb = await getSetting(MODULE_KEYS.attendanceValidation);
-  if (fromDb && (VALIDATION_MODES as string[]).includes(fromDb)) return fromDb as ValidationMode;
-  const fromEnv = (process.env.ATTENDANCE_VALIDATION_MODE ?? "").trim().toUpperCase();
-  if ((VALIDATION_MODES as string[]).includes(fromEnv)) return fromEnv as ValidationMode;
-  return "NONE";
+  return modeFrom(await getSetting(MODULE_KEYS.attendanceValidation));
 }
 
-/** Current values for the Module Toggles page — point reads, batched. */
+/**
+ * Current values for the Module Toggles page and the System Dashboard — all
+ * three keys in ONE read. Same resolution and the same never-throw rule as the
+ * single-key readers above: a failed read falls back to the defaults.
+ *
+ * Not cached: the idle kill switch and the validation mode are security
+ * configuration, and must take effect the moment a Super Admin changes them.
+ */
 export async function moduleToggleValues(): Promise<{
   idleTracking: boolean;
   engagement: boolean;
   attendanceValidation: ValidationMode;
 }> {
-  const [idle, engagement, mode] = await Promise.all([
-    idleTrackingEnabled(),
-    engagementEnabled(),
-    attendanceValidationMode(),
-  ]);
+  let rows: { key: string; value: string }[] = [];
+  try {
+    rows = await db.systemSetting.findMany({
+      where: { key: { in: Object.values(MODULE_KEYS) } },
+      select: { key: true, value: true },
+    });
+  } catch {
+    // Never throw — defaults below.
+  }
+  const get = (key: string) => rows.find((r) => r.key === key)?.value ?? null;
   return {
-    idleTracking: idle,
-    engagement,
-    attendanceValidation: mode,
+    idleTracking: boolFrom(get(MODULE_KEYS.idleTracking), true),
+    engagement: boolFrom(get(MODULE_KEYS.engagement), true),
+    attendanceValidation: modeFrom(get(MODULE_KEYS.attendanceValidation)),
   };
 }

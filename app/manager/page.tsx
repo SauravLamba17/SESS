@@ -1,12 +1,8 @@
 import { getEffectiveUserId } from "@/lib/auth";
+import { loadManagerDashboard } from "@/lib/dashboard/manager";
 import { PageHeader } from "@/components/portal/portal-shell";
 import { Panel, PanelHeader, StatCard } from "@/components/ui/panel";
 import { StatusDot, type StatusState } from "@/components/ui/status-dot";
-import { db } from "@/lib/db";
-import { getEmployeeByClerkId } from "@/lib/data/scope";
-import { getTeamRoster } from "@/lib/cache/employees";
-import { getPendingLeaveCount } from "@/lib/cache/dashboard";
-import { currentPeriod } from "@/lib/period";
 import { TodayWidgets } from "@/components/engagement/today-widgets";
 import { loadToday } from "@/lib/engagement/today";
 import { ErrorPanel, UnlinkedEmployeeNotice } from "@/components/ui/notice";
@@ -15,7 +11,6 @@ import { ErrorPanel, UnlinkedEmployeeNotice } from "@/components/ui/notice";
 // punch route is role-agnostic and always resolves the caller's own Employee
 // record, so no API change was needed.
 import { ClockInWidget } from "@/components/employee/clock-in-widget";
-import { loadOwnAttendance } from "@/lib/attendance/own-summary";
 import {
   ShiftBanner,
   TodayAttendanceCard,
@@ -53,77 +48,7 @@ async function load() {
   const userId = await getEffectiveUserId();
   if (!userId) return { manager: null, error: null };
   try {
-    const manager = await getEmployeeByClerkId(userId);
-    if (!manager) return { manager: null, error: null };
-
-    const { period, monthStart, monthEnd } = currentPeriod();
-    // ORANGE TIER (SESS_Caching_Strategy.docx §2/§4) — manager/team roster,
-    // 60 s, dropped by tag on any roster or shift change. A display projection
-    // of the SAME direct-reports-only query (managerId + active, single level,
-    // no recursive descent) — not a wider one.
-    const reports = await getTeamRoster(manager.id);
-    const ids = reports.map((r) => r.id);
-    const inMonth = { gte: monthStart, lt: monthEnd };
-    const scope = { managerId: manager.id };
-
-    // All set-based aggregates — independent of team size (no N+1). `own` is
-    // the manager's OWN attendance (today/week/shift), batched into the same
-    // round trip rather than fetched separately.
-    const [totals, lates, actuals, targets, pendingApprovals, quality, own] = await Promise.all([
-      db.attendance.groupBy({
-        by: ["employeeId"],
-        where: { employee: scope, date: inMonth },
-        _count: { _all: true },
-      }),
-      db.attendance.groupBy({
-        by: ["employeeId"],
-        where: { employee: scope, date: inMonth, lateFlag: true },
-        _count: { _all: true },
-      }),
-      db.production.groupBy({
-        by: ["employeeId"],
-        where: { employeeId: { in: ids }, date: inMonth },
-        _sum: { unitsProduced: true },
-      }),
-      db.monthlyTarget.findMany({ where: { period, employeeId: { in: ids } } }),
-      // ORANGE TIER (§2/§4) — pending-approvals COUNT, 60 s, invalidated the
-      // moment a decision is made. Only the number is cached; the list of
-      // requests the manager acts on is read fresh on /manager/attendance, and
-      // the decision itself is gated by the atomic where-clause in
-      // app/api/manager/leave/route.ts, never by anything cached.
-      getPendingLeaveCount(manager.id),
-      // Same query the Team Quality page runs for the same manager's reports:
-      // this month's rows, newest first, so the first row per employee is the
-      // latest. One query for the whole team — no N+1.
-      db.qualityReport.findMany({
-        where: { employeeId: { in: ids }, date: inMonth },
-        orderBy: { date: "desc" },
-        select: { employeeId: true, qualityScore: true, date: true },
-      }),
-      // The manager's own row — scoped to manager.id, never to a report's id.
-      loadOwnAttendance(manager.id, manager.shiftId),
-    ]);
-
-    const totalBy = new Map(totals.map((g) => [g.employeeId, g._count._all]));
-    const lateBy = new Map(lates.map((g) => [g.employeeId, g._count._all]));
-    const actualBy = new Map(actuals.map((a) => [a.employeeId, a._sum.unitsProduced ?? 0]));
-    const targetBy = new Map(targets.map((t) => [t.employeeId, t.targetUnits]));
-    const qualityBy = new Map<string, number>();
-    for (const q of quality) if (!qualityBy.has(q.employeeId)) qualityBy.set(q.employeeId, q.qualityScore);
-
-    const rows = reports.map((r) => {
-      const total = totalBy.get(r.id) ?? 0;
-      const late = lateBy.get(r.id) ?? 0;
-      const punctuality = total > 0 ? Math.round((1 - late / total) * 100) : null;
-      const actual = actualBy.get(r.id) ?? 0;
-      const target = targetBy.get(r.id) ?? null;
-      const prodPct = target && target > 0 ? Math.round((actual / target) * 100) : null;
-      const quality = qualityBy.get(r.id) ?? null;
-      return { r, punctuality, actual, target, prodPct, quality };
-    });
-
-    const totalLate = lates.reduce((s, g) => s + g._count._all, 0);
-    return { manager, error: null, rows, pendingApprovals, totalLate, targetsSet: targets.length, own };
+    return await loadManagerDashboard(userId);
   } catch (err) {
     console.error("[manager/dashboard] failed:", err);
     return { manager: null, error: "Team data is unavailable right now." };

@@ -72,7 +72,9 @@ export default clerkMiddleware(async (auth, req) => {
   // in-route, which is where the 401/403 responses in this codebase come from.
   if (!isPortalRoute(req) && !isSharedAuthedRoute(req)) return;
 
+  const tAuth = performance.now(); // TEMPORARY Server-Timing (see end of handler)
   const { userId, sessionClaims, redirectToSignIn } = await auth();
+  const authMs = performance.now() - tAuth;
 
   // Not signed in → send to Clerk sign-in.
   if (!userId) {
@@ -86,8 +88,11 @@ export default clerkMiddleware(async (auth, req) => {
   // an effective role. Same signed-cookie check used everywhere else — the
   // route gate below is identical for genuine and impersonated sessions.
   let role = realRole;
+  let impMs = 0;
   if (realRole === "SUPER_ADMIN") {
+    const tImp = performance.now();
     const imp = await verifyImpersonation(req.cookies.get(IMP_COOKIE)?.value, userId);
+    impMs = performance.now() - tImp;
     if (imp) role = imp.role;
   }
 
@@ -103,6 +108,15 @@ export default clerkMiddleware(async (auth, req) => {
   // null for those, so they fall through untouched, exactly as before.
   if (portal && (!role || !canAccessPath(role, req.nextUrl.pathname))) {
     return NextResponse.redirect(new URL("/", req.url));
+  }
+
+  // TEMPORARY (2026-10-17): Server-Timing for the slow /manager investigation —
+  // durations only, on /manager only. Remove with lib/server-timing.ts and
+  // app/api/debug/manager-timing.
+  if (req.nextUrl.pathname === "/manager") {
+    const res = NextResponse.next();
+    res.headers.set("Server-Timing", `mw-clerk-auth;dur=${authMs.toFixed(1)}, mw-impersonation;dur=${impMs.toFixed(1)}`);
+    return res;
   }
 });
 

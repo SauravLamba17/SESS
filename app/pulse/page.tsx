@@ -11,6 +11,7 @@ import { ModulePaused } from "@/components/engagement/module-paused";
 import { engagementEnabled } from "@/lib/system-settings";
 import { ErrorPanel, UnlinkedEmployeeNotice } from "@/components/ui/notice";
 import { ymd } from "@/lib/reports/range";
+import { pulseLastOpenDay } from "@/lib/engagement/logic";
 
 // Tab title for this route; the root layout appends " · SESS".
 export const metadata = { title: "Pulse Surveys" };
@@ -113,7 +114,7 @@ export default async function PulsePage() {
                   action={
                     s.closesAt ? (
                       <span className="font-mono text-[11px] text-text-muted">
-                        closes {ymd(s.closesAt)}
+                        closes {ymd(pulseLastOpenDay(s.closesAt))}
                       </span>
                     ) : undefined
                   }

@@ -19,7 +19,7 @@ export function AttendancePdf({ r, meta }: { r: AttendanceResult; meta: ReportMe
           {
             label: "Avg punch-in",
             value: r.orgAvgPunchIn ?? "—",
-            hint: r.orgAvgPunchInMethod === "circular" ? "circular mean ○" : "org-wide mean",
+            hint: r.orgAvgPunchInMethod === "circular" ? "circular mean *" : "org-wide mean",
           },
           { label: "No punch recorded", value: r.noPunchDays, hint: "weekdays" },
         ]}
@@ -41,7 +41,7 @@ export function AttendancePdf({ r, meta }: { r: AttendanceResult; meta: ReportMe
             value: (d) =>
               d.avgPunchIn === null
                 ? "—"
-                : `${d.avgPunchIn}${d.avgPunchInMethod === "circular" ? " ○" : ""}`,
+                : `${d.avgPunchIn}${d.avgPunchInMethod === "circular" ? " *" : ""}`,
           },
         ]}
       />
@@ -69,7 +69,7 @@ export function AttendancePdf({ r, meta }: { r: AttendanceResult; meta: ReportMe
             value: (e) =>
               e.avgPunchIn === null
                 ? "—"
-                : `${e.avgPunchIn}${e.avgPunchInMethod === "circular" ? " ○" : ""}`,
+                : `${e.avgPunchIn}${e.avgPunchInMethod === "circular" ? " *" : ""}`,
           },
         ]}
       />

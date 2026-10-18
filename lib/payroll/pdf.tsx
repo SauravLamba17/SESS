@@ -317,7 +317,7 @@ function Payslip({ d }: { d: PayslipData }) {
         </View>
 
         <Text style={s.note}>
-          Net pay = Gross Earnings − Total Deductions + Bonus + Reimbursements.
+          Net pay = Gross Earnings - Total Deductions + Bonus + Reimbursements.
           Total Deductions includes any salary-advance recovery.{"\n"}
           TDS shown above is the figure recorded by HR from the company’s
           accountant{d.tdsSource ? ` (${d.tdsSource})` : ""}. It is not computed

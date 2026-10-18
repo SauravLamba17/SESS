@@ -280,7 +280,34 @@ const FIXTURES = [
   ],
 ];
 
+/**
+ * Every PDF uses react-pdf's built-in Helvetica, which encodes text as
+ * Windows-1252. A character outside that set is not drawn — it is written as a
+ * meaningless byte (the payslip's "−" minus sign came out as 0x12). Fail on any
+ * such character in the templates or in the report code that builds their
+ * strings, comments excluded.
+ */
+function checkPdfCharset() {
+  const CP1252_EXTRA = new Set([0x20ac, 0x201a, 0x0192, 0x201e, 0x2026, 0x2020, 0x2021, 0x02c6, 0x2030, 0x0160, 0x2039, 0x0152, 0x017d, 0x2018, 0x2019, 0x201c, 0x201d, 0x2022, 0x2013, 0x2014, 0x02dc, 0x2122, 0x0161, 0x203a, 0x0153, 0x017e, 0x0178]);
+  const encodable = (cp) => cp < 0x80 || (cp >= 0xa0 && cp <= 0xff) || CP1252_EXTRA.has(cp);
+  const files = [
+    ...fs.readdirSync(path.join(ROOT, "lib/reports/pdf")).map((f) => `lib/reports/pdf/${f}`),
+    "lib/reports/pdf-layout.tsx",
+    "lib/payroll/pdf.tsx",
+    ...fs.readdirSync(path.join(ROOT, "lib/reports")).filter((f) => f.endsWith(".ts")).map((f) => `lib/reports/${f}`),
+  ];
+  const bad = [];
+  for (const f of files) {
+    fs.readFileSync(path.join(ROOT, f), "utf8").split(/\r?\n/).forEach((line, i) => {
+      const code = line.replace(/\/\*.*?\*\//g, "").replace(/\/\/.*$/, "").replace(/^\s*\*.*$/, "");
+      for (const ch of code) if (!encodable(ch.codePointAt(0))) bad.push(`${f}:${i + 1} U+${ch.codePointAt(0).toString(16).toUpperCase()} ${ch}`);
+    });
+  }
+  check("PDF text uses only characters the built-in font can draw (Windows-1252)", bad.length === 0, bad.slice(0, 8).join("; "));
+}
+
 async function main() {
+  checkPdfCharset();
   console.log(`compiling lib/reports → ${OUT}`);
   compile();
   console.log("compiled.\n");

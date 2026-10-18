@@ -18,6 +18,15 @@
  */
 export const DELETE_WINDOW_MINUTES = 15;
 
+/**
+ * The last day a pulse survey is open, for display. `closesAt` is stored as the
+ * EXCLUSIVE end — local midnight starting the day after the date HR picked
+ * (app/api/hr/pulse-survey) — so printing it directly shows one day late.
+ */
+export function pulseLastOpenDay(closesAt: Date): Date {
+  return new Date(closesAt.getTime() - 1);
+}
+
 export type PresenceStatus = "IN" | "ON_LEAVE" | "NOT_MARKED";
 
 export interface PresenceRow {

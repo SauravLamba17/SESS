@@ -122,15 +122,18 @@ export function AttendanceCalendar({
 
     if (joiningDay && cellDate < joiningDay)
       return { state: "idle", note: "" };
-    if (weekend) return { state: "idle", note: "" };
-    if (cellDate > today) return { state: "idle", note: "" };
 
+    // A punch decides the colour before the weekend does: weekend work is
+    // real attendance, and a late or flagged weekend punch must still show.
     const rec = byDate.get(ymd(year, month, day));
     if (rec?.checkIn) {
       if (rec.lateFlag || rec.flaggedForReview)
         return { state: "warn", note: "" };
       return { state: "good", note: "" };
     }
+
+    if (weekend) return { state: "idle", note: "" };
+    if (cellDate > today) return { state: "idle", note: "" };
     // Working day, in the past, no punch.
     if (cellDate < today) return { state: "danger", note: "no punch" };
     return { state: "idle", note: "" }; // today, not yet punched

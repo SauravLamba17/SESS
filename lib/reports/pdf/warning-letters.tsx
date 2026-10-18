@@ -38,7 +38,7 @@ export function WarningLettersPdf({ r, meta }: { r: WarningLettersResult; meta: 
             {
               label: "",
               width: "25%",
-              value: (m) => "█".repeat(Math.min(10, m.count)),
+              value: (m) => "•".repeat(Math.min(10, m.count)),
             },
           ]}
         />

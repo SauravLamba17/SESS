@@ -36,7 +36,7 @@ export function AppraisalDistributionPdf({
           {
             label: "",
             width: "15%",
-            value: (b) => "█".repeat(Math.min(6, Math.round((b.sharePct ?? 0) / 17))),
+            value: (b) => "•".repeat(Math.min(6, Math.round((b.sharePct ?? 0) / 17))),
           },
         ]}
         emptyMessage="No published scores in this period."

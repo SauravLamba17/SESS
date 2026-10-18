@@ -9,6 +9,7 @@ import { db } from "@/lib/db";
 import { aggregateSurveys, type PulseAggregate } from "@/lib/engagement/pulse";
 import { ErrorPanel } from "@/components/ui/notice";
 import { ymd } from "@/lib/reports/range";
+import { pulseLastOpenDay } from "@/lib/engagement/logic";
 
 // Tab title for this route; the root layout appends " · SESS".
 export const metadata = { title: "Pulse Surveys" };
@@ -152,7 +153,7 @@ export default async function PulseSurveysPage() {
                     <p className="mt-3 font-mono text-[10px] text-text-muted">
                       scale {s.scaleMin}–{s.scaleMax} · created{" "}
                       {s.createdAt.toISOString().slice(0, 10)}
-                      {s.closesAt && ` · closes ${ymd(s.closesAt)}`}
+                      {s.closesAt && ` · closes ${ymd(pulseLastOpenDay(s.closesAt))}`}
                     </p>
                   </div>
                 </Panel>

@@ -121,14 +121,11 @@ export function PayrollRowEditor({ row }: { row: EditableRow }) {
       {isAdjustment && (
         <div className="rounded border border-accent/40 bg-accent/10 px-3 py-2">
           <p className="text-xs font-medium text-accent">
-            Additional amount — these figures are ADDED to the original payslip,
-            not a replacement for it.
+            These amounts are added to the original payslip.
           </p>
           <p className="mt-1 text-[10px] text-text-muted">
-            Enter only the difference. To pay ₹2,000 of arrears on Basic, enter
-            Basic = 2000 and leave everything else at 0. To recover an
-            overpayment, use a negative amount (e.g. -2000). The original{" "}
-            {row.adjustmentFor?.period} payslip stays exactly as issued.
+            Enter only the difference, e.g. 2000 for ₹2,000 arrears, or -2000 to
+            recover an overpayment.
           </p>
         </div>
       )}
@@ -187,17 +184,14 @@ export function PayrollRowEditor({ row }: { row: EditableRow }) {
           className={inputClass.replace("font-mono", "")}
         />
         <p className="mt-1 text-[10px] text-text-muted">
-          TDS is entered from the company’s accountant. SESS never calculates
-          it, and never applies a tax slab or exemption.
+          Enter TDS from the company’s accountant. SESS doesn’t calculate tax.
         </p>
       </div>
 
       {Number(row.loanDeduction) > 0 && (
         <p className="rounded border border-border bg-surface-raised/40 px-2.5 py-1.5 text-[10px] text-text-muted">
-          Salary advance recovery of ₹{inr(Number(row.loanDeduction).toFixed(2))} is
-          included in deductions. It is not editable here — the amount is derived
-          from the outstanding balance, and finalizing this run reduces that
-          balance by exactly this figure.
+          Includes ₹{inr(Number(row.loanDeduction).toFixed(2))} salary advance
+          recovery. It’s set automatically and reduces the balance when finalised.
         </p>
       )}
 

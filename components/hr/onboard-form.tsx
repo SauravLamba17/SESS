@@ -139,8 +139,7 @@ export function OnboardForm({
           </label>
         )}
         <span className="text-xs text-text-muted">
-          Optional — the record is created either way. Skip it for employees who
-          won’t personally use SESS.
+          Optional. Skip it for employees who won’t use SESS themselves.
         </span>
       </div>
 

@@ -119,9 +119,8 @@ export function AppraisalFormulaForm({ initial }: { initial: ResolvedFormula }) 
         <div className="text-sm">
           <p className="font-medium text-text">Super Admin owns the appraisal formula.</p>
           <p className="mt-0.5 text-text-muted">
-            These weights are the single source of truth. HR snapshots them at cycle
-            creation but <span className="text-text">cannot edit them</span>. This endpoint
-            is role-gated to Super Admin server-side.
+            These weights apply to every new appraisal cycle. Only a Super Admin
+            can change them.
           </p>
         </div>
       </div>
@@ -190,13 +189,7 @@ export function AppraisalFormulaForm({ initial }: { initial: ResolvedFormula }) 
               className="w-full rounded border border-border bg-background px-3 py-2 font-mono text-sm text-text focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             />
             <p className="mt-1 text-xs text-text-muted">
-              How much of punctuality comes from HOW OFTEN someone is late.{" "}
-              <span className="text-text-muted">
-                Suggested: 70. Industry HR-analytics practice generally weights how OFTEN
-                someone is late more heavily than how late any single instance was — occasional
-                lateness should have limited impact, while a consistent pattern is the stronger
-                signal. 70/30 is a reasonable starting split; adjust for your context.
-              </span>
+              How much punctuality depends on how often someone is late. Suggested: 70.
             </p>
           </div>
           <div>
@@ -215,8 +208,8 @@ export function AppraisalFormulaForm({ initial }: { initial: ResolvedFormula }) 
               className="w-full rounded border border-border bg-background px-3 py-2 font-mono text-sm text-text focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             />
             <p className="mt-1 text-xs text-text-muted">
-              How much comes from HOW LATE they are, on the days they ARE late. Must sum to 100
-              with frequency weight. Suggested: 30.
+              How much punctuality depends on how late someone is. Both must total 100.
+              Suggested: 30.
             </p>
           </div>
           <div>
@@ -234,11 +227,7 @@ export function AppraisalFormulaForm({ initial }: { initial: ResolvedFormula }) 
               className="w-full rounded border border-border bg-background px-3 py-2 font-mono text-sm text-text focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             />
             <p className="mt-1 text-xs text-text-muted">
-              Minutes-late at which the severity sub-score bottoms out at 0 (counted only on days
-              someone was actually late). Suggested: 60. A common reference point: many attendance
-              policies treat lateness beyond about an hour as materially more serious than a short
-              delay. This is a suggested default, not a fixed standard — set it to what your
-              organization considers a serious incident.
+              Being this many minutes late, or more, scores zero. Suggested: 60.
             </p>
           </div>
         </div>

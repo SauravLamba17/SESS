@@ -165,8 +165,8 @@ export default async function TeamExpensesPage() {
               </ul>
             )}
             <p className="border-t border-border px-4 py-3 text-xs text-text-muted">
-              Approved claims are picked up by the next payroll run and stamped
-              as reimbursed, so the same claim can never be paid twice.
+              Approved claims are paid with the next payroll and can’t be paid
+              twice.
             </p>
           </Panel>
         </div>

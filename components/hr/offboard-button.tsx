@@ -91,8 +91,8 @@ export function OffboardButton({ employeeId, name }: { employeeId: string; name:
             />
           </label>
           <span className="max-w-[18rem] text-right text-[10px] text-text-muted">
-            Raises a DRAFT full &amp; final settlement pro-rated to this date,
-            including any outstanding advance in full.
+            Creates a draft final settlement up to this date, including any
+            unpaid advance.
           </span>
           <span className="flex items-center gap-2">
             <button

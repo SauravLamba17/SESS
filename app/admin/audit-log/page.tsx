@@ -112,7 +112,7 @@ export default async function AuditLogPage({
     <>
       <PageHeader
         title="Audit Log"
-        description="Every governed action across the system, newest first. Append-only — entries can never be edited or deleted, by anyone, through any code path."
+        description="Every important action in the system, newest first. Entries can never be edited or deleted."
         action={<PrintButton label="Print this page" />}
       />
 
@@ -233,8 +233,7 @@ export default async function AuditLogPage({
         )}
 
         <p className="border-t border-border px-4 py-3 text-xs text-text-muted print:hidden">
-          Paginated server-side — each page fetches only its own {q.pageSize} rows
-          from the database, never the whole table.
+          Shows {q.pageSize} entries per page.
         </p>
       </Panel>
     </>

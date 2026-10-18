@@ -188,13 +188,11 @@ export function SalaryStructureForm({
           difference between "I saved it" and "I ran payroll". */}
       {saved && (
         <p className="rounded border border-border bg-surface-raised/40 px-2.5 py-1.5 text-[11px] text-text-muted">
-          Salary structure saved — this defines what the employee is paid, but it
-          does not create a payslip. To actually pay them, go to{" "}
+          Salary structure saved. To pay the employee, run payroll in{" "}
           <Link href="/hr/payroll" className="text-accent underline">
             Payroll &amp; Financials
-          </Link>{" "}
-          and run <span className="text-text">Step 1 · Create payroll run</span>{" "}
-          for the period, then <span className="text-text">Step 2 · Submit</span>.
+          </Link>
+          .
         </p>
       )}
 

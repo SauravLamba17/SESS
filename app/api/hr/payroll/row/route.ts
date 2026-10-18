@@ -108,7 +108,7 @@ export async function POST(req: NextRequest) {
         "LOCKED",
         row.status === "FINALIZED"
           ? "This payroll row is FINALIZED and permanently immutable. Corrections must be issued as a separate adjustment record."
-          : "This payroll row is SUBMITTED and locked for HR editing while it awaits Super Admin finalization.",
+          : "This payroll row is SUBMITTED and locked for HR editing while it awaits Super Admin finalisation.",
         409,
       );
     }

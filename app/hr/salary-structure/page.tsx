@@ -70,7 +70,7 @@ export default async function SalaryStructurePage() {
     <>
       <PageHeader
         title="Salary Structure"
-        description="Set each employee's monthly salary breakup. A payroll run only picks up employees who have a structure — everyone else is reported as unpayable rather than given a zeroed row."
+        description="Set each employee’s monthly pay. Payroll only includes employees with a salary structure."
       />
 
       {error && (
@@ -252,9 +252,8 @@ export default async function SalaryStructurePage() {
                           </tbody>
                         </table>
                         <p className="mt-2 text-[10px] text-text-muted">
-                          Ranges are half-open: a version ends on the day the next
-                          takes effect. Finalized payslips are unaffected by any
-                          later change — they snapshot the figures at run time.
+                          Each version ends when the next one starts. Finalised
+                          payslips never change.
                         </p>
                       </div>
                     </details>
@@ -288,14 +287,8 @@ export default async function SalaryStructurePage() {
           </ul>
         )}
         <p className="border-t border-border px-4 py-3 text-xs text-text-muted">
-          One current structure per employee. Saving no longer discards the old
-          one: the version being replaced is archived with its effective range
-          closed, and the full timeline appears under “Salary history”
-          above. The new structure must take effect after the current one — to
-          fix a typo in the version in force, correct its effective date rather
-          than recording a change that never happened. Payroll rows snapshot
-          Basic/HRA/Special Allowance at run time, so finalized payslips are
-          unaffected by any later structure change.
+          Saving a change keeps the old version in Salary history. Finalised
+          payslips never change.
         </p>
       </Panel>
     </>

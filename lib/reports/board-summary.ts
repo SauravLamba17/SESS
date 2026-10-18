@@ -130,7 +130,7 @@ export function computeBoardSummary(
       source: "Payroll Cost Summary (FINALIZED only)",
     },
     {
-      label: "Payroll rows finalized",
+      label: "Payroll rows finalised",
       value: String(payroll.finalizedRowCount),
       source: "Payroll Cost Summary (FINALIZED only)",
     },

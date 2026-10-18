@@ -50,10 +50,9 @@ export function CreateAdjustmentButton({
     return (
       <div className="flex max-w-sm flex-col items-end gap-1.5">
         <p className="text-right text-[10px] text-text-muted">
-          Creates a NEW draft row for {period} holding only the{" "}
-          <span className="text-accent">difference</span>. The finalized payslip
-          is not changed — it stays exactly as issued, and the adjustment goes
-          through the same submit and finalize steps.
+          Creates a new draft for {period} with only the{" "}
+          <span className="text-accent">difference</span>. The finalised payslip
+          stays unchanged.
         </p>
         <span className="flex items-center gap-2">
           <button

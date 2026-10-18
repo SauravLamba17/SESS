@@ -23,7 +23,7 @@ export default async function ModuleToggles() {
     <>
       <PageHeader
         title="Module Toggles"
-        description="Org-wide switches for the genuinely optional features. Changes apply immediately — no redeploy."
+        description="Turn optional features on or off for everyone. Changes apply immediately."
       />
 
       <div className="space-y-6">
@@ -33,7 +33,7 @@ export default async function ModuleToggles() {
             <BoolToggle
               settingKey={MODULE_KEYS.idleTracking}
               title="Idle-time tracking (org-wide kill switch)"
-              description="When off, EVERY desktop-agent heartbeat is rejected regardless of individual consent records or tokens. Agents pause themselves on the rejection. Consent records and historical data are untouched."
+              description="When off, idle tracking stops for everyone. Consent records and past data are kept."
               initial={values.idleTracking}
               onLabel="Tracking enabled"
               offLabel="Tracking disabled"
@@ -49,7 +49,7 @@ export default async function ModuleToggles() {
           <ModeSelect
             settingKey={MODULE_KEYS.attendanceValidation}
             title="Punch validation mode"
-            description="NONE records every punch unchecked. IP_LOCK checks the office IP allowlist, GEOFENCE checks office coordinates, BOTH checks both. A failing punch is still recorded — it is flagged for HR review, never dropped. Allowlist/coordinates still come from .env; this replaces the redeploy that changing the MODE used to need."
+            description="Choose how clock-ins are checked. A failed check is flagged for HR review, never blocked."
             initial={values.attendanceValidation}
           />
         </Panel>
@@ -59,7 +59,7 @@ export default async function ModuleToggles() {
           <BoolToggle
             settingKey={MODULE_KEYS.engagement}
             title="Community wall & pulse surveys"
-            description="When paused, /community and /pulse show a notice and new posts/responses are rejected. Nothing is deleted — everything returns when re-enabled."
+            description="When paused, the community wall and pulse surveys are hidden. Nothing is deleted."
             initial={values.engagement}
             onLabel="Visible"
             offLabel="Paused"
@@ -67,9 +67,7 @@ export default async function ModuleToggles() {
         </Panel>
 
         <p className="text-xs text-text-muted">
-          Every change is written to the audit log as{" "}
-          <span className="font-mono">MODULE_TOGGLED</span> with the setting and
-          new value.
+          Every change is recorded in the audit log.
         </p>
       </div>
     </>

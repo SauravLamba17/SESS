@@ -286,7 +286,7 @@ export function payrollCostCsv(r: PayrollCostResult): CsvSection[] {
       headers: ["Measure", "Value"],
       rows: [
         ["Payslips counted", r.finalizedRowCount],
-        ["Rows excluded (not finalized)", r.excludedRowCount],
+        ["Rows excluded (not finalised)", r.excludedRowCount],
         ["Distinct employees", r.distinctEmployees],
         ["Total gross", r.totalGross],
         ["Total deductions", r.totalDeductions],

@@ -100,17 +100,16 @@ export function EmployeeRetentionActions({
             record: <span className="font-mono">{redactedFields.join(", ")}</span>.
           </p>
           <p className="mt-1 text-[11px] text-text-muted">
-            <span className="text-text">Will be kept</span>:{" "}
-            <span className="font-mono">{preservedFields.join(", ")}</span> — and
-            every payroll, attendance, appraisal, warning and expense record,
-            which stay complete and queryable. The employee record itself is
-            never deleted.
+            <span className="text-text">Kept</span>:{" "}
+            <span className="font-mono">{preservedFields.join(", ")}</span>, plus
+            all payroll, attendance, appraisal, warning and expense records. The
+            employee record is never deleted.
           </p>
         </>
       ) : (
         <p className="text-xs text-text">
-          Push {name}’s redaction date out by one year. Use this only when
-          there is a live legal or audit reason to hold their full record.
+          Delay removing {name}’s details by one year. Use only for a legal or
+          audit reason.
         </p>
       )}
 

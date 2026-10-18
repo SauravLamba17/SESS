@@ -60,7 +60,7 @@ export default async function TeamPayrollPage() {
     <>
       <PageHeader
         title="Team Payroll"
-        description="Reference view of payroll for your direct reports. Managers cannot edit payroll — this view is read-only, and the payroll APIs reject manager writes."
+        description="Payroll for your team, view only. Contact HR about any changes."
       />
 
       {error && (
@@ -76,8 +76,7 @@ export default async function TeamPayrollPage() {
           <Panel className="flex items-center gap-3 px-4 py-3">
             <StatusDot state="idle" />
             <span className="text-sm text-text-muted">
-              Read-only. Salary figures are managed by HR and locked by the Super
-              Admin — raise any correction with HR rather than here.
+              View only. Contact HR about any salary correction.
             </span>
           </Panel>
 

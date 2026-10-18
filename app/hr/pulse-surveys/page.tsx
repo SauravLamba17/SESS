@@ -54,7 +54,7 @@ export default async function PulseSurveysPage() {
     <>
       <PageHeader
         title="Pulse Surveys"
-        description="Short anonymous check-ins. You see averages and distributions only — individual responses are not stored against anyone, so there is nothing to drill into."
+        description="Short anonymous surveys. You see averages only — answers can’t be traced to anyone."
       />
 
       {error && (
@@ -67,12 +67,8 @@ export default async function PulseSurveysPage() {
           <div className="text-xs text-text-muted">
             <p className="text-text">Why you can’t see who said what</p>
             <p className="mt-1">
-              Ratings are stored with no employee field. A separate record
-              tracks only that someone responded, to stop double-voting — it
-              holds no rating. The two are never joined, so individual answers
-              are not hidden from you, they genuinely do not exist in a
-              linkable form. Small response counts still reveal a lot, so treat
-              anything under about five responses as directional only.
+              Answers are saved without names. With fewer than five responses,
+              treat results as a rough guide.
             </p>
           </div>
         </div>

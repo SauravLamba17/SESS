@@ -26,8 +26,8 @@ export default function CareersLayout({ children }: { children: React.ReactNode 
 
       <footer className="mx-auto max-w-4xl px-6 pb-10 pt-4">
         <p className="border-t border-border pt-4 text-xs text-text-muted">
-          Simplen is an equal-opportunity employer. Applications are reviewed by
-          our people — every resume is read by a person, not scored by software.
+          Simplen is an equal-opportunity employer. Every application is read by
+          a person.
         </p>
       </footer>
     </div>

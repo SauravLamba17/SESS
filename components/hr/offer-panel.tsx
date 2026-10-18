@@ -213,9 +213,8 @@ export function OfferPanel({
         <p className="flex items-start gap-2 rounded border border-border bg-surface-raised/40 px-3 py-2 text-[11px] text-text-muted">
           <Lock size={13} className="mt-0.5 shrink-0" />
           <span>
-            These figures are locked. Once an offer is SENT the terms are
-            immutable through every code path — withdraw it and raise a new
-            offer if the terms must change.
+            Terms are locked once the offer is sent. To change them, withdraw it
+            and create a new offer.
           </span>
         </p>
       )}
@@ -381,11 +380,10 @@ export function OfferPanel({
             {ATTESTATION_DISCLAIMER}
           </p>
           <p className="mt-2 text-[11px] text-text-muted">
-            You are recording that <span className="text-text">{candidateName}</span>{" "}
+            You’re recording that <span className="text-text">{candidateName}</span>{" "}
             {responding === "ACCEPTED" ? "accepted" : "declined"} this offer.
-            Type their full name to confirm what you were told. Your user id, the
-            time and your IP are recorded alongside it — this is a record of your
-            data entry on the candidate’s behalf, not of their own signature.
+            Type their full name to confirm. Your account, the time and your IP
+            are recorded.
           </p>
           <input
             type="text"

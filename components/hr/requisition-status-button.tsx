@@ -66,8 +66,8 @@ export function RequisitionStatusButton({
       {confirming ? (
         <div className="flex max-w-xs flex-col items-end gap-1.5">
           <p className="text-right text-[10px] text-text-muted">
-            Closing “{title}” removes it from the public career page and rejects
-            any further applications, including from stale browser tabs.
+            Closing “{title}” removes it from the careers page and stops new
+            applications.
           </p>
           <span className="flex items-center gap-2">
             <button

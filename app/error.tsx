@@ -46,9 +46,8 @@ export default function GlobalError({
           <div>
             <h1 className="text-lg font-bold text-text">Something went wrong</h1>
             <p className="mt-1.5 text-sm text-text-muted">
-              This page could not be loaded. Nothing you were working on has been
-              lost. Try again, and if it keeps happening, contact your system
-              administrator.
+              This page couldn’t load. Your work hasn’t been lost. Try again or
+              contact your administrator.
             </p>
           </div>
         </div>
@@ -60,8 +59,7 @@ export default function GlobalError({
             </p>
             <p className="mt-0.5 font-mono text-xs text-text">{error.digest}</p>
             <p className="mt-1 text-[11px] text-text-muted">
-              Quote this when reporting the problem — it identifies this exact
-              event in the server log.
+              Share this code when reporting the problem.
             </p>
           </div>
         )}

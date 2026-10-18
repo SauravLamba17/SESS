@@ -211,9 +211,8 @@ export function ReviewNotesForm({
         className={inputClass}
       />
       <p className="text-[10px] text-text-muted">
-        Written by you, for your team. Nothing on this page is generated,
-        extracted or summarised automatically — read the resume and write what
-        you think.
+        Your own notes for the hiring team. Read the resume and write your
+        assessment.
       </p>
       <div className="flex items-center justify-end gap-2">
         {saved && (

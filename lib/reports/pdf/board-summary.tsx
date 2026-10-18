@@ -79,7 +79,7 @@ export function BoardSummaryPdf({ r, meta }: { r: BoardSummaryResult; meta: Repo
             value: (m) => inr(m.costToCompany),
           },
         ]}
-        emptyMessage="No finalized payroll in this period."
+        emptyMessage="No finalised payroll in this period."
       />
 
       <Note>

@@ -43,7 +43,7 @@ export default async function ManagerIdleTrackingPage() {
     <>
       <PageHeader
         title="Team Activity"
-        description="Roughly how much of tracked time your direct reports' machines were in use. Aggregates only — there is no minute-by-minute timeline here, by design."
+        description="How much of tracked time your team’s computers were in use. Totals only."
       />
 
       {error && (
@@ -60,12 +60,8 @@ export default async function ManagerIdleTrackingPage() {
             <div className="flex items-start gap-3 text-xs text-text-muted">
               <StatusDot state="idle" className="mt-1" />
               <p>
-                This shows idle-vs-active minutes only. It does not show what
-                anyone worked on, which applications they used, or any
-                productivity score — and it is not part of appraisal. Treat a
-                low figure as a prompt for a conversation, not a conclusion:
-                someone in meetings all day or working away from their machine
-                will read as idle here.
+                Active versus idle time only, not used in appraisals. A low
+                figure is a reason to talk, not a verdict.
               </p>
             </div>
           </Panel>

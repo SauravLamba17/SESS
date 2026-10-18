@@ -85,7 +85,7 @@ export function adjustmentLabel(row: {
 }): string {
   if (row.status !== "FINALIZED" || !row.finalizedAt)
     return `adjustment, ${row.status.toLowerCase()}`;
-  return `adjustment, finalized ${row.finalizedAt.toLocaleDateString("en-GB", {
+  return `adjustment, finalised ${row.finalizedAt.toLocaleDateString("en-GB", {
     day: "numeric",
     month: "short",
     year: "numeric",

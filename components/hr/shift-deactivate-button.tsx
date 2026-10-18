@@ -44,11 +44,11 @@ export function ShiftActiveToggle({
       {confirming ? (
         <div className="flex flex-col items-end gap-1.5" role="group" aria-label="Confirm deactivation">
           <span className="max-w-[18rem] text-right text-[10px] text-text-muted">
-            Deactivate this shift? It disappears from assignment pickers
+            Deactivate this shift? It won’t be offered for new assignments
             {assignedCount > 0
               ? `; ${assignedCount} employee(s) keep it until reassigned.`
               : "."}{" "}
-            Shifts are never hard-deleted — you can reactivate it.
+            You can reactivate it later.
           </span>
           <span className="flex items-center gap-2">
             <button

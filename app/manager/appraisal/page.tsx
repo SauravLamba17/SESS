@@ -58,7 +58,7 @@ export default async function TeamAppraisalPage() {
     <>
       <PageHeader
         title="Team Appraisal"
-        description="Enter numeric feedback (0–100) and comments for your direct reports on open cycles. Formula weights are owned by Super Admin."
+        description="Give feedback scores (0–100) and comments for your team on open cycles."
       />
 
       {data.error && (

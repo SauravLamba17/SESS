@@ -99,7 +99,7 @@ export default async function HRDashboard() {
   const presentPct = pct(d.presentCount, d.activeCount);
   // The payroll card reports the FURTHEST stage this month has reached.
   const payrollStage = d.payroll.finalized
-    ? { value: "Finalized", state: "good" as const, status: `${d.payroll.finalized} locked` }
+    ? { value: "Finalised", state: "good" as const, status: `${d.payroll.finalized} locked` }
     : d.payroll.submitted
       ? {
           value: "Submitted",
@@ -178,8 +178,8 @@ export default async function HRDashboard() {
               </StatusLabel>
             </div>
             <p className="pt-2 text-xs text-text-muted">
-              HR edits and submits. Only Super Admin finalizes/locks — payroll is
-              immutable once finalized.
+              HR edits and submits. Only Super Admin finalises/locks — payroll is
+              immutable once finalised.
             </p>
           </div>
         </Panel>
@@ -204,9 +204,8 @@ export default async function HRDashboard() {
               </StatusLabel>
             </div>
             <p className="pt-2 text-xs text-text-muted">
-              Idle tracking is consent-gated: no active consent, no tracking.
-              Retention rows are redacted, never deleted — the financial record
-              stays intact.
+              Idle tracking only runs with consent. Former employees’ personal
+              details are removed; pay records stay.
             </p>
           </div>
         </Panel>

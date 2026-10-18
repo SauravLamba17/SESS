@@ -93,8 +93,8 @@ export function AcknowledgeButton({
         className="w-full rounded border border-border bg-background px-2.5 py-1.5 text-sm text-text placeholder:text-text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       />
       <p className="mt-1 text-[10px] text-text-muted">
-        Must match your name on record: <span className="text-text">{employeeName}</span>.
-        Your name, the time, and your IP address are recorded.
+        Type your name as on record: <span className="text-text">{employeeName}</span>.
+        Your name, the time and your IP address are recorded.
       </p>
 
       <div className="mt-3 flex items-center justify-end gap-2">

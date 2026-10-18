@@ -89,7 +89,7 @@ export default async function RetentionReviewPage() {
 
       <PageHeader
         title="Candidates Due for Review"
-        description="Unsuccessful candidates whose retention window has elapsed. Nothing is deleted automatically — you decide, because a purge cannot be undone and may destroy data needed for a live matter."
+        description="Rejected candidates whose keep-period has ended. Nothing is deleted automatically, and deletion can’t be undone."
       />
 
       {error && (
@@ -123,12 +123,9 @@ export default async function RetentionReviewPage() {
           <div className="text-xs text-text-muted">
             <p className="text-text">Retention policy</p>
             <p className="mt-1">
-              Rejected without talent-pool consent — reviewed after{" "}
-              {RETENTION_DAYS_NO_CONSENT} days. Rejected with consent — reviewed
-              after {RETENTION_DAYS_WITH_CONSENT} days; consent extends the
-              window but does not make it indefinite. Hired candidates are never
-              scheduled: their record becomes employment history under a
-              different lawful basis.
+              Reviewed after {RETENTION_DAYS_NO_CONSENT} days, or{" "}
+              {RETENTION_DAYS_WITH_CONSENT} days if they agreed to stay on file.
+              Hired candidates aren’t listed.
             </p>
           </div>
         </div>

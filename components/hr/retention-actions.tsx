@@ -57,10 +57,9 @@ export function RetentionActions({
     return (
       <div className="flex max-w-sm flex-col items-end gap-1.5">
         <p className="rounded border border-danger/40 bg-danger/10 px-2.5 py-2 text-right text-[10px] text-danger">
-          Permanently delete all data for <strong>{name}</strong>: their profile,
-          resume file, {applications} application{applications === 1 ? "" : "s"},
-          interview feedback and any offer. This cannot be undone. An audit
-          record of the deletion is kept.
+          Permanently delete all data for <strong>{name}</strong>: profile,
+          resume, {applications} application{applications === 1 ? "" : "s"},
+          feedback and any offer. This can’t be undone.
         </p>
         <span className="flex items-center gap-2">
           <button

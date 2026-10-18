@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
   if (!userId) return fail("UNAUTHENTICATED", "Not authenticated", 401);
   const role = await getCurrentRole();
   if (role !== "SUPER_ADMIN")
-    return fail("FORBIDDEN", "Only a Super Admin may finalize payroll", 403);
+    return fail("FORBIDDEN", "Only a Super Admin may finalise payroll", 403);
 
   let body: { period?: unknown };
   try {
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
     if (pending.length === 0)
       return fail(
         "NOT_SUBMITTED",
-        `No SUBMITTED payroll rows for ${period} — nothing awaiting finalization.`,
+        `No SUBMITTED payroll rows for ${period} — nothing awaiting finalisation.`,
         409,
       );
 
@@ -133,18 +133,18 @@ export async function POST(req: NextRequest) {
     if (err instanceof LoanUnmatchedError)
       return fail(
         "LOAN_UNMATCHED",
-        `Cannot finalize ${period}. ${err.message} Nothing was finalized — correct that row's loan deduction and resubmit.`,
+        `Cannot finalise ${period}. ${err.message} Nothing was finalised — correct that row's loan deduction and resubmit.`,
         409,
       );
     if (err instanceof Error && err.message.startsWith("PARTIAL:")) {
       console.error("[admin/payroll/finalize] partial transition, rolled back:", err.message);
       return fail(
         "CONCURRENT_CHANGE",
-        "The run changed while finalizing and was rolled back — nothing was finalized. Reload and try again.",
+        "The run changed while finalising and was rolled back — nothing was finalised. Reload and try again.",
         409,
       );
     }
     console.error("[admin/payroll/finalize] failed:", err);
-    return fail("SERVER_ERROR", "Could not finalize the payroll run", 503);
+    return fail("SERVER_ERROR", "Could not finalise the payroll run", 503);
   }
 }

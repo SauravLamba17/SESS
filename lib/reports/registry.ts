@@ -94,7 +94,7 @@ export const REPORTS: ReportDef[] = [
     id: "payroll-cost",
     title: "Payroll Cost Summary",
     description:
-      "Total payroll cost broken down by component, month and department. Finalized runs only.",
+      "Total payroll cost broken down by component, month and department. Finalised runs only.",
     access: { EMPLOYEE: "none", MANAGER: "none", HR: "org", SUPER_ADMIN: "org" },
     csv: true,
   },

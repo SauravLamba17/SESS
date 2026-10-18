@@ -124,10 +124,9 @@ export function BulkImport() {
 
       <p className="text-[11px] text-text-muted">
         Columns: employeeCode, name, department, designation, managerEmployeeCode,
-        joiningDate (YYYY-MM-DD), machineId, email (optional). Managers are
-        referenced by their employee <em>code</em>, not an internal id. Login
-        invitations are NOT sent at import — use “Send invitation” on the
-        roster afterwards. Nothing is written until you confirm.
+        joiningDate (YYYY-MM-DD), machineId, email (optional). Invitations
+        aren’t sent — use “Send invitation” afterwards. Nothing is saved until
+        you confirm.
       </p>
 
       {error && (
@@ -164,8 +163,8 @@ export function BulkImport() {
           {preview.invalidCount > 0 && (
             <div>
               <p className="mb-1 text-xs font-medium text-danger">
-                These rows will NOT be imported — the whole file is rejected until
-                they are fixed:
+                Fix these rows first — the file can’t be imported until they’re
+                corrected:
               </p>
               <ul className="space-y-1">
                 {preview.invalid.map((r) => (

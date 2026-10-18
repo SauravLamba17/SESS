@@ -126,13 +126,13 @@ export function PayrollRunActions({
             onClick={() => setConfirming(true)}
             className={`${btn} border-danger/40 text-danger hover:bg-danger/10 focus-visible:ring-danger`}
           >
-            <Lock size={13} /> Finalize &amp; lock
+            <Lock size={13} /> Finalise &amp; lock
           </button>
         )}
 
         {canFinalize && confirming && (
           <span className="inline-flex items-center gap-2 rounded border border-danger/40 bg-danger/10 px-3 py-1.5 text-xs text-danger">
-            Finalizing {period} is permanent and cannot be undone.
+            Finalising {period} is permanent and cannot be undone.
             <button
               type="button"
               disabled={pending}
@@ -140,7 +140,7 @@ export function PayrollRunActions({
                 setConfirming(false);
                 post(
                   "/api/admin/payroll/finalize",
-                  (d) => `Finalized ${d.finalized} rows for ${period}. These are now immutable.`,
+                  (d) => `Finalised ${d.finalized} rows for ${period}. These are now immutable.`,
                 );
               }}
               className="rounded bg-danger px-2 py-0.5 font-medium text-background disabled:opacity-50"

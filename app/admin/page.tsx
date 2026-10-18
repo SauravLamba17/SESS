@@ -50,8 +50,8 @@ export default async function SystemDashboard() {
   const actions: { label: string; detail: string; href: string; state: "warn" | "danger" }[] = [];
   if (d.submittedRows > 0) {
     actions.push({
-      label: `${d.submittedRows} payroll row${d.submittedRows === 1 ? "" : "s"} awaiting finalize`,
-      detail: `Submitted by HR for ${d.submittedPayroll.map((g) => g.month).join(", ")}. Finalizing locks them permanently — only a Super Admin can.`,
+      label: `${d.submittedRows} payroll row${d.submittedRows === 1 ? "" : "s"} awaiting finalisation`,
+      detail: `Submitted by HR for ${d.submittedPayroll.map((g) => g.month).join(", ")}. Finalising locks them permanently — only a Super Admin can.`,
       href: "/admin/payroll",
       state: "warn",
     });
@@ -59,7 +59,7 @@ export default async function SystemDashboard() {
   if (d.draftOffers > 0) {
     actions.push({
       label: `${d.draftOffers} offer${d.draftOffers === 1 ? "" : "s"} awaiting approval`,
-      detail: "Drafted by HR. An offer cannot be sent to a candidate until a Super Admin approves its figures.",
+      detail: "Drafted by HR. It can’t be sent until you approve it.",
       href: "/admin/offers",
       state: "warn",
     });
@@ -117,7 +117,7 @@ export default async function SystemDashboard() {
           status={d.openReqs > 0 ? "Accepting applications" : "None open"}
         />
         <StatCard
-          label="Payroll awaiting finalize"
+          label="Payroll awaiting finalisation"
           value={d.submittedRows}
           state={d.submittedRows > 0 ? "warn" : "good"}
           status={d.submittedRows > 0 ? "Action required" : "Queue clear"}
@@ -220,8 +220,7 @@ export default async function SystemDashboard() {
           <div className="p-4">
             <HeadcountTrendChart points={d.trend} />
             <p className="mt-2 text-[11px] text-text-muted">
-              Measured at each month end (today for the current month), using the
-              same employed-on-this-date rule as the Headcount report.
+              Measured at each month end, or today for the current month.
             </p>
           </div>
         </Panel>
@@ -263,8 +262,7 @@ export default async function SystemDashboard() {
           <div className="p-4">
             <RoleDistributionChart rows={d.roleRows} />
             <p className="mt-2 text-[11px] text-text-muted">
-              Linked SESS accounts only. Employees without a login do not appear —
-              manage on{" "}
+              Only people with a login are counted. Manage accounts on{" "}
               <Link href="/admin/roles" className="text-accent hover:underline">
                 Roles &amp; Permissions
               </Link>
@@ -291,8 +289,7 @@ export default async function SystemDashboard() {
               <div>
                 <p className="text-sm text-text">Nothing needs your attention</p>
                 <p className="mt-0.5 text-xs text-text-muted">
-                  No payroll awaiting finalize, no offers awaiting approval, no
-                  failed role syncs, no unclosed attendance records.
+                  Nothing needs your attention right now.
                 </p>
               </div>
             </div>
@@ -344,12 +341,7 @@ export default async function SystemDashboard() {
               <span className="font-mono text-xs text-text">{d.toggles.attendanceValidation}</span>
             </div>
             <p className="border-t border-border pt-3 text-[11px] text-text-muted">
-              Status comes from a live <span className="font-mono">SELECT 1</span>{" "}
-              against the database on each load — the same probe the{" "}
-              <Link href="/admin/integrations" className="text-accent hover:underline">
-                Integrations
-              </Link>{" "}
-              page runs.
+              Checked live each time this page loads.
             </p>
           </div>
         </Panel>

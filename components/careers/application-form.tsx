@@ -75,9 +75,8 @@ export function ApplicationForm({ requisitionId }: { requisitionId: string }) {
         <div>
           <p className="text-sm font-medium text-good">Application received</p>
           <p className="mt-1 text-xs text-text-muted">
-            Thank you. Someone from our team will read your resume and be in
-            touch if there’s a fit. You won’t receive an automated
-            score or rejection — a person reviews every application.
+            Thank you. Our team will read your resume and contact you if there’s
+            a fit.
           </p>
         </div>
       </div>

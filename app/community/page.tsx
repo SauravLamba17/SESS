@@ -80,7 +80,7 @@ export default async function CommunityPage() {
     <>
       <PageHeader
         title="Community"
-        description="Shout-outs and celebrations. Visible to everyone, and deliberately kept separate from appraisals — nothing posted here feeds into anyone's review."
+        description="Shout-outs and celebrations, visible to everyone. Posts here don’t affect appraisals."
       />
 
       {error && (
@@ -103,8 +103,8 @@ export default async function CommunityPage() {
                 <ShoutOutForm people={people.filter((p) => p.id !== me.id)} />
               ) : (
                 <p className="text-sm text-text-muted">
-                  No employee record is linked to your account yet, so you can’t
-                  post. You can still read the wall.
+                  Your account isn’t linked to an employee record yet, so you can
+                  read but not post.
                 </p>
               )}
             </div>

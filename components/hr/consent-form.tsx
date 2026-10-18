@@ -126,9 +126,8 @@ export function ConsentForm({
           <span className="text-xs text-text">
             Also generate the desktop agent token
             <span className="mt-0.5 block text-text-muted">
-              Idle tracking does nothing until {selectedName}’s machine has a
-              token. Ticking this issues it in the same step and shows it below —
-              you won’t need to go anywhere else.
+              Idle tracking needs a token on {selectedName}’s computer. Tick this
+              to create it now.
             </span>
           </span>
         </label>
@@ -151,8 +150,8 @@ export function ConsentForm({
             </p>
           </div>
           <p className="mt-1 text-[10px] text-text-muted">
-            Agent token for {selectedName}. Paste it into the SESS Idle Agent on
-            their machine. Treat it like a password.
+            Paste this into the SESS Idle Agent on {selectedName}’s computer.
+            Keep it private.
           </p>
           <code className="mt-2 block break-all rounded bg-background px-2 py-2 font-mono text-[11px] text-text">
             {token}

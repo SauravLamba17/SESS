@@ -51,7 +51,7 @@ export default async function MyExpensesPage() {
     <>
       <PageHeader
         title="Expense Claims"
-        description="Submit reimbursement claims. Your manager approves them, and approved claims are paid out with your next finalized payroll run."
+        description="Submit expense claims. Once your manager approves, they’re paid with your next payslip."
       />
 
       {error && (
@@ -127,8 +127,8 @@ export default async function MyExpensesPage() {
               </ul>
             )}
             <p className="border-t border-border px-4 py-3 text-xs text-text-muted">
-              An approved claim is paid as a reimbursement line on your payslip —
-              added after deductions, since a reimbursement is not taxable salary.
+              Approved claims are added to your payslip after deductions, as they
+              aren’t taxed.
             </p>
           </Panel>
         </div>

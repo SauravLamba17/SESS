@@ -70,8 +70,8 @@ export default async function MyAttendancePage() {
       />
 
       {!employeeLinked && (
-        <UnlinkedEmployeeNotice>No employee record is linked to your account yet. Attendance and
-            leave will appear once HR completes onboarding.</UnlinkedEmployeeNotice>
+        <UnlinkedEmployeeNotice>Your account isn’t linked to an employee record yet. HR will set
+            this up.</UnlinkedEmployeeNotice>
       )}
 
       {employeeLinked && (

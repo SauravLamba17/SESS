@@ -205,7 +205,7 @@ function Payslip({ d }: { d: PayslipData }) {
               label="Corrects"
               value={
                 d.adjustmentFor.finalizedAt
-                  ? `${d.adjustmentFor.period} payslip, finalized ${toYmd(d.adjustmentFor.finalizedAt)}`
+                  ? `${d.adjustmentFor.period} payslip, finalised ${toYmd(d.adjustmentFor.finalizedAt)}`
                   : `${d.adjustmentFor.period} payslip`
               }
             />
@@ -213,7 +213,7 @@ function Payslip({ d }: { d: PayslipData }) {
             <Meta label="Days paid" value={`${d.daysWorked} of ${d.daysInMonth}`} />
           )}
           <Meta
-            label="Finalized on"
+            label="Finalised on"
             value={ymd(d.finalizedAt)}
           />
         </View>
@@ -387,8 +387,8 @@ function Form16({ d }: { d: Form16Data }) {
           <View style={s.banner}>
             <Text>
               PARTIAL-YEAR STATEMENT — only {d.monthsCovered} of 12 months in FY{" "}
-              {d.financialYear} have finalized payroll. The figures below cover
-              those months only. Months with no finalized payroll are omitted
+              {d.financialYear} have finalised payroll. The figures below cover
+              those months only. Months with no finalised payroll are omitted
               entirely; nothing has been estimated or filled in.
             </Text>
           </View>
@@ -415,14 +415,14 @@ function Form16({ d }: { d: Form16Data }) {
           ))}
           {d.months.length === 0 && (
             <View style={s.tRow}>
-              <Text style={s.cMonth}>No finalized payroll in this year</Text>
+              <Text style={s.cMonth}>No finalised payroll in this year</Text>
             </View>
           )}
         </View>
 
         <View style={[s.column, { marginTop: 16 }]}>
           <Text style={s.colHead}>SUMMARY</Text>
-          <Line label="1. Gross salary (sum of finalized months)" value={d.totalGross} />
+          <Line label="1. Gross salary (sum of finalised months)" value={d.totalGross} />
           <Line label="2. Provident Fund — employee contribution" value={d.totalPf} alt />
           <Line label="3. Professional Tax" value={d.totalProfessionalTax} />
           <View style={s.subtotal}>
@@ -432,7 +432,7 @@ function Form16({ d }: { d: Form16Data }) {
         </View>
 
         <Text style={s.note}>
-          This statement aggregates figures already recorded against finalized
+          This statement aggregates figures already recorded against finalised
           payroll runs. Every TDS amount shown was entered by HR from the
           company’s accountant
           {d.tdsSources.length > 0 ? ` (${d.tdsSources.join("; ")})` : ""}.

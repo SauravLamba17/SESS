@@ -127,9 +127,8 @@ export function AgentTokenManager({
       {confirmRegen && (
         <div className="rounded border border-warn/40 bg-warn/10 p-2.5">
           <p className="text-[11px] text-warn">
-            This replaces {name}’s existing token. The agent already
-            installed on their machine will stop reporting until the new token is
-            entered into it.
+            This replaces {name}’s token. Their agent stops until the new token
+            is entered.
           </p>
           <div className="mt-2 flex items-center gap-2">
             <button
@@ -163,8 +162,8 @@ export function AgentTokenManager({
             </p>
           </div>
           <p className="mt-1 text-[10px] text-text-muted">
-            Agent token for {name}. Paste it into the SESS Idle Agent on their
-            machine. Treat it like a password.
+            Paste this into the SESS Idle Agent on {name}’s computer. Keep it
+            private.
           </p>
           <code className="mt-2 block break-all rounded bg-background px-2 py-2 font-mono text-[11px] text-text">
             {token}

@@ -243,8 +243,7 @@ export function ClockInWidget({
               </h2>
             </div>
             <p className="mb-3 text-xs text-text-muted">
-              Your manager requires a comment with every web clock-in. Add a short note about
-              what you’re starting on.
+              Add a short note about what you’re starting on.
             </p>
             <textarea
               autoFocus

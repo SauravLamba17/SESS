@@ -66,7 +66,7 @@ export default async function OfferApprovalPage() {
     <>
       <PageHeader
         title="Offer Approvals"
-        description="Offers drafted by HR awaiting your authorisation. HR cannot send an offer until it is approved here — and cannot approve their own."
+        description="Offers drafted by HR that need your approval. HR can’t send an offer until you approve it."
       />
 
       {error && (
@@ -125,9 +125,8 @@ export default async function OfferApprovalPage() {
           </ul>
         )}
         <p className="border-t border-border px-4 py-3 text-xs text-text-muted">
-          Approval authorises the terms. HR then marks the offer as sent, and
-          records the candidate’s real-world response — accepting converts
-          them into an employee automatically.
+          After approval, HR sends the offer. If the candidate accepts, they
+          become an employee automatically.
         </p>
       </Panel>
 

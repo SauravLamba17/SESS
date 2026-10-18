@@ -200,8 +200,7 @@ export function ReportPreview({
       )}
 
       <p className="mt-3 border-t border-border pt-2 text-[10px] text-text-muted">
-        These are the same figures the PDF and CSV contain — the server computes
-        the report once and renders whichever format is requested.
+        The PDF and CSV downloads contain these same figures.
       </p>
     </Panel>
   );

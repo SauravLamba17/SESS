@@ -48,7 +48,7 @@ export default async function OnboardingPage() {
     <>
       <PageHeader
         title="Onboarding Checklists"
-        description="New joiners get a default checklist automatically when they accept an offer. Tick items off as they're done, and add anything role-specific."
+        description="New joiners get a checklist when they accept an offer. Tick items off and add your own."
       />
 
       {error && (
@@ -59,9 +59,8 @@ export default async function OnboardingPage() {
         <Panel className="px-4 py-12 text-center">
           <p className="text-sm text-text">No onboarding checklists yet.</p>
           <p className="mt-1 text-xs text-text-muted">
-            A checklist is created automatically when a candidate accepts an
-            offer. You can also add tasks to any employee from here once they
-            have one.
+            Checklists are created when a candidate accepts an offer. You can
+            then add tasks here.
           </p>
         </Panel>
       ) : (

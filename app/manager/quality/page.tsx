@@ -54,7 +54,7 @@ export default async function TeamQualityPage() {
     <>
       <PageHeader
         title="Team Quality"
-        description="Log defect counts and quality scores for your direct reports — one review per employee per day."
+        description="Record defect counts and quality scores for your team, one per person per day."
       />
 
       {data.error && (

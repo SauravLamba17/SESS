@@ -27,7 +27,7 @@ export async function ReportsPageBody() {
     <>
       <PageHeader
         title="Reports & Analytics"
-        description="Generate a PDF report for any period. Every report is scoped to what your role may see."
+        description="Create a PDF report for any period. You only see data your role allows."
       />
 
       {available.length === 0 && (

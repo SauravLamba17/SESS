@@ -62,13 +62,8 @@ export default async function HrIdleTrackingPage() {
           <div className="text-xs text-text-muted">
             <p className="text-text">What this records — and what it does not</p>
             <p className="mt-1">
-              Only idle-vs-active minutes, from whether the machine received
-              keyboard or mouse input within{" "}
-              <span className="font-mono text-text">{threshold}s</span>. No
-              screenshots, no application or website tracking, no keystrokes, and
-              no productivity scoring. The desktop agent is visible in the
-              employee’s system tray at all times and can be paused by them.
-              Issue a token only after recording consent on{" "}
+              Tracks only active versus idle time — no screenshots, keystrokes or
+              websites. Record consent first on{" "}
               <Link href="/hr/compliance" className="text-accent underline">
                 Compliance &amp; Consent
               </Link>
@@ -200,9 +195,8 @@ export default async function HrIdleTrackingPage() {
         )}
         <p className="border-t border-border px-4 py-3 text-xs text-text-muted">
           <MonitorSmartphone size={12} className="mr-1 inline" />
-          An employee whose consent is not active shows “tracking
-          paused” — any totals beside it are historical, not current. The
-          server rejects new heartbeats for them.
+          “Tracking paused” means consent isn’t active. Any totals shown are
+          from before.
         </p>
       </Panel>
     </>

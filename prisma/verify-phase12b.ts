@@ -236,7 +236,7 @@ async function main() {
   check("CSV total gross matches the computed value", payLines.includes(`Total gross,${payroll.totalGross}`));
   check(
     "CSV reports the excluded DRAFT row rather than hiding it",
-    payLines.includes(`Rows excluded (not finalized),${payroll.excludedRowCount}`),
+    payLines.includes(`Rows excluded (not finalised),${payroll.excludedRowCount}`),
   );
   check(
     "CSV cost to company matches the computed value",

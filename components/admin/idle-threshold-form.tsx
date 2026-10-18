@@ -81,10 +81,8 @@ export function IdleThresholdForm({ current }: { current: number }) {
       </div>
 
       <p className="text-[11px] text-text-muted">
-        Default is <span className="font-mono text-text">210s</span> (3.5 minutes).
-        Agents pick up a change on their next heartbeat — within 15 minutes, with
-        no reinstall. Lower values are more intrusive; consider carefully before
-        going below the default.
+        Default: <span className="font-mono text-text">210</span> seconds. Changes
+        apply within 15 minutes. Lower values are more intrusive.
       </p>
 
       {error && <p className="text-xs text-danger">{error}</p>}

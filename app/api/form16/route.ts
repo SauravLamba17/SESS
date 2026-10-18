@@ -91,7 +91,7 @@ export async function GET(req: NextRequest) {
     if (rows.length === 0)
       return fail(
         "NO_FINALIZED_DATA",
-        `No finalized payroll exists for ${employee.name} in FY ${fy}. Form 16 can only be generated from finalized runs.`,
+        `No finalised payroll exists for ${employee.name} in FY ${fy}. Form 16 can only be generated from finalised runs.`,
         409,
       );
 

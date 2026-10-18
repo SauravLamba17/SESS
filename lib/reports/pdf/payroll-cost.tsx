@@ -39,7 +39,7 @@ export function PayrollCostPdf({ r, meta }: { r: PayrollCostResult; meta: Report
           { label: "Component", width: "60%", value: (c) => c.label },
           { label: "Amount (INR)", width: "40%", align: "right", value: (c) => inr(c.amount) },
         ]}
-        emptyMessage="No finalized payroll in this period."
+        emptyMessage="No finalised payroll in this period."
       />
 
       <DataTable
@@ -79,7 +79,7 @@ export function PayrollCostPdf({ r, meta }: { r: PayrollCostResult; meta: Report
       <Note>
         FINALIZED payroll rows only.{" "}
         {r.excludedRowCount > 0
-          ? `${r.excludedRowCount} draft or submitted row(s) in this period were excluded — those figures are provisional until a Super Admin finalizes them, so this total will rise once they are.`
+          ? `${r.excludedRowCount} draft or submitted row(s) in this period were excluded — those figures are provisional until a Super Admin finalises them, so this total will rise once they are.`
           : "No draft or submitted rows existed in this period, so this total is complete."}
         {"\n"}
         Cost to company = gross + employer PF + bonus + reimbursements. It is

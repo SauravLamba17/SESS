@@ -46,8 +46,8 @@ export function OfferApproveButton({
     return (
       <div className="flex max-w-sm flex-col items-end gap-1.5">
         <p className="text-right text-[10px] text-text-muted">
-          Approving authorises HR to send {candidateName} an offer at ₹
-          {monthlyGross}/month. HR still controls when it is sent.
+          Approving lets HR send {candidateName} an offer at ₹{monthlyGross}/month.
+          HR decides when to send it.
         </p>
         <span className="flex items-center gap-2">
           <button

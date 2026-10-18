@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
           claim.employeeId,
           decision === "APPROVE" ? "EXPENSE_APPROVED" : "EXPENSE_REJECTED",
           decision === "APPROVE"
-            ? `Your ${claim.category.toLowerCase()} expense claim for ₹${claim.amount.toFixed(2)} was approved. It will be reimbursed with your next finalized payroll run.`
+            ? `Your ${claim.category.toLowerCase()} expense claim for ₹${claim.amount.toFixed(2)} was approved. It will be reimbursed with your next finalised payroll run.`
             : `Your ${claim.category.toLowerCase()} expense claim for ₹${claim.amount.toFixed(2)} was not approved. Speak to your manager if you need to discuss it.`,
         );
       }

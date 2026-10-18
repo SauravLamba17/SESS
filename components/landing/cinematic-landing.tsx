@@ -708,8 +708,8 @@ export default function CinematicLanding({
             </p>
             {signedInWithoutRole && (
               <p className={s.notice}>
-                You’re signed in, but no role is set on your account yet.
-                Ask an administrator to assign one.
+                You’re signed in, but no role is assigned yet. Ask an
+                administrator.
               </p>
             )}
             <div className={`${s.acts} ${s.rv}`}>

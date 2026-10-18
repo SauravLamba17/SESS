@@ -146,8 +146,7 @@ export function WhosInToday({
         </div>
       )}
       <p className="border-t border-border px-4 py-2.5 text-[11px] text-text-muted">
-        Presence only — this view shows whether someone has marked attendance
-        today, not when they arrived.
+        Shows who has marked attendance today, not what time.
       </p>
     </Panel>
   );

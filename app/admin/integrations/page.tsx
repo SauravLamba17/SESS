@@ -73,7 +73,7 @@ export default async function IntegrationsPage() {
     <>
       <PageHeader
         title="Integrations"
-        description="Connection status only. Secrets live in .env and are never shown or editable here."
+        description="Connection status only. Passwords and keys are never shown here."
       />
 
       <Panel>
@@ -92,9 +92,8 @@ export default async function IntegrationsPage() {
           ))}
         </div>
         <p className="border-t border-border px-4 py-3 text-xs text-text-muted">
-          To change any of these, edit the deployment’s .env and restart —
-          deliberately not editable from the browser, so a compromised admin
-          session cannot exfiltrate or rotate credentials.
+          These settings are managed by your technical team and can’t be
+          changed here, for security.
         </p>
       </Panel>
     </>

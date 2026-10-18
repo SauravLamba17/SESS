@@ -62,7 +62,7 @@ export default async function CompliancePage() {
     <>
       <PageHeader
         title="Compliance & Consent"
-        description="Record and track employee consent for idle tracking — and issue the desktop agent token from the same place."
+        description="Record employees’ consent for idle tracking and set up their desktop agent."
         action={
           <Link
             href="/hr/idle-tracking"
@@ -90,7 +90,7 @@ export default async function CompliancePage() {
             title="Consent Status"
             action={
               <span className="text-xs text-text-muted">
-                Agent tokens are issued here — no need to leave this page
+                Set up the desktop agent from this page.
               </span>
             }
           />
@@ -163,9 +163,8 @@ export default async function CompliancePage() {
             </table>
           </div>
           <p className="border-t border-border px-4 py-3 text-xs text-text-muted">
-            A token can only be issued while idle-tracking consent is active —
-            the same rule the server enforces on every heartbeat. Revoking
-            consent stops tracking regardless of whether a token still exists.
+            The agent can only be set up while consent is active. Withdrawing
+            consent stops tracking.
           </p>
         </Panel>
       </div>

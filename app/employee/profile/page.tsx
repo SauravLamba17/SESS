@@ -86,8 +86,8 @@ export default async function MyProfilePage() {
       )}
 
       {!employee && !error && (
-        <UnlinkedEmployeeNotice>No employee record is linked to your account yet. Your profile will
-            appear once HR completes onboarding.</UnlinkedEmployeeNotice>
+        <UnlinkedEmployeeNotice>Your account isn’t linked to an employee record yet. HR will set
+            this up.</UnlinkedEmployeeNotice>
       )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

@@ -148,8 +148,8 @@ export default async function EmployeeRetentionReview({
               {REDACTED_FIELDS.join(", ")}
             </p>
             <p className="mt-1.5 text-[11px] text-text-muted">
-              Direct personal identifiers with no remaining audit purpose.
-              Emergency contact names a third party who never worked here.
+              Personal details no longer needed, including the emergency
+              contact.
             </p>
           </div>
           <div className="rounded border border-good/30 bg-good/5 p-3">
@@ -158,19 +158,14 @@ export default async function EmployeeRetentionReview({
               {PRESERVED_FIELDS.join(", ")}
             </p>
             <p className="mt-1.5 text-[11px] text-text-muted">
-              Plus every payroll, attendance, appraisal, warning, expense and
-              salary record. The employee row is never deleted — the retention
-              period exists precisely to keep these auditable.
+              Plus all payroll, attendance, appraisal, warning, expense and
+              salary records. The employee record is never deleted.
             </p>
           </div>
         </div>
         <p className="mt-3 text-[11px] text-text-muted">
-          <span className="text-text">Why the name is kept:</span> payslips, Form
-          16 and warning letters are legal documents that name the person they
-          concern. Redacting the name would leave financial records that cannot
-          be tied to anyone, defeating the audit purpose of the retention period
-          and making a lawful subject-access request unanswerable. Erasing a name
-          is a deliberate legal decision for a human, not this routine default.
+          The name stays so payslips, Form 16 and warning letters still show
+          who they belong to.
         </p>
       </Panel>
 

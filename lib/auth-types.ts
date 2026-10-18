@@ -165,8 +165,8 @@ export const NAV: Record<PortalKey, NavItem[]> = {
     // CROSS_PORTAL_NAV at the bottom of this file for why they are a separate,
     // permission-filtered group rather than 16 duplicated entries.
     { label: "Roles & Permissions", href: "/admin/roles", icon: "KeyRound" },
-    { label: "Organization", href: "/admin/organization", icon: "Network" },
-    { label: "Payroll Finalization", href: "/admin/payroll", icon: "Lock" },
+    { label: "Organisation", href: "/admin/organization", icon: "Network" },
+    { label: "Payroll Finalisation", href: "/admin/payroll", icon: "Lock" },
     { label: "Offer Approvals", href: "/admin/offers", icon: "FileSignature" },
     { label: "Appraisal Formula", href: "/admin/appraisal-formula", icon: "SlidersHorizontal" },
     { label: "Reports", href: "/admin/reports", icon: "BarChart3" },

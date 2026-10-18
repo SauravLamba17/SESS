@@ -57,7 +57,7 @@ export default async function MyPayslipsPage() {
     <>
       <PageHeader
         title="Payslips & Financials"
-        description="Your finalized payslips and annual Form 16 Part B statement. A payslip appears here once the payroll run for that month has been finalized."
+        description="Your payslips and yearly Form 16. A payslip appears once that month’s payroll is finalised."
       />
 
       {error && (
@@ -75,13 +75,13 @@ export default async function MyPayslipsPage() {
               label="Latest Net Pay"
               value={latest ? `₹${inr(latest.net.toFixed(2))}` : "—"}
               state={latest ? "good" : "idle"}
-              status={latest ? periodLabel(latest.month) : "No finalized payslip yet"}
+              status={latest ? periodLabel(latest.month) : "No finalised payslip yet"}
             />
             <StatCard
               label="Payslips Available"
               value={rows.length}
               state={rows.length > 0 ? "good" : "idle"}
-              status="Finalized only"
+              status="Finalised only"
             />
             <StatCard
               label="Current Period"
@@ -96,8 +96,7 @@ export default async function MyPayslipsPage() {
             <PanelHeader title={`My Payslips · ${rows.length}`} />
             {rows.length === 0 ? (
               <div className="px-4 py-10 text-center text-sm text-text-muted">
-                No finalized payslips yet. A payslip becomes downloadable only
-                after the payroll run for that month has been finalized.
+                No payslips yet. They appear once a month’s payroll is finalised.
               </div>
             ) : (
               <ul className="divide-y divide-border">
@@ -207,15 +206,13 @@ export default async function MyPayslipsPage() {
             <div className="px-4 py-3">
               {years.length === 0 ? (
                 <p className="text-sm text-text-muted">
-                  Available once you have at least one finalized payroll month.
+                  Available once you have at least one finalised payroll month.
                 </p>
               ) : (
                 <>
                   <p className="mb-3 text-sm text-text-muted">
-                    An annual statement aggregating your finalized payroll for a
-                    financial year (April–March). If a year has fewer than 12
-                    finalized months, the statement is clearly labelled as
-                    partial — no month is ever estimated.
+                    A yearly summary (April–March) of your finalised pay. Incomplete
+                    years are marked as partial.
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {years.map((fy) => (

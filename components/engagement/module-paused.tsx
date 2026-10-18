@@ -13,8 +13,8 @@ export function ModulePaused({ title }: { title: string }) {
       <Panel className="flex items-center gap-3 px-4 py-6">
         <StatusDot state="idle" />
         <span className="text-sm text-text-muted">
-          The engagement module has been paused by the administrator. Nothing is
-          deleted — everything returns when it is switched back on.
+          This feature is paused by your administrator. Nothing has been
+          deleted.
         </span>
       </Panel>
     </>

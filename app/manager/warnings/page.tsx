@@ -41,7 +41,7 @@ export default async function ManagerWarningsPage() {
     <>
       <PageHeader
         title="Warning Letters"
-        description="Draft warning letters for your direct reports. Only HR can release a draft to the employee."
+        description="Draft warning letters for your team. Only HR can send them to the employee."
       />
 
       {data.error && (

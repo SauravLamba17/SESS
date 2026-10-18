@@ -41,16 +41,14 @@ export default function MyDataPage() {
           <PanelHeader title="What's included" />
           <div className="space-y-2 p-4 text-sm text-text-muted">
             <p>
-              Your profile, attendance, leave requests, production and quality
-              records, published appraisal scores, released warning letters,
-              consent records and expense claims — for the period you choose.
+              Your profile, attendance, leave, production, quality, appraisals,
+              warnings, consents and expenses for the dates you choose.
             </p>
             <ul className="mt-3 space-y-1.5 text-xs">
               <li className="flex gap-2">
                 <span className="text-text-muted">·</span>
-                Appraisal scores appear only once a cycle has been{" "}
-                <span className="text-text">published</span>. Scores still being
-                worked on are not yours yet, so they are not included.
+                Appraisal scores appear only after they’re{" "}
+                <span className="text-text">published</span>.
               </li>
               <li className="flex gap-2">
                 <span className="text-text-muted">·</span>
@@ -71,9 +69,7 @@ export default function MyDataPage() {
         <Panel className="flex items-start gap-3 px-4 py-3">
           <StatusDot state="good" className="mt-1" />
           <span className="text-xs text-text-muted">
-            This export always contains your own records only. It is generated
-            from your signed-in identity, so it is not possible for this page to
-            return anyone else’s data.
+            This file only ever contains your own records.
           </span>
         </Panel>
       </div>

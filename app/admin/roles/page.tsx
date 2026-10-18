@@ -20,13 +20,13 @@ const MATRIX: { module: string; access: Record<Role, string> }[] = [
   { module: "Attendance", access: { EMPLOYEE: "Own punches", MANAGER: "Team view", HR: "Org oversight + review flags", SUPER_ADMIN: "Full" } },
   { module: "Production & Quality", access: { EMPLOYEE: "Log/view own", MANAGER: "Team + targets + quality entry", HR: "Org view", SUPER_ADMIN: "Full" } },
   { module: "Leave & Expenses", access: { EMPLOYEE: "Request/claim own", MANAGER: "Approve team", HR: "Org view + payroll fold-in", SUPER_ADMIN: "Full" } },
-  { module: "Payroll", access: { EMPLOYEE: "Own payslips/Form 16", MANAGER: "Team summary", HR: "Run + draft + submit", SUPER_ADMIN: "Finalize (lock)" } },
+  { module: "Payroll", access: { EMPLOYEE: "Own payslips/Form 16", MANAGER: "Team summary", HR: "Run + draft + submit", SUPER_ADMIN: "Finalise (lock)" } },
   { module: "Salary Structure & Advances", access: { EMPLOYEE: "—", MANAGER: "—", HR: "Manage", SUPER_ADMIN: "Full" } },
   { module: "Appraisal", access: { EMPLOYEE: "Own published score", MANAGER: "Team feedback", HR: "Cycles + compute + publish", SUPER_ADMIN: "Formula weights" } },
   { module: "Warning Letters", access: { EMPLOYEE: "Acknowledge own", MANAGER: "Draft", HR: "Release", SUPER_ADMIN: "Full" } },
   { module: "Recruitment / ATS", access: { EMPLOYEE: "—", MANAGER: "Interview feedback", HR: "Pipeline + offers + hire", SUPER_ADMIN: "Offer approval" } },
   { module: "Employee Master & Onboarding", access: { EMPLOYEE: "Own profile", MANAGER: "—", HR: "Onboard/offboard + invitations", SUPER_ADMIN: "Full" } },
-  { module: "Idle Tracking", access: { EMPLOYEE: "Own totals", MANAGER: "Team aggregates", HR: "Org view + consent + tokens", SUPER_ADMIN: "Threshold + kill switch" } },
+  { module: "Idle Tracking", access: { EMPLOYEE: "Own totals", MANAGER: "Team aggregates", HR: "Organisation view, consent and desktop agent setup", SUPER_ADMIN: "Threshold + kill switch" } },
   { module: "Engagement (wall / pulse)", access: { EMPLOYEE: "Participate", MANAGER: "Participate", HR: "Manage surveys", SUPER_ADMIN: "Module toggle" } },
   { module: "Audit Log & System Config", access: { EMPLOYEE: "—", MANAGER: "—", HR: "—", SUPER_ADMIN: "Full" } },
 ];
@@ -122,11 +122,8 @@ export default async function RolesPermissions() {
             </table>
           </div>
           <p className="border-t border-border px-4 py-3 text-xs text-text-muted">
-            A role change updates the SESS database first, then the Clerk
-            account’s metadata. If the Clerk sync fails, the row shows an
-            explicit retry — it is never left silently out of sync. Audit:{" "}
-            <span className="font-mono">USER_ROLE_CHANGED</span>. The last Super
-            Admin cannot be demoted.
+            If a role change doesn’t fully apply, use Retry on that row. The
+            last Super Admin can’t be demoted.
           </p>
         </Panel>
 
@@ -158,8 +155,8 @@ export default async function RolesPermissions() {
               </table>
             </div>
             <p className="border-t border-border px-4 py-3 text-xs text-text-muted">
-              Invitations are sent from the Employee Master page — roles here
-              apply only once an account exists.
+              Invite new people from Employee Master. You can set their role
+              here once they sign up.
             </p>
           </Panel>
         )}
@@ -191,10 +188,8 @@ export default async function RolesPermissions() {
             </table>
           </div>
           <p className="border-t border-border px-4 py-3 text-xs text-text-muted">
-            Hierarchy: SUPER_ADMIN &gt; HR &gt; MANAGER &gt; EMPLOYEE — each
-            level can also open the portals below it. Enforced in middleware
-            and in every API route; this table is documentation, not the
-            enforcement.
+            Higher roles can also open lower portals: Super Admin &gt; HR &gt;
+            Manager &gt; Employee.
           </p>
         </Panel>
       </div>

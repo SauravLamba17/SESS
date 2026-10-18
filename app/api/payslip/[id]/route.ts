@@ -71,7 +71,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     if (row.status !== "FINALIZED")
       return fail(
         "NOT_FINALIZED",
-        "This payslip is not finalized yet. Payslips become available once a Super Admin finalizes the payroll run.",
+        "This payslip is not finalised yet. Payslips become available once a Super Admin finalises the payroll run.",
         409,
       );
 

@@ -39,7 +39,7 @@ export default async function RequisitionsPage() {
     <>
       <PageHeader
         title="Job Requisitions"
-        description="Open roles are published on the public career page. Closing a requisition removes it from that page and rejects further applications."
+        description="Open roles appear on the careers page. Closing a role removes it and stops new applications."
         action={
           <Link
             href="/careers"

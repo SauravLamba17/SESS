@@ -81,10 +81,7 @@ export default async function PulsePage() {
           <div className="text-xs text-text-muted">
             <p className="text-text">How anonymity works here</p>
             <p className="mt-1">
-              Your rating is stored in a table that has no employee field at
-              all. A separate record notes only <em>that</em> you responded, so
-              you aren’t asked twice — it never stores what you said. The
-              two are never joined, anywhere. HR sees averages and counts only,
+              Your answer is saved without your name. HR sees averages only,
               never individual answers.
             </p>
           </div>

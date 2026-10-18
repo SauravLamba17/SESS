@@ -71,7 +71,7 @@ export default async function HolidaysPage() {
     <>
       <PageHeader
         title="Holiday Calendar"
-        description="Holidays drive the celebratory banner across every portal. One row per actual date — no recurrence rules, because festival dates move each year."
+        description="Holidays show a banner in every portal. Add each date separately, as festival dates change yearly."
       />
 
       {error && (

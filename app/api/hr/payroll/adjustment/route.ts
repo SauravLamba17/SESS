@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
       return fail(
         "NOT_FINALIZED",
         original.adjustmentForPayrollId
-          ? `This adjustment is still ${original.status}. Finalize it before correcting it again — a draft correction cannot itself be corrected.`
+          ? `This adjustment is still ${original.status}. Finalise it before correcting it again — a draft correction cannot itself be corrected.`
           : `Only a FINALIZED payroll row can be adjusted. This row is ${original.status}; edit it directly instead.`,
         409,
       );
@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
     if (openAdjustment)
       return fail(
         "ADJUSTMENT_OPEN",
-        `An adjustment for this row already exists and is ${openAdjustment.status}. Finalize or resolve it before creating another.`,
+        `An adjustment for this row already exists and is ${openAdjustment.status}. Finalise or resolve it before creating another.`,
         409,
       );
 

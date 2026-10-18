@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     if (drafts === 0)
       return fail(
         "NO_DRAFTS",
-        `No DRAFT payroll rows for ${period} — the run is already submitted, finalized, or was never created.`,
+        `No DRAFT payroll rows for ${period} — the run is already submitted, finalised, or was never created.`,
         409,
       );
 

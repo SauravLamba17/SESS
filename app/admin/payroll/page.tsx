@@ -7,7 +7,7 @@ import { inr, periodLabel } from "@/lib/payroll/format";
 import { ErrorPanel } from "@/components/ui/notice";
 
 // Tab title for this route; the root layout appends " · SESS".
-export const metadata = { title: "Payroll Finalization" };
+export const metadata = { title: "Payroll Finalisation" };
 
 export const dynamic = "force-dynamic";
 
@@ -64,8 +64,8 @@ export default async function PayrollFinalizationPage() {
   return (
     <>
       <PageHeader
-        title="Payroll Finalization"
-        description="Runs submitted by HR and awaiting the permanent lock. Finalizing is irreversible — afterwards no code path can alter a figure, and corrections must be issued as separate adjustment records."
+        title="Payroll Finalisation"
+        description="Payroll submitted by HR for your approval. Finalised payroll can’t be undone."
       />
 
       {error && (
@@ -73,21 +73,20 @@ export default async function PayrollFinalizationPage() {
       )}
 
       <Panel className="mb-6">
-        <PanelHeader title={`Awaiting Finalization · ${submitted.length}`} />
+        <PanelHeader title={`Awaiting Finalisation · ${submitted.length}`} />
         {submitted.length === 0 ? (
           <div className="px-4 py-8 text-sm">
             <div className="flex items-center gap-2 text-text-muted">
-              <StatusDot state="good" /> Nothing awaiting finalization.
+              <StatusDot state="good" /> Nothing awaiting finalisation.
             </div>
             {/* An empty queue is ambiguous: it can mean "all done" or "HR
                 created drafts but never submitted them". Say which. */}
             {draftsWaiting > 0 && (
               <p className="mt-3 rounded border border-warn/40 bg-warn/10 px-3 py-2 text-xs text-warn">
-                Note: HR has {draftsWaiting} DRAFT payroll row
+                HR has {draftsWaiting} draft payroll row
                 {draftsWaiting === 1 ? "" : "s"} (
-                {draftPeriods.join(", ")}) that have not been submitted yet.
-                Draft rows never appear here — HR must run “Submit run for
-                approval” before you can finalize them.
+                {draftPeriods.join(", ")}) not yet submitted. They appear here once
+                HR submits them.
               </p>
             )}
           </div>
@@ -123,15 +122,14 @@ export default async function PayrollFinalizationPage() {
           </ul>
         )}
         <p className="border-t border-border px-4 py-3 text-xs text-text-muted">
-          Finalization is all-or-nothing: if any row changes state mid-transition
-          the whole run is rolled back rather than left half-finalized.
+          A run is finalised completely or not at all — never halfway.
         </p>
       </Panel>
 
       <Panel>
-        <PanelHeader title="Finalized Runs" />
+        <PanelHeader title="Finalised Runs" />
         {finalized.length === 0 ? (
-          <div className="px-4 py-8 text-sm text-text-muted">No finalized runs yet.</div>
+          <div className="px-4 py-8 text-sm text-text-muted">No finalised runs yet.</div>
         ) : (
           <ul className="divide-y divide-border">
             {finalized.map((r) => (

@@ -5,7 +5,7 @@ import { departmentSummary } from "@/lib/admin/organization";
 import { ErrorPanel } from "@/components/ui/notice";
 
 // Tab title for this route; the root layout appends " · SESS".
-export const metadata = { title: "Organization" };
+export const metadata = { title: "Organisation" };
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +39,7 @@ async function load() {
     return { summary, total: employees.length, error: null };
   } catch (err) {
     console.error("[admin/organization] failed:", err);
-    return { summary: [], total: 0, error: "Organization data is unavailable right now." };
+    return { summary: [], total: 0, error: "Organisation data is unavailable right now." };
   }
 }
 
@@ -49,7 +49,7 @@ export default async function OrganizationPage() {
   return (
     <>
       <PageHeader
-        title="Organization"
+        title="Organisation"
         description="Departments in use, headcount and manager oversight — derived from live employee records. Read-only."
       />
 
@@ -87,9 +87,8 @@ export default async function OrganizationPage() {
           </table>
         </div>
         <p className="border-t border-border px-4 py-3 text-xs text-text-muted">
-          Departments are free-text values on employee records (set at
-          onboarding). Renaming or merging a department would mean reassigning
-          every employee’s record — flagged as future work, not a quick edit.
+          Departments are set on each employee’s record. Renaming a department
+          isn’t available yet.
         </p>
       </Panel>
     </>

@@ -130,8 +130,8 @@ export default async function CandidateDetailPage({
                 <FileText size={15} /> Open resume (PDF)
               </a>
               <p className="mt-2 text-[11px] text-text-muted">
-                Read it yourself. SESS does not parse, extract or summarise
-                resumes — no automated screening is applied to any applicant.
+                Please read the resume yourself. SESS doesn’t scan or score
+                resumes.
               </p>
               <object
                 data={`/api/resume/${application.id}`}

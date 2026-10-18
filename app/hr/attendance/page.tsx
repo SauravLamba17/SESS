@@ -165,7 +165,7 @@ export default async function AttendanceOversight({
     <>
       <PageHeader
         title="Attendance Oversight"
-        description="Organisation-wide attendance for a date range, with exception handling and manual correction. Every correction is written to the audit log."
+        description="Attendance for everyone over a date range. Fix mistakes here; every correction is recorded."
       />
 
       {error && (
@@ -383,13 +383,8 @@ export default async function AttendanceOversight({
         )}
 
         <p className="border-t border-border px-4 py-3 text-xs text-text-muted">
-          A correction rewrites the stored clock times and recalculates lateness
-          from the employee’s shift. Both the old and new values are recorded
-          under{" "}
-          <span className="font-mono">ATTENDANCE_MANUALLY_CORRECTED</span> in the
-          audit log, with the reason given — the corrected row no longer holds
-          what it previously said, so that entry is the only surviving record of
-          the change.
+          A correction updates the clock times and lateness. The old and new
+          times are recorded.
         </p>
       </Panel>
     </>

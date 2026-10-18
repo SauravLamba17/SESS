@@ -41,9 +41,8 @@ export function SalaryAdvanceForm({
           {inr(paid.toFixed(2))} · ₹{inr(activeAdvance.monthlyDeduction)}/month
         </p>
         <p className="text-[11px] text-text-muted">
-          Recovered automatically on each payroll run, capped at the outstanding
-          balance. On offboarding the full remaining balance is settled at once.
-          A second advance can only be issued once this one closes.
+          Recovered from each payroll. Any balance is settled at offboarding. One
+          advance at a time.
         </p>
       </div>
     );

@@ -1,25 +1,34 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile, readFile, unlink } from "node:fs/promises";
-import path from "node:path";
 
 /**
- * Resume file storage.
+ * Resume file storage — a PRIVATE Supabase Storage bucket.
  *
- * Files are written to `.uploads/resumes/` at the project root — deliberately
- * OUTSIDE Next's `public/` directory. Anything under public/ is served
- * statically with no auth, which would put every applicant's CV (name, phone,
- * address, employment history) on the open internet behind a guessable URL.
- * Instead the stored key is opaque and the only way to read a file is through
+ * The old version wrote to `.uploads/resumes/` on local disk. Vercel functions
+ * have a read-only filesystem, so every career-page application failed with a
+ * 503 in production. Storage is now Supabase's REST API over plain fetch (no SDK).
+ *
+ * The bucket is private and only the server holds the service-role key, so
+ * there is no public URL to leak or guess. The only way to read a file is
  * app/api/resume/[applicationId]/route.ts, which checks role first.
  *
- * ponytail: local disk, single-instance. Fine at this scale and for dev, but
- * it does not survive a serverless deploy or horizontal scaling — swap the two
- * functions below for S3/R2/Supabase Storage when that day comes. Nothing else
- * in the codebase touches the filesystem, so the change is contained here.
+ * Config (server-only, never NEXT_PUBLIC_):
+ *   SUPABASE_URL               https://<project-ref>.supabase.co
+ *   SUPABASE_SERVICE_ROLE_KEY  the project's service_role key
+ *   RESUME_BUCKET              optional, defaults to "resumes"
  */
 
-const RESUME_DIR = path.join(process.cwd(), ".uploads", "resumes");
+function storageConfig() {
+  const url = process.env.SUPABASE_URL?.replace(/\/+$/, "");
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key)
+    throw new Error("Resume storage is not configured: set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.");
+  const bucket = process.env.RESUME_BUCKET || "resumes";
+  return { base: `${url}/storage/v1/object/${bucket}`, headers: { Authorization: `Bearer ${key}`, apikey: key } };
+}
+
+/** Keys are always our own `<uuid>.pdf`; anything else is never sent to storage. */
+const KEY_RE = /^[0-9a-f-]{36}\.pdf$/i;
 
 export const MAX_RESUME_BYTES = 5 * 1024 * 1024; // 5 MB
 export const ALLOWED_RESUME_MIME = "application/pdf";
@@ -70,43 +79,54 @@ export async function storeResume(file: File): Promise<StoreResult> {
 
   // Opaque, unguessable filename — the key is never the candidate's name.
   const key = `${randomUUID()}.pdf`;
-  await mkdir(RESUME_DIR, { recursive: true });
-  await writeFile(path.join(RESUME_DIR, key), bytes);
+  const { base, headers } = storageConfig();
+  const res = await fetch(`${base}/${key}`, {
+    method: "POST",
+    headers: { ...headers, "Content-Type": ALLOWED_RESUME_MIME, "x-upsert": "false" },
+    body: bytes,
+    cache: "no-store",
+  });
+  // Thrown, not returned: the caller's catch turns it into a 503 and logs it,
+  // and no Candidate row is written for a file that was never stored.
+  if (!res.ok) throw new Error(`Resume upload failed: ${res.status} ${(await res.text()).slice(0, 200)}`);
   return { ok: true, key };
 }
 
 /**
- * Read a stored resume by key.
+ * Read a stored resume by key. Null when the key is malformed or the object
+ * does not exist; any other storage failure throws (the route returns 503).
  *
- * The key is validated against a strict pattern before it touches the
- * filesystem — a key like `../../.env` must never resolve outside RESUME_DIR.
+ * The key is validated against a strict pattern before it reaches storage —
+ * a key like `../other-bucket/x` must never be requested.
  */
 export async function readResume(key: string): Promise<Buffer | null> {
-  if (!/^[0-9a-f-]{36}\.pdf$/i.test(key)) return null;
-  try {
-    return await readFile(path.join(RESUME_DIR, key));
-  } catch {
-    return null;
-  }
+  if (!KEY_RE.test(key)) return null;
+  const { base, headers } = storageConfig();
+  const res = await fetch(`${base}/${key}`, { headers, cache: "no-store" });
+  // Supabase answers a missing object with 400 or 404 depending on version.
+  if (res.status === 404 || res.status === 400) return null;
+  if (!res.ok) throw new Error(`Resume read failed: ${res.status}`);
+  return Buffer.from(await res.arrayBuffer());
 }
 
 /**
- * Delete a stored resume from disk.
+ * Delete a stored resume.
  *
  * Essential to the retention policy: the resume file has NO database relation,
  * so deleting the Candidate row would otherwise leave the applicant's CV — the
- * single most personal artefact they gave us — sitting on disk forever. That
- * would be erasure in name only.
+ * single most personal artefact they gave us — in storage forever. That would
+ * be erasure in name only.
  *
  * Returns true if a file was removed, false if there was nothing to remove
  * (already gone, or a malformed key). A missing file is not an error: the goal
  * is "this file no longer exists", and it already doesn't.
  */
 export async function deleteResume(key: string): Promise<boolean> {
-  if (!/^[0-9a-f-]{36}\.pdf$/i.test(key)) return false;
+  if (!KEY_RE.test(key)) return false;
   try {
-    await unlink(path.join(RESUME_DIR, key));
-    return true;
+    const { base, headers } = storageConfig();
+    const res = await fetch(`${base}/${key}`, { method: "DELETE", headers, cache: "no-store" });
+    return res.ok;
   } catch {
     return false;
   }

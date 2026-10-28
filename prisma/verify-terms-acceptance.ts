@@ -19,8 +19,6 @@
  * Run:  node --env-file=.env prisma/verify-terms-acceptance.ts
  */
 import { PrismaClient } from "@prisma/client";
-import { unlink } from "node:fs/promises";
-import path from "node:path";
 import { TERMS_VERSION } from "../lib/recruitment/terms.ts";
 
 // Literal rather than imported: lib/recruitment/rate-limit.ts pulls in
@@ -31,7 +29,21 @@ const CAREERS_APPLY_ACTION = "careers_apply";
 
 const db = new PrismaClient();
 const BASE = "http://127.0.0.1:3005";
-const RESUME_DIR = path.join(process.cwd(), ".uploads", "resumes");
+
+/**
+ * Same REST call as lib/recruitment/storage.ts deleteResume — inlined because
+ * that module is "server-only" and cannot be imported under plain Node.
+ */
+async function deleteStoredResume(key: string) {
+  const url = process.env.SUPABASE_URL?.replace(/\/+$/, "");
+  const sk = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !sk) return;
+  const bucket = process.env.RESUME_BUCKET || "resumes";
+  await fetch(`${url}/storage/v1/object/${bucket}/${key}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${sk}`, apikey: sk },
+  }).catch(() => {});
+}
 
 const TAG = "ZZ-TERMS-TEST";
 const E_OK = "zz-terms-ok@example.invalid";
@@ -77,7 +89,7 @@ async function cleanup() {
   });
   for (const c of cands) {
     if (/^[0-9a-f-]{36}\.pdf$/i.test(c.resumeUrl)) {
-      await unlink(path.join(RESUME_DIR, c.resumeUrl)).catch(() => {});
+      await deleteStoredResume(c.resumeUrl);
     }
   }
   const ids = cands.map((c) => c.id);

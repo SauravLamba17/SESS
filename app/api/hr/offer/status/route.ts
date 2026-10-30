@@ -81,6 +81,7 @@ export async function POST(req: NextRequest) {
           select: {
             id: true,
             stage: true,
+            jobRequisitionId: true,
             candidate: { select: { id: true, name: true, email: true } },
           },
         },
@@ -238,6 +239,18 @@ export async function POST(req: NextRequest) {
       await tx.auditLog.create({
         data: { actorUserId: userId, action: "OFFER_ACCEPTED", targetEntity: id },
       });
+
+      // 5. The last opening is filled → close the role, so it leaves the
+      // careers page. Counted inside the transaction, after this hire.
+      const reqId = offer.application.jobRequisitionId;
+      const req = await tx.jobRequisition.findUnique({ where: { id: reqId }, select: { openings: true, status: true } });
+      const hired = await tx.application.count({ where: { jobRequisitionId: reqId, stage: "HIRED" } });
+      if (req && req.status !== "CLOSED" && hired >= req.openings) {
+        await tx.jobRequisition.update({ where: { id: reqId }, data: { status: "CLOSED", closedAt: new Date() } });
+        await tx.auditLog.create({
+          data: { actorUserId: userId, action: "REQUISITION_CLOSED", targetEntity: `${reqId} (all ${req.openings} opening(s) filled)` },
+        });
+      }
       await notifyHr(
         tx,
         "OFFER_ACCEPTED",

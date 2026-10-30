@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/time-display";
 import { Panel, PanelHeader, StatCard } from "@/components/ui/panel";
 import { StatusDot, StatusLabel, type StatusState } from "@/components/ui/status-dot";
 import { fmtTime, type OwnAttendance } from "@/lib/attendance/own-summary";
@@ -78,7 +79,7 @@ export function WeekAttendancePanel({
             weekStart.getDate() + i,
           );
           const rec = weekByDate.get(ymd(d));
-          const label = d.toLocaleDateString([], { weekday: "short", day: "2-digit" });
+          const label = formatDate(d, { weekday: "short", day: "2-digit" });
           const isToday = d.getTime() === nowDay.getTime();
           const isFuture = d.getTime() > nowDay.getTime();
           let s: StatusState = "idle";

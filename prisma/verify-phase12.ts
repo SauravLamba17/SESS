@@ -21,9 +21,10 @@
  * Creates its own throwaway data and deletes everything, pass or fail.
  *
  * Run:  node --env-file=.env prisma/verify-phase12.ts
+ *       node prisma/verify-phase12.ts --pure   (DB-free production-target checks only)
  */
 import { PrismaClient } from "@prisma/client";
-import { parseRange, weekdaysInRange, monthsInRange } from "../lib/reports/range.ts";
+import { parseRange, weekdaysInRange, monthsInRange, wholeMonthPeriods } from "../lib/reports/range.ts";
 import type { ReportEmployee } from "../lib/reports/types.ts";
 import { computeHeadcount, headcountOn } from "../lib/reports/headcount.ts";
 import {
@@ -42,6 +43,7 @@ import { computeWarningLetters } from "../lib/reports/warning-letters.ts";
 import { computeBoardSummary } from "../lib/reports/board-summary.ts";
 import { REPORTS, scopeFor, reportsForRole } from "../lib/reports/registry.ts";
 import { formatScoreOutOfFive } from "../lib/appraisal/display.ts";
+import { inr } from "../lib/payroll/format.ts";
 
 const db = new PrismaClient();
 
@@ -74,6 +76,7 @@ async function cleanup() {
   const ids = emps.map((e) => e.id);
   await db.attendance.deleteMany({ where: { employeeId: { in: ids } } });
   await db.production.deleteMany({ where: { employeeId: { in: ids } } });
+  await db.monthlyTarget.deleteMany({ where: { employeeId: { in: ids } } });
   await db.idleLog.deleteMany({ where: { employeeId: { in: ids } } });
   await db.warningLetter.deleteMany({ where: { employeeId: { in: ids } } });
   await db.appraisalScore.deleteMany({ where: { employeeId: { in: ids } } });
@@ -111,7 +114,49 @@ function at(y: number, m: number, d: number, hh: number, mm: number): Date {
   return new Date(y, m - 1, d, hh, mm, 0, 0);
 }
 
+/**
+ * DB-free: the Production vs Target report takes its target from MonthlyTarget
+ * with the appraisal whole-month rule. Runs with --pure, and as part of main().
+ */
+function pureProductionChecks() {
+  step("4p", "Production target rule (DB-free)");
+  const emps: ReportEmployee[] = [
+    { id: "o", name: "One", employeeCode: "T-1", department: "QA", joiningDate: new Date(2026, 9, 1), offboardedAt: null, active: true },
+    { id: "n", name: "NoTarget", employeeCode: "T-2", department: "QA", joiningDate: new Date(2026, 9, 1), offboardedAt: null, active: true },
+  ];
+  const oct = parseRange("2026-10-01", "2026-10-31");
+  const part = parseRange("2026-10-01", "2026-10-27");
+  const q = parseRange("2026-07-01", "2026-09-30");
+  if (!oct.ok || !part.ok || !q.ok) throw new Error("range parse failed");
+  eq("Oct 1–31 → whole month", wholeMonthPeriods(oct.range), ["2026-10"]);
+  eq("Jul 1–Sep 30 → three whole months", wholeMonthPeriods(q.range), ["2026-07", "2026-08", "2026-09"]);
+  eq("Oct 1–27 → partial month (null)", wholeMonthPeriods(part.range), null);
+
+  // One's live October: entries 42 (18 Oct) + 10 (27 Oct); the 55 target was
+  // set AFTER the 18 Oct entry. Rows carry no target at all.
+  const rows = [
+    { employeeId: "o", unitsProduced: 42 },
+    { employeeId: "o", unitsProduced: 10 },
+  ];
+  const r = computeProduction(rows, emps, [{ employeeId: "o", targetUnits: 55 }]);
+  const one = r.byEmployee.find((e) => e.employeeId === "o")!;
+  eq("target set after the entry still applies: 52 of 55", [one.actual, one.target], [52, 55]);
+  eq("achievement 52/55 = 94.5%", one.achievementPct, 94.5);
+  eq("variance −3", one.variance, -3);
+  const none = r.byEmployee.find((e) => e.employeeId === "n")!;
+  eq("no target set → target 0, achievement null (not 0%)", [none.target, none.achievementPct], [0, null]);
+  eq("met/below count only employees with a target", [r.metTargetCount, r.belowTargetCount], [0, 1]);
+
+  const p = computeProduction(rows, emps, null);
+  eq("partial month → targetsApply false", p.targetsApply, false);
+  eq("partial month → every target N/A (null), never 0",
+    [p.totalTarget, p.achievementPct, p.variance, p.byEmployee[0].target, p.byDepartment[0].target],
+    [null, null, null, null, null]);
+  eq("partial month → actual still reported", p.totalActual, 52);
+}
+
 async function main() {
+  pureProductionChecks();
   await cleanup();
 
   // ══ THE SEED — every number below is hand-derivable from this ══
@@ -280,21 +325,34 @@ async function main() {
 
   // ── 4: PRODUCTION ───────────────────────────────────────────────
   step("4", "Production vs Target");
-  // A: 100/80 and 60/80  → 160 actual / 160 target → 100%
-  // B: 30/50             → 30 / 50 → 60%
-  // Org: 190 / 210
+  // A: 100 + 60 = 160 actual, June target 160 → 100%
+  // B: 30 actual, June target 50 → 60%
+  // Org: 190 / 210. The legacy per-row targetUnits stays 0, as the app writes it.
   await db.production.createMany({
     data: [
-      { employeeId: A.id, date: day(2026, 6, 1), unitsProduced: 100, targetUnits: 80 },
-      { employeeId: A.id, date: day(2026, 6, 2), unitsProduced: 60, targetUnits: 80 },
-      { employeeId: B.id, date: day(2026, 6, 11), unitsProduced: 30, targetUnits: 50 },
+      { employeeId: A.id, date: day(2026, 6, 1), unitsProduced: 100, targetUnits: 0 },
+      { employeeId: A.id, date: day(2026, 6, 2), unitsProduced: 60, targetUnits: 0 },
+      { employeeId: B.id, date: day(2026, 6, 11), unitsProduced: 30, targetUnits: 0 },
     ],
   });
-  const prodRows = await db.production.findMany({
-    where: { employeeId: { in: employees.map((e) => e.id) }, date: { gte: range.start, lt: range.endExclusive } },
-    select: { employeeId: true, unitsProduced: true, targetUnits: true },
+  await db.monthlyTarget.createMany({
+    data: [
+      { employeeId: A.id, period: "2026-06", targetUnits: 160, setBy: ACTOR },
+      { employeeId: B.id, period: "2026-06", targetUnits: 50, setBy: ACTOR },
+    ],
   });
-  const production = computeProduction(prodRows, employees);
+  const prodIds = employees.map((e) => e.id);
+  const prodMonths = wholeMonthPeriods(range);
+  eq("June range is whole months", prodMonths, ["2026-06"]);
+  const prodRows = await db.production.findMany({
+    where: { employeeId: { in: prodIds }, date: { gte: range.start, lt: range.endExclusive } },
+    select: { employeeId: true, unitsProduced: true },
+  });
+  const prodTargets = await db.monthlyTarget.findMany({
+    where: { employeeId: { in: prodIds }, period: { in: prodMonths ?? [] } },
+    select: { employeeId: true, targetUnits: true },
+  });
+  const production = computeProduction(prodRows, employees, prodTargets);
   eq("total actual", production.totalActual, 190);
   eq("total target", production.totalTarget, 210);
   eq("achievement % (190/210)", production.achievementPct, 90.5);
@@ -614,7 +672,7 @@ async function main() {
     formatScoreOutOfFive(appraisal.average),
   );
   eq("the sub-result itself is still raw 0-100", board.appraisal.average, appraisal.average);
-  eq("headline payroll matches report", headline("Payroll cost to company"), `INR ${payroll.totalCostToCompany}`);
+  eq("headline payroll matches report", headline("Payroll cost to company"), `INR ${inr(payroll.totalCostToCompany)}`);
   eq("headline hired matches report", headline("Candidates hired"), String(funnel.hiredCount));
   check(
     "every headline names the report it came from",
@@ -696,13 +754,19 @@ async function main() {
   if (fail > 0) process.exitCode = 1;
 }
 
-main()
-  .catch((err) => {
-    console.error("VERIFY SCRIPT CRASHED:", err);
-    process.exitCode = 1;
-  })
-  .finally(async () => {
-    await cleanup();
-    await db.$disconnect();
-    console.log("cleanup complete");
-  });
+if (process.argv.includes("--pure")) {
+  pureProductionChecks();
+  console.log(`\n══ PURE RESULT: ${pass} passed, ${fail} failed ══`);
+  if (fail > 0) process.exitCode = 1;
+} else {
+  main()
+    .catch((err) => {
+      console.error("VERIFY SCRIPT CRASHED:", err);
+      process.exitCode = 1;
+    })
+    .finally(async () => {
+      await cleanup();
+      await db.$disconnect();
+      console.log("cleanup complete");
+    });
+}

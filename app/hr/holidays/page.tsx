@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/time-display";
 import { PageHeader } from "@/components/portal/portal-shell";
 import { Panel, PanelHeader } from "@/components/ui/panel";
 import { StatusDot } from "@/components/ui/status-dot";
@@ -54,12 +55,7 @@ export default async function HolidaysPage() {
         </span>
         <span className="inline-flex items-center gap-2">
           <span className="font-mono text-xs text-text-muted">
-            {h.date.toLocaleDateString([], {
-              weekday: "short",
-              day: "2-digit",
-              month: "short",
-              year: "numeric",
-            })}
+            {formatDate(h.date, { weekday: "short", day: "2-digit", month: "short", year: "numeric" })}
           </span>
           <RemoveHolidayButton id={h.id} name={h.name} />
         </span>

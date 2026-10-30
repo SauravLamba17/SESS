@@ -4,6 +4,8 @@ import { Panel, PanelHeader } from "@/components/ui/panel";
 import { PrintButton } from "@/components/ui/print-button";
 import { db } from "@/lib/db";
 import { ErrorPanel } from "@/components/ui/notice";
+import { namesForClerkIds } from "@/lib/data/names";
+import { ORG_TIME_ZONE } from "@/lib/time-display";
 import {
   buildAuditQuery,
   totalPages,
@@ -24,8 +26,13 @@ export const dynamic = "force-dynamic";
  * an audit trail may never do.
  */
 
+/** "2026-10-28 06:52:47" in IST — the time people in the office read. */
 function fmt(d: Date): string {
-  return d.toISOString().replace("T", " ").slice(0, 19);
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: ORG_TIME_ZONE,
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+  }).format(d);
 }
 
 async function load(sp: Record<string, string | undefined>) {
@@ -71,7 +78,8 @@ async function load(sp: Record<string, string | undefined>) {
         orderBy: { action: "asc" },
       }),
     ]);
-    return { rows, total, actions: actions.map((a) => a.action), q, error: null };
+    const actorNames = await namesForClerkIds(rows.map((r) => r.actorUserId));
+    return { rows, total, actions: actions.map((a) => a.action), q, error: null, actorNames };
   } catch (err) {
     console.error("[admin/audit-log] failed:", err);
     return {
@@ -89,7 +97,7 @@ export default async function AuditLogPage({
 }: {
   searchParams: Record<string, string | undefined>;
 }) {
-  const { rows, total, actions, q, error } = await load(searchParams);
+  const { rows, total, actions, q, error, actorNames } = await load(searchParams);
   const pages = totalPages(total, q.pageSize);
   const first = total === 0 ? 0 : q.skip + 1;
   const last = Math.min(q.skip + q.pageSize, total);
@@ -166,7 +174,7 @@ export default async function AuditLogPage({
 
       <Panel className="print-area">
         <PanelHeader
-          title={`Entries · ${total.toLocaleString()}`}
+          title={`Entries · ${total.toLocaleString("en-IN")}`}
           action={
             <span className="font-mono text-xs text-text-muted">
               {total === 0 ? "no matches" : `showing ${first}–${last}`}
@@ -182,7 +190,7 @@ export default async function AuditLogPage({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-text-muted">
-                  <th className="px-4 py-3 font-medium">Timestamp (UTC)</th>
+                  <th className="px-4 py-3 font-medium">Time (IST)</th>
                   <th className="px-4 py-3 font-medium">Action</th>
                   <th className="px-4 py-3 font-medium">Actor</th>
                   <th className="px-4 py-3 font-medium">Target</th>
@@ -199,8 +207,8 @@ export default async function AuditLogPage({
                         {r.action}
                       </span>
                     </td>
-                    <td className="px-4 py-2.5 font-mono text-xs text-text-muted">
-                      {r.actorUserId}
+                    <td className="px-4 py-2.5 text-xs text-text-muted" title={r.actorUserId}>
+                      {actorNames?.get(r.actorUserId) ?? r.actorUserId}
                     </td>
                     <td className="max-w-md truncate px-4 py-2.5 font-mono text-xs text-text-muted">
                       {r.targetEntity}

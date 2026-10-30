@@ -1,5 +1,6 @@
 "use client";
 
+import { formatStamp } from "@/lib/time-display";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, Copy, KeyRound, Loader2, RefreshCw, ShieldOff } from "lucide-react";
@@ -75,7 +76,7 @@ export function AgentTokenManager({
       {!consentActive && (
         <div className="flex items-start gap-1.5 text-[11px] text-warn">
           <AlertTriangle size={12} className="mt-0.5 shrink-0" />
-          <span>{consentHint ?? "Record IDLE_TRACKING consent above before issuing a token."}</span>
+          <span>{consentHint ?? "Record idle-tracking consent above before setting up the desktop agent."}</span>
         </div>
       )}
 
@@ -98,7 +99,7 @@ export function AgentTokenManager({
           <p className="font-mono text-[11px] text-text-muted">
             Token active
             {lastSeenAt
-              ? ` · last seen ${new Date(lastSeenAt).toLocaleString()}`
+              ? ` · last seen ${formatStamp(lastSeenAt)}`
               : " · never reported"}
           </p>
           <div className="flex flex-wrap items-center gap-2">

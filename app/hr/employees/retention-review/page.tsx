@@ -10,6 +10,7 @@ import {
   RETENTION_YEARS,
   REDACTED_FIELDS,
   PRESERVED_FIELDS,
+  fieldLabels,
 } from "@/lib/employees/retention";
 import { ymd as localYmd } from "@/lib/reports/range";
 
@@ -144,8 +145,8 @@ export default async function EmployeeRetentionReview({
         <div className="mt-2 grid grid-cols-1 gap-3 text-xs sm:grid-cols-2">
           <div className="rounded border border-danger/30 bg-danger/5 p-3">
             <p className="font-medium text-danger">Erased on redaction</p>
-            <p className="mt-1 font-mono text-[11px] text-text-muted">
-              {REDACTED_FIELDS.join(", ")}
+            <p className="mt-1 text-[11px] text-text-muted">
+              {fieldLabels(REDACTED_FIELDS).join(", ")}
             </p>
             <p className="mt-1.5 text-[11px] text-text-muted">
               Personal details no longer needed, including the emergency
@@ -154,8 +155,8 @@ export default async function EmployeeRetentionReview({
           </div>
           <div className="rounded border border-good/30 bg-good/5 p-3">
             <p className="font-medium text-good">Kept permanently</p>
-            <p className="mt-1 font-mono text-[11px] text-text-muted">
-              {PRESERVED_FIELDS.join(", ")}
+            <p className="mt-1 text-[11px] text-text-muted">
+              {fieldLabels(PRESERVED_FIELDS).join(", ")}
             </p>
             <p className="mt-1.5 text-[11px] text-text-muted">
               Plus all payroll, attendance, appraisal, warning, expense and
@@ -241,8 +242,8 @@ export default async function EmployeeRetentionReview({
                     <EmployeeRetentionActions
                       employeeId={e.id}
                       name={e.name}
-                      redactedFields={REDACTED_FIELDS}
-                      preservedFields={PRESERVED_FIELDS}
+                      redactedFields={fieldLabels(REDACTED_FIELDS)}
+                      preservedFields={fieldLabels(PRESERVED_FIELDS)}
                     />
                   </div>
                 </div>

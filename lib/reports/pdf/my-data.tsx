@@ -1,4 +1,4 @@
-import { ReportDocument, SummaryStats, DataTable, Note, fmtNum, type ReportMeta } from "../pdf-layout.tsx";
+import { ReportDocument, SummaryStats, DataTable, Note, fmtNum, fmtPct, type ReportMeta } from "../pdf-layout.tsx";
 import type { MyDataResult } from "../my-data.ts";
 import { ymd } from "../range.ts";
 import { inr } from "../../payroll/format.ts";
@@ -23,7 +23,17 @@ export function MyDataPdf({ r, meta }: { r: MyDataResult; meta: ReportMeta }) {
       <SummaryStats
         stats={[
           { label: "Attendance days", value: r.attendanceSummary.days, hint: `${r.attendanceSummary.late} late` },
-          { label: "Production days", value: r.productionSummary.days },
+          {
+            label: "Production",
+            value: `${r.productionSummary.actual} units`,
+            // Monthly target over whole months only; N/A for a partial-month range.
+            hint:
+              r.productionSummary.target === null
+                ? "target N/A for this period"
+                : r.productionSummary.target === 0
+                  ? "no target set"
+                  : `of ${r.productionSummary.target} target (${fmtPct(r.productionSummary.achievementPct)})`,
+          },
           { label: "Quality reviews", value: r.qualitySummary.reviews, hint: `avg ${fmtNum(r.qualitySummary.averageScore)}` },
           { label: "Appraisals", value: r.appraisals.length, hint: "published only" },
           { label: "Warnings", value: r.warnings.length, hint: "released only" },
@@ -81,9 +91,8 @@ export function MyDataPdf({ r, meta }: { r: MyDataResult; meta: ReportMeta }) {
         rows={r.production}
         maxRows={60}
         columns={[
-          { label: "Date", width: "34%", value: (x) => ymd(x.date) },
-          { label: "Units produced", width: "33%", align: "right", value: (x) => String(x.unitsProduced) },
-          { label: "Target", width: "33%", align: "right", value: (x) => String(x.targetUnits) },
+          { label: "Date", width: "50%", value: (x) => ymd(x.date) },
+          { label: "Units produced", width: "50%", align: "right", value: (x) => String(x.unitsProduced) },
         ]}
       />
 

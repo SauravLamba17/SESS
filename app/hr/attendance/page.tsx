@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { readableReviewReason } from "@/lib/attendance/validation";
 import { PageHeader } from "@/components/portal/portal-shell";
 import { Panel, PanelHeader, StatCard } from "@/components/ui/panel";
 import { StatusDot, type StatusState } from "@/components/ui/status-dot";
@@ -331,7 +332,7 @@ export default async function AttendanceOversight({
                         </span>
                         {r.flaggedForReview && r.reviewReason && (
                           <div className="mt-0.5 max-w-[18rem] text-[10px] text-danger">
-                            {r.reviewReason}
+                            {readableReviewReason(r.reviewReason)}
                           </div>
                         )}
                         {/* Same placement and size as the reason above, but

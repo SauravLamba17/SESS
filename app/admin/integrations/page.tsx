@@ -54,8 +54,8 @@ export default async function IntegrationsPage() {
       name: "Clerk — webhook (invitation → account link)",
       configured: Boolean(process.env.CLERK_WEBHOOK_SECRET),
       detail: process.env.CLERK_WEBHOOK_SECRET
-        ? "Signing secret set · endpoint /api/webhooks/clerk"
-        : "CLERK_WEBHOOK_SECRET not set — accepted invitations will not auto-link",
+        ? "Signing secret set · receiving account sign-ups"
+        : "Not set up — accepted invitations won’t link to employee records automatically",
     },
     {
       name: "Supabase / PostgreSQL",
@@ -64,7 +64,7 @@ export default async function IntegrationsPage() {
         const host = dbHost(process.env.DATABASE_URL);
         return host
           ? `Host ${host} · ${reachable ? "reachable" : "NOT reachable"}`
-          : "DATABASE_URL not configured";
+          : "Database connection not set up";
       })(),
     },
   ];

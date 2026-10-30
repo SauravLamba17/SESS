@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/time-display";
 import { PageHeader } from "@/components/portal/portal-shell";
 import { Panel, PanelHeader } from "@/components/ui/panel";
 import {
@@ -27,7 +28,7 @@ function relativeTime(d: Date, now: Date): string {
   if (hrs < 24) return `${hrs}h ago`;
   const days = Math.floor(hrs / 24);
   if (days < 7) return `${days}d ago`;
-  return d.toLocaleDateString([], { day: "numeric", month: "short", year: "numeric" });
+  return formatDate(d, { day: "numeric", month: "short", year: "numeric" });
 }
 
 async function load() {
@@ -48,7 +49,8 @@ async function load() {
         take: 100,
       }),
       db.employee.findMany({
-        where: { active: true },
+        // Already joined: a future joiner can't be thanked for anything yet.
+        where: { active: true, joiningDate: { lte: new Date() } },
         select: { id: true, name: true, department: true },
         orderBy: [{ department: "asc" }, { name: "asc" }],
       }),

@@ -146,8 +146,10 @@ export function AppraisalFormulaForm({ initial }: { initial: ResolvedFormula }) 
             {loading
               ? "loading…"
               : configured
-                ? `configured (${source})`
-                : "no formula configured yet"}
+                ? source === "department" && department
+                  ? "Set for this department"
+                  : "Using the company-wide weights"
+                : "No weights set yet"}
           </span>
         </span>
       </Panel>

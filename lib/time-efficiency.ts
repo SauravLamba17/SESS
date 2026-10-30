@@ -5,9 +5,15 @@
 // compute it for every row without an N+1 of per-row DB lookups.
 
 /**
+ * Shorter than this, a rate is noise: punches 14 seconds apart turned 42 units
+ * into "11013.18 units/hr". 15 minutes is well under any real shift.
+ */
+export const MIN_EFFICIENCY_HOURS = 0.25;
+
+/**
  * Units produced per hour worked for one employee-day.
  * Returns null when there is no usable attendance window (no check-in,
- * still clocked in, or a non-positive duration) — callers show "—", never 0.
+ * still clocked in, or under MIN_EFFICIENCY_HOURS) — callers show "—", never 0.
  */
 export function timeEfficiency(
   unitsProduced: number,
@@ -16,7 +22,7 @@ export function timeEfficiency(
 ): number | null {
   if (!checkIn || !checkOut) return null;
   const hours = (checkOut.getTime() - checkIn.getTime()) / 3_600_000;
-  if (hours <= 0) return null;
+  if (hours < MIN_EFFICIENCY_HOURS) return null;
   return unitsProduced / hours;
 }
 

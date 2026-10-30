@@ -5,6 +5,7 @@ import { lateMinutesForShift } from "@/lib/attendance/validation";
 import { fail } from "@/lib/api/response";
 import { ymd } from "@/lib/reports/range";
 import { onAttendanceCorrected } from "@/lib/invalidation/attendance";
+import { clockHHMM } from "@/lib/time-display";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -100,15 +101,18 @@ export async function POST(req: NextRequest) {
     if (!row) return fail("NOT_FOUND", "Attendance record not found", 404);
 
     // ── Build the new values ──
+    // The form always resends both pre-filled times. A time equal to the stored
+    // one (to the minute) is "unchanged": keep the original, seconds and all,
+    // instead of rewriting 18:53:06 as 18:53:00.
     let newCheckIn = row.checkIn;
-    if (checkInRaw) {
+    if (checkInRaw && checkInRaw !== clockHHMM(row.checkIn)) {
       const parsed = timeOnDay(row.date, checkInRaw);
       if (!parsed) return fail("BAD_INPUT", "checkIn must be HH:MM", 400);
       newCheckIn = parsed;
     }
 
     let newCheckOut = row.checkOut;
-    if (checkOutRaw) {
+    if (checkOutRaw && checkOutRaw !== clockHHMM(row.checkOut)) {
       const parsed = timeOnDay(row.date, checkOutRaw);
       if (!parsed) return fail("BAD_INPUT", "checkOut must be HH:MM", 400);
       newCheckOut = parsed;

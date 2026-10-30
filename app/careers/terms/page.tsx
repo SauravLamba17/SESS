@@ -8,7 +8,7 @@ import {
 } from "@/lib/recruitment/terms";
 
 export const metadata = {
-  title: "Terms & Conditions — SESS Careers",
+  title: "Careers Terms & Conditions",
   description:
     "What we collect from job applicants, why, how long we keep it, and how to have it deleted.",
 };

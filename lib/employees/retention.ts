@@ -128,6 +128,26 @@ export const PRESERVED_FIELDS = [
   "pfUan",
 ] as const;
 
+/** Plain-English names for the fields above, for everything HR reads. */
+const FIELD_LABEL: Record<string, string> = {
+  email: "email address",
+  emergencyContact: "emergency contact",
+  dateOfBirth: "date of birth",
+  pendingInvitationId: "unused login invitation",
+  name: "name",
+  employeeCode: "employee code",
+  department: "department",
+  designation: "designation",
+  joiningDate: "joining date",
+  offboardedAt: "exit date",
+  pfUan: "PF UAN",
+};
+
+/** ["emergencyContact", "pfUan"] → ["emergency contact", "PF UAN"]. */
+export function fieldLabels(fields: readonly string[]): string[] {
+  return fields.map((f) => FIELD_LABEL[f] ?? f);
+}
+
 export type RetentionEligibility =
   | { ok: true }
   | { ok: false; code: "NOT_OFFBOARDED" | "ALREADY_REDACTED" | "NOT_DUE"; message: string };

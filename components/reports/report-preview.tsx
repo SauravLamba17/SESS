@@ -44,7 +44,7 @@ function formatValue(v: unknown): string {
     if (!Number.isFinite(v)) return "—";
     // Keep decimals where the value genuinely has them (percentages, averages)
     // and group thousands where it does not (counts, rupees).
-    return Number.isInteger(v) ? v.toLocaleString() : v.toFixed(2);
+    return Number.isInteger(v) ? v.toLocaleString("en-IN") : v.toFixed(2);
   }
   if (typeof v === "string") return v === "" ? "—" : v;
   return JSON.stringify(v);

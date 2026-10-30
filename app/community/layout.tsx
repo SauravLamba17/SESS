@@ -1,5 +1,6 @@
 import { PortalShell } from "@/components/portal/portal-shell";
 import { getCurrentRole } from "@/lib/auth";
+import { OffboardedBanner } from "@/components/employee/offboarded-banner";
 import { PORTAL_FOR_ROLE } from "@/lib/auth-types";
 
 /**
@@ -12,6 +13,7 @@ export default async function CommunityLayout({ children }: { children: React.Re
   const portal = role ? PORTAL_FOR_ROLE[role] : "employee";
   return (
     <PortalShell portal={portal} role={role}>
+      <OffboardedBanner />
       {children}
     </PortalShell>
   );

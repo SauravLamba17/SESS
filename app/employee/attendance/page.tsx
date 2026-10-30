@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/time-display";
 import { getEffectiveUserId } from "@/lib/auth";
 import type { LeaveStatus } from "@prisma/client";
 import { PageHeader } from "@/components/portal/portal-shell";
@@ -22,11 +23,7 @@ const LEAVE_STATE: Record<LeaveStatus, StatusState> = {
 };
 
 function fmtDate(d: Date): string {
-  return d.toLocaleDateString([], {
-    year: "numeric",
-    month: "short",
-    day: "2-digit",
-  });
+  return formatDate(d);
 }
 
 async function loadOwnLeave() {

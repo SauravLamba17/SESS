@@ -77,7 +77,7 @@ export function ShiftActiveToggle({
         disabled={pending}
         title={
           active && assignedCount > 0
-            ? `Deactivating hides this shift from assignment; ${assignedCount} employee(s) keep it until reassigned. Shifts are never hard-deleted.`
+            ? `Deactivating hides this shift from assignment; ${assignedCount} employee(s) keep it until reassigned. Shifts can’t be deleted.`
             : ""
         }
         className="inline-flex items-center gap-1 rounded border border-border px-2.5 py-1 text-xs text-text-muted hover:text-text focus:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"

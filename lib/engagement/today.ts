@@ -59,7 +59,7 @@ export async function loadToday(now = new Date()): Promise<TodayData> {
                 WHERE l."employeeId" = e.id AND l.status = 'APPROVED'
                   AND l."startDate" < ${dayEnd} AND l."endDate" >= ${dayStart}) AS "onLeave"
       FROM "Employee" e
-      WHERE e.active
+      WHERE e.active AND e."joiningDate" <= now()
       ORDER BY e.department ASC, e.name ASC`,
 
     // GREEN TIER (SESS_Caching_Strategy.docx §2/§4) — holiday calendar, 6 hr,

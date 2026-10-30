@@ -48,7 +48,7 @@ export default async function HrIdleTrackingPage() {
     <>
       <PageHeader
         title="Idle Tracking"
-        description="Idle-vs-active minutes from company machines. Consent-gated: no active consent, no tracking."
+        description="Active and idle time from company computers. Tracking only runs with the employee’s consent."
         action={<PrintButton label="Print report" />}
       />
 
@@ -78,7 +78,7 @@ export default async function HrIdleTrackingPage() {
           label="Consented"
           value={`${consented.length} / ${rows.length}`}
           state={consented.length > 0 ? "good" : "idle"}
-          status="Active IDLE_TRACKING consent"
+          status="Active idle-tracking consent"
         />
         <StatCard
           label="Agents Issued"

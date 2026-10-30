@@ -1,4 +1,6 @@
+import { formatDate } from "@/lib/time-display";
 import { getEffectiveUserId } from "@/lib/auth";
+import { readableReviewReason } from "@/lib/attendance/validation";
 import { PageHeader } from "@/components/portal/portal-shell";
 import { Panel, PanelHeader } from "@/components/ui/panel";
 import { StatusDot } from "@/components/ui/status-dot";
@@ -16,7 +18,7 @@ export const metadata = { title: "Team Attendance" };
 export const dynamic = "force-dynamic";
 
 function fmtDate(d: Date): string {
-  return d.toLocaleDateString([], { month: "short", day: "2-digit" });
+  return formatDate(d, { month: "short", day: "2-digit" });
 }
 
 async function load() {
@@ -69,6 +71,9 @@ async function load() {
           lat: true,
           long: true,
           accuracy: true,
+          // The punch's own employee: the roster below holds ACTIVE reports
+          // only, so someone who has since left showed as "—".
+          employee: { select: { name: true, active: true } },
         },
         orderBy: { date: "desc" },
       }),
@@ -85,10 +90,6 @@ async function load() {
       lateByEmp.set(row.employeeId, arr);
     }
 
-    // Name lookup for the detail list, off the reports already fetched above —
-    // no extra query.
-    const nameById = new Map(reports.map((r) => [r.id, r.name]));
-
     return {
       manager,
       error: null,
@@ -97,7 +98,6 @@ async function load() {
       handled,
       lateByEmp,
       attnRows,
-      nameById,
     };
   } catch (err) {
     console.error("[manager/attendance] failed:", err);
@@ -250,7 +250,8 @@ export default async function TeamAttendancePage() {
                   <li key={i} className="flex flex-wrap items-start justify-between gap-2 px-4 py-2.5 text-sm">
                     <span className="min-w-0">
                       <span className="text-text">
-                        {data.nameById.get(a.employeeId) ?? "—"}
+                        {a.employee.name}
+                        {!a.employee.active && " (left)"}
                       </span>
                       <span className="ml-2 font-mono text-[11px] text-text-muted">
                         {fmtDate(a.date)}
@@ -258,7 +259,7 @@ export default async function TeamAttendancePage() {
                       {/* Reason keeps the danger colour it has on HR's page. */}
                       {a.flaggedForReview && a.reviewReason && (
                         <span className="mt-0.5 block max-w-[28rem] text-[10px] text-danger">
-                          {a.reviewReason}
+                          {readableReviewReason(a.reviewReason)}
                         </span>
                       )}
                       <PunchLocation

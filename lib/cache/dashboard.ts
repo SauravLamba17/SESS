@@ -121,7 +121,7 @@ export function getHrDashboardTotals(
         }[]
       >`
         SELECT
-          (SELECT count(*) FROM "Employee" WHERE active)::int AS "activeCount",
+          (SELECT count(*) FROM "Employee" WHERE active AND "joiningDate" <= now())::int AS "activeCount",
           (SELECT count(DISTINCT "employeeId") FROM "Attendance"
             WHERE date >= ${today} AND date < ${tomorrow})::int AS "presentCount",
           (SELECT count(*) FROM "Payroll" WHERE month = ${period} AND status = 'DRAFT')::int AS draft,

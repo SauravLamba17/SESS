@@ -207,11 +207,11 @@ export function validatePunch(input: PunchInput, modeOverride?: ValidationMode):
       .filter(Boolean);
 
     if (allowed.length === 0) {
-      failures.push("IP validation enabled but ALLOWED_IPS is not configured");
+      failures.push("Office network check is on, but no office network has been set up yet");
     } else if (!input.ip) {
-      failures.push("Request IP address could not be determined");
+      failures.push("Couldn't tell which network this punch came from");
     } else if (!allowed.includes(input.ip)) {
-      failures.push(`IP ${input.ip} is not in the allowlist`);
+      failures.push(`Punched from a network outside the office (${input.ip})`);
     }
   }
 
@@ -223,11 +223,9 @@ export function validatePunch(input: PunchInput, modeOverride?: ValidationMode):
     const radius = parseNumber(process.env.GEOFENCE_RADIUS_METERS);
 
     if (officeLat === null || officeLong === null || radius === null) {
-      failures.push(
-        "Geofence validation enabled but OFFICE_LAT/OFFICE_LONG/GEOFENCE_RADIUS_METERS are not fully configured",
-      );
+      failures.push("Office location check is on, but the office location hasn't been set up yet");
     } else if (input.lat === null || input.long === null) {
-      failures.push("Geolocation was not provided by the device");
+      failures.push("The device didn't share its location");
     } else {
       const dist = haversineMeters(
         input.lat,
@@ -237,7 +235,7 @@ export function validatePunch(input: PunchInput, modeOverride?: ValidationMode):
       );
       if (dist > radius) {
         failures.push(
-          `Outside geofence: ${Math.round(dist)}m from office (limit ${radius}m)`,
+          `Punched ${Math.round(dist)} m from the office (allowed: ${radius} m)`,
         );
       }
     }
@@ -321,4 +319,26 @@ export function isLateForShift(
   endTime?: string,
 ): boolean {
   return lateMinutesForShift(at, startTime, gracePeriodMinutes, endTime) !== null;
+}
+
+/**
+ * Wording the validation used before 2026-10-28, still stored on older rows,
+ * mapped to today's plain messages. Display-only: stored rows are not edited.
+ */
+const LEGACY_REASON: [RegExp, string][] = [
+  [/^IP validation enabled but ALLOWED_IPS is not configured$/, "Office network check is on, but no office network has been set up yet"],
+  [/^Geofence validation enabled but OFFICE_LAT\/OFFICE_LONG\/GEOFENCE_RADIUS_METERS are not fully configured$/, "Office location check is on, but the office location hasn't been set up yet"],
+  [/^Request IP address could not be determined$/, "Couldn't tell which network this punch came from"],
+  [/^IP (.+) is not in the allowlist$/, "Punched from a network outside the office ($1)"],
+  [/^Geolocation was not provided by the device$/, "The device didn't share its location"],
+  [/^Outside geofence: (\d+)m from office \(limit (.+)m\)$/, "Punched $1 m from the office (allowed: $2 m)"],
+];
+
+/** A stored reviewReason as people should read it: plain wording, each reason once. */
+export function readableReviewReason(stored: string): string {
+  const parts = stored.split("; ").map((p) => {
+    for (const [re, plain] of LEGACY_REASON) if (re.test(p)) return p.replace(re, plain);
+    return p;
+  });
+  return Array.from(new Set(parts)).join("; ");
 }

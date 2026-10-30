@@ -94,7 +94,8 @@ export default async function OnboardingPage() {
                   <div className="p-4">
                     <p className="mb-3 font-mono text-[11px] text-text-muted">
                       {e.department}
-                      {e.designation ? ` · ${e.designation}` : ""} · joined{" "}
+                      {e.designation ? ` · ${e.designation}` : ""} ·{" "}
+                      {e.joiningDate > new Date() ? "joins" : "joined"}{" "}
                       {ymd(e.joiningDate)}
                     </p>
                     <OnboardingChecklist

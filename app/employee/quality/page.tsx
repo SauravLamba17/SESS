@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { getEmployeeByClerkId } from "@/lib/data/scope";
 import { ErrorPanel, UnlinkedEmployeeNotice } from "@/components/ui/notice";
 import { ymd } from "@/lib/reports/range";
+import { namesForClerkIds } from "@/lib/data/names";
 
 // Tab title for this route; the root layout appends " · SESS".
 export const metadata = { title: "My Quality" };
@@ -29,7 +30,9 @@ async function load() {
       orderBy: { date: "desc" },
       take: 60,
     });
-    return { employee, error: null, reports };
+    // reviewedBy holds the reviewer's account id; show their name instead.
+    const reviewers = await namesForClerkIds(reports.map((r) => r.reviewedBy));
+    return { employee, error: null, reports, reviewers };
   } catch (err) {
     console.error("[employee/quality] failed:", err);
     return { employee: null, error: "Quality data is unavailable right now." };
@@ -92,8 +95,8 @@ export default async function MyQualityPage() {
                           </span>
                         </span>
                       </td>
-                      <td className="px-4 py-3 font-mono text-xs text-text-muted">
-                        {r.reviewedBy ?? "—"}
+                      <td className="px-4 py-3 text-xs text-text-muted">
+                        {(r.reviewedBy && data.reviewers.get(r.reviewedBy)) ?? "—"}
                       </td>
                     </tr>
                   ))}

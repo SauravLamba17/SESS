@@ -126,7 +126,7 @@ export function weekdaysInRange(range: DateRange): number {
 }
 
 /** Distinct "YYYY-MM" months the range touches, in order. */
-export function monthsInRange(range: DateRange): string[] {
+export function monthsInRange(range: Pick<DateRange, "start" | "endExclusive">): string[] {
   const out: string[] = [];
   const cur = new Date(range.start.getFullYear(), range.start.getMonth(), 1);
   while (cur < range.endExclusive) {
@@ -134,4 +134,14 @@ export function monthsInRange(range: DateRange): string[] {
     cur.setMonth(cur.getMonth() + 1);
   }
   return out;
+}
+
+/**
+ * The "YYYY-MM" months of a range that is exactly whole calendar months
+ * (starts on a 1st, ends on a last day), else null. The same whole-month rule
+ * appraisal cycles use for MonthlyTarget, so a report never pro-rates one.
+ */
+export function wholeMonthPeriods(range: Pick<DateRange, "start" | "endExclusive">): string[] | null {
+  if (range.start.getDate() !== 1 || range.endExclusive.getDate() !== 1) return null;
+  return monthsInRange(range);
 }

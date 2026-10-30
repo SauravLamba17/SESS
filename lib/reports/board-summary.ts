@@ -47,6 +47,7 @@ import {
   type RecruitmentFunnelResult,
 } from "./recruitment-funnel.ts";
 import { formatScoreOutOfFive } from "../appraisal/display.ts";
+import { inr } from "../payroll/format.ts";
 
 export interface BoardSummaryInput {
   employees: ReportEmployee[];
@@ -126,13 +127,13 @@ export function computeBoardSummary(
     },
     {
       label: "Payroll cost to company",
-      value: `INR ${payroll.totalCostToCompany}`,
-      source: "Payroll Cost Summary (FINALIZED only)",
+      value: `INR ${inr(payroll.totalCostToCompany)}`,
+      source: "Payroll Cost Summary (finalised payroll only)",
     },
     {
       label: "Payroll rows finalised",
       value: String(payroll.finalizedRowCount),
-      source: "Payroll Cost Summary (FINALIZED only)",
+      source: "Payroll Cost Summary (finalised payroll only)",
     },
     {
       label: "Applications received",

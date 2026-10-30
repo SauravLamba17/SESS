@@ -1,8 +1,12 @@
 import { ReportDocument, SummaryStats, DataTable, Note, fmtPct, type ReportMeta } from "../pdf-layout.tsx";
-import type { ProductionResult } from "../production.ts";
+import { PRODUCTION_TARGET_NA_NOTE, type ProductionResult } from "../production.ts";
 
-function signed(n: number): string {
-  return `${n >= 0 ? "+" : ""}${n}`;
+function signed(n: number | null): string {
+  return n === null ? "N/A" : `${n >= 0 ? "+" : ""}${n}`;
+}
+
+function target(n: number | null): string {
+  return n === null ? "N/A" : String(n);
 }
 
 export function ProductionPdf({ r, meta }: { r: ProductionResult; meta: ReportMeta }) {
@@ -11,7 +15,7 @@ export function ProductionPdf({ r, meta }: { r: ProductionResult; meta: ReportMe
       <SummaryStats
         stats={[
           { label: "Units produced", value: r.totalActual },
-          { label: "Target", value: r.totalTarget },
+          { label: "Target", value: target(r.totalTarget) },
           { label: "Achievement", value: fmtPct(r.achievementPct) },
           { label: "Variance", value: signed(r.variance) },
           {
@@ -29,7 +33,7 @@ export function ProductionPdf({ r, meta }: { r: ProductionResult; meta: ReportMe
           { label: "Department", width: "34%", value: (d) => d.department },
           { label: "Staff", width: "12%", align: "right", value: (d) => String(d.employees) },
           { label: "Actual", width: "16%", align: "right", value: (d) => String(d.actual) },
-          { label: "Target", width: "16%", align: "right", value: (d) => String(d.target) },
+          { label: "Target", width: "16%", align: "right", value: (d) => target(d.target) },
           {
             label: "Achieved",
             width: "12%",
@@ -50,7 +54,7 @@ export function ProductionPdf({ r, meta }: { r: ProductionResult; meta: ReportMe
           { label: "Dept", width: "18%", value: (e) => e.department },
           { label: "Days", width: "8%", align: "right", value: (e) => String(e.days) },
           { label: "Actual", width: "12%", align: "right", value: (e) => String(e.actual) },
-          { label: "Target", width: "12%", align: "right", value: (e) => String(e.target) },
+          { label: "Target", width: "12%", align: "right", value: (e) => target(e.target) },
           {
             label: "Achieved",
             width: "10%",
@@ -61,10 +65,9 @@ export function ProductionPdf({ r, meta }: { r: ProductionResult; meta: ReportMe
       />
 
       <Note>
-        Target is the figure recorded on each production entry, summed over the
-        period — not a monthly target pro-rated to the range. An employee with
-        no target recorded shows “—” and is excluded from the met/below
-        counts.
+        {r.targetsApply
+          ? "Target is each employee's monthly target for the months in this period. An employee with no target shows - and is left out of the met/below counts."
+          : PRODUCTION_TARGET_NA_NOTE}
       </Note>
     </ReportDocument>
   );

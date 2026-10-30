@@ -39,7 +39,7 @@ export function headcountOn(employees: ReportEmployee[], date: Date): number {
 }
 
 export interface HeadcountResult {
-  /** Currently-active employees (the `active` flag, not a date calculation). */
+  /** Employees on staff now: `active` and already joined (a future joiner is not counted yet). */
   totalActive: number;
   byDepartment: { department: string; count: number }[];
   departmentCount: number;
@@ -54,8 +54,9 @@ export interface HeadcountResult {
 export function computeHeadcount(
   employees: ReportEmployee[],
   range: DateRange,
+  now: Date = new Date(),
 ): HeadcountResult {
-  const active = employees.filter((e) => e.active);
+  const active = employees.filter((e) => e.active && e.joiningDate <= now);
 
   const counts = new Map<string, number>();
   for (const e of active) counts.set(e.department, (counts.get(e.department) ?? 0) + 1);

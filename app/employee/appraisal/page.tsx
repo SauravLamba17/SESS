@@ -140,8 +140,8 @@ export default async function MyAppraisalPage() {
                         <div className="flex items-center justify-between">
                           <span className="text-text-muted">
                             {label}{" "}
-                            <span className="font-mono text-xs">
-                              (w{d?.weight ?? 0})
+                            <span className="text-xs">
+                              ({d?.weight ?? 0}% of your score)
                             </span>
                           </span>
                           {d?.hasData ? (
@@ -178,17 +178,17 @@ export default async function MyAppraisalPage() {
                         points it read as "4.0/5" above and "−10" below, a
                         deduction twice the size of the maximum score. */}
                     <span className="text-text-muted">
-                      Warning penalty{" "}
-                      <span className="font-mono text-xs">
-                        ({cs.warningPenalty?.releasedWarnings ?? 0} ×{" "}
-                        {(
-                          (cs.warningPenalty?.pointsEach ?? 0) / SCALE_DIVISOR
-                        ).toFixed(2)}
-                        )
+                      Warning letters{" "}
+                      <span className="text-xs">
+                        {(cs.warningPenalty?.releasedWarnings ?? 0) === 0
+                          ? "(none)"
+                          : `(${cs.warningPenalty?.releasedWarnings} on record)`}
                       </span>
                     </span>
-                    <span className="font-mono text-danger">
-                      −{((cs.warningPenalty?.total ?? 0) / SCALE_DIVISOR).toFixed(1)}
+                    <span className={`font-mono ${(cs.warningPenalty?.total ?? 0) > 0 ? "text-danger" : "text-text-muted"}`}>
+                      {(cs.warningPenalty?.total ?? 0) > 0
+                        ? `−${((cs.warningPenalty?.total ?? 0) / SCALE_DIVISOR).toFixed(1)}`
+                        : "no deduction"}
                     </span>
                   </div>
                 </div>

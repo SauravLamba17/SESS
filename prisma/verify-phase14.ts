@@ -23,6 +23,7 @@ import {
   NO_DATA,
 } from "../lib/appraisal/display.ts";
 import { resolveTheme, isThemeMode, THEME_MODES, THEME_INIT_SCRIPT } from "../lib/theme.ts";
+import { publishBlockers, canPublishCycle } from "../lib/appraisal/publish-rule.ts";
 
 let pass = 0;
 let fail = 0;
@@ -229,6 +230,32 @@ check(
   "compute.ts still clamps to 0-100, not 0-5",
   src.toString().includes("clamp(") && src.toString().includes("100"),
 );
+
+// ── 9: appraisal publish rule — the page and the API use the SAME function ──
+// Bug: the page counted excluded employees as incomplete, so Publish stayed
+// disabled after Exclude while the API would have accepted the publish.
+step("9", "Publish rule shared by page and API");
+const st = (employeeId: string, finalScore: number | null, excluded = false) => ({ employeeId, finalScore, excluded });
+eq("unscored, not excluded → blocks", publishBlockers(["a", "b"], [st("a", 88), st("b", null)]), ["b"]);
+eq("unscored but excluded → does not block", publishBlockers(["a", "b"], [st("a", 88), st("b", null, true)]), []);
+eq("no score row at all → blocks", publishBlockers(["a", "b"], [st("a", 88)]), ["b"]);
+eq("exclude → publishable", canPublishCycle(["a", "b"], [st("a", 88), st("b", null, true)]), true);
+eq("include back → not publishable", canPublishCycle(["a", "b"], [st("a", 88), st("b", null, false)]), false);
+eq("empty department → never publishable", canPublishCycle([], []), false);
+
+const root = path.join(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1")), "..");
+const read = (rel: string) => fs.readFileSync(path.join(root, rel), "utf8");
+const publishSrc = read("app/api/hr/appraisal/publish/route.ts");
+const pageSrc = read("components/hr/cycle-actions.tsx");
+const computeSrc = read("app/api/hr/appraisal/compute/route.ts");
+check("publish API imports the shared rule", publishSrc.includes('from "@/lib/appraisal/publish-rule"') && publishSrc.includes("publishBlockers("));
+check("publish API has no private copy of the rule", !publishSrc.includes("row.finalScore === null && !row.excluded"));
+check("HR page enables Publish with the shared rule", pageSrc.includes('from "@/lib/appraisal/publish-rule"') && pageSrc.includes("canPublishCycle("));
+check("HR page no longer uses 'incomplete.length === 0' to enable Publish", !pageSrc.includes("incomplete.length === 0 && summary.total"));
+check("compute reports excluded people separately", computeSrc.includes("excluded: people.filter((p) => p.excluded)"));
+check("page offers Include for excluded people", pageSrc.includes("setExcluded(e.employeeId, false)"));
+check("page restores the lists after a reload (GET status)", pageSrc.includes("/api/hr/appraisal/compute?cycleId=") && computeSrc.includes("export async function GET"));
+check("page refreshes the score count after compute", pageSrc.includes("router.refresh(); // the cycle card"));
 
 console.log(`\n══ RESULT: ${pass} passed, ${fail} failed ══`);
 if (fail > 0) process.exitCode = 1;

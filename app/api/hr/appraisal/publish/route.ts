@@ -6,6 +6,7 @@ import { getActiveEmployees } from "@/lib/data/scope";
 import { notifyEmployees } from "@/lib/notify";
 import { fail } from "@/lib/api/response";
 import { onAppraisalChanged } from "@/lib/invalidation/employee";
+import { publishBlockers } from "@/lib/appraisal/publish-rule";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,15 +39,15 @@ export async function POST(req: NextRequest) {
         select: { employeeId: true, finalScore: true, excluded: true },
       }),
     ]);
-    const byEmp = new Map(scores.map((s) => [s.employeeId, s]));
-
-    // Every in-scope employee must be COMPLETE (finalScore set) or excluded.
+    // Every in-scope employee must be COMPLETE (finalScore set) or excluded —
+    // the same rule the HR page uses to enable Publish (lib/appraisal/publish-rule).
+    const blockingIds = new Set(publishBlockers(employees.map((e) => e.id), scores));
     const blocking = employees
-      .filter((e) => {
-        const row = byEmp.get(e.id);
-        return !row || (row.finalScore === null && !row.excluded);
-      })
+      .filter((e) => blockingIds.has(e.id))
       .map((e) => ({ employeeId: e.id, name: e.name }));
+
+    if (employees.length === 0)
+      return fail("EMPTY_SCOPE", "Cannot publish: nobody is in this cycle's department.", 409);
 
     if (blocking.length > 0) {
       return NextResponse.json(

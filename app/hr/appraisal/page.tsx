@@ -35,7 +35,7 @@ export default async function AppraisalCyclesPage() {
     <>
       <PageHeader
         title="Appraisal Cycles"
-        description="Create cycles, compute scores from the snapshotted formula, and publish. HR cannot edit formula weights."
+        description="Create a cycle, calculate scores and publish them. Only a Super Admin can change the scoring weights."
         action={<PrintButton label="Print results" />}
       />
 

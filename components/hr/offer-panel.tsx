@@ -146,6 +146,9 @@ export function OfferPanel({
           router.refresh();
           return;
         }
+        // The response is recorded: close the attestation form.
+        setResponding(null);
+        setAttestedName("");
         setSaved(
           status === "ACCEPTED"
             ? `Hired. Employee ${data.employeeCode} created with a salary structure and ${data.onboardingTasksCreated} onboarding tasks.` +

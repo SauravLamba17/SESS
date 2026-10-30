@@ -17,7 +17,7 @@
 import type { HeadcountResult } from "./headcount.ts";
 import type { AttendanceResult } from "./attendance.ts";
 import type { HiresExitsResult } from "./hires-exits.ts";
-import type { ProductionResult } from "./production.ts";
+import { PRODUCTION_TARGET_NA_NOTE, type ProductionResult } from "./production.ts";
 import type { AppraisalDistributionResult } from "./appraisal-distribution.ts";
 import type { PayrollCostResult } from "./payroll-cost.ts";
 import { COST_COMPONENTS, COMPONENT_LABEL } from "./payroll-cost.ts";
@@ -193,24 +193,27 @@ export function hiresExitsCsv(r: HiresExitsResult): CsvSection[] {
 }
 
 export function productionCsv(r: ProductionResult): CsvSection[] {
+  // A partial-month range has no comparable target: "N/A", never a blank or 0.
+  const na = (v: number | null) => (v === null && !r.targetsApply ? "N/A" : v);
   return [
     {
       title: "Summary",
       headers: ["Measure", "Value"],
       rows: [
         ["Units produced", r.totalActual],
-        ["Target", r.totalTarget],
-        ["Achievement %", r.achievementPct],
-        ["Variance", r.variance],
+        ["Target", na(r.totalTarget)],
+        ["Achievement %", na(r.achievementPct)],
+        ["Variance", na(r.variance)],
         ["Met target", r.metTargetCount],
         ["Below target", r.belowTargetCount],
+        ...(r.targetsApply ? [] : [["Note", PRODUCTION_TARGET_NA_NOTE]]),
       ],
     },
     {
       title: "By department",
       headers: ["Department", "Employees", "Actual", "Target", "Achievement %", "Variance"],
       rows: r.byDepartment.map((d) => [
-        d.department, d.employees, d.actual, d.target, d.achievementPct, d.variance,
+        d.department, d.employees, d.actual, na(d.target), na(d.achievementPct), na(d.variance),
       ]),
     },
     {
@@ -220,8 +223,8 @@ export function productionCsv(r: ProductionResult): CsvSection[] {
         "Achievement %", "Variance",
       ],
       rows: r.byEmployee.map((e) => [
-        e.employeeCode, e.name, e.department, e.days, e.actual, e.target,
-        e.achievementPct, e.variance,
+        e.employeeCode, e.name, e.department, e.days, e.actual, na(e.target),
+        na(e.achievementPct), na(e.variance),
       ]),
     },
   ];

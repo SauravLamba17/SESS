@@ -32,7 +32,7 @@ export default async function ShiftsPage() {
     <>
       <PageHeader
         title="Shifts"
-        description="Named shifts define the on-time cut-off (start + grace) that drives each employee's lateFlag."
+        description="Each shift sets when staff are due in. Arriving after the start time plus grace counts as late."
       />
 
       {error && (
@@ -101,8 +101,8 @@ export default async function ShiftsPage() {
             </ul>
           )}
           <p className="px-4 py-3 text-xs text-text-muted">
-            Shifts are never hard-deleted — deactivate instead, so no employee’s
-            assignment is orphaned.
+            Shifts can’t be deleted. Deactivate one instead, so nobody is left
+            without a shift.
           </p>
         </Panel>
       </div>

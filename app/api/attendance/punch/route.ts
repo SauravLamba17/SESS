@@ -194,7 +194,11 @@ export async function POST(req: NextRequest) {
           // Preserve any earlier flag; add this punch's failure if present.
           flaggedForReview: existing.flaggedForReview || flaggedForReview,
           reviewReason:
-            [existing.reviewReason, reviewReason].filter(Boolean).join("; ") ||
+            // Each reason once: a check-out failing the same check as the
+            // check-in used to print the whole message twice.
+            Array.from(
+              new Set([existing.reviewReason, reviewReason].filter(Boolean).flatMap((r) => r!.split("; "))),
+            ).join("; ") ||
             null,
           // Only overwrite IP/geo if we now have them (checkout may add geo).
           ipAddress: existing.ipAddress ?? ip,

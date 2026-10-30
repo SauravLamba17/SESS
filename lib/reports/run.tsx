@@ -1,7 +1,7 @@
 import "server-only";
 import { db } from "@/lib/db";
 import type { DateRange } from "./range.ts";
-import { monthsInRange } from "./range.ts";
+import { monthsInRange, wholeMonthPeriods } from "./range.ts";
 import type { ReportId } from "./registry.ts";
 import type { ReportScope } from "./scope.ts";
 import type { ReportMeta } from "./pdf-layout.tsx";
@@ -230,11 +230,21 @@ export async function runReport(
     }
 
     case "production": {
-      const rows = await db.production.findMany({
-        where: { employeeId: { in: ids }, date: inRange(range) },
-        select: { employeeId: true, unitsProduced: true, targetUnits: true },
-      });
-      const result = computeProduction(rows, employees);
+      const months = wholeMonthPeriods(range);
+      const [rows, targets] = await Promise.all([
+        db.production.findMany({
+          where: { employeeId: { in: ids }, date: inRange(range) },
+          select: { employeeId: true, unitsProduced: true },
+        }),
+        // Null months = partial-month range: targets are N/A, not pro-rated.
+        months
+          ? db.monthlyTarget.findMany({
+              where: { employeeId: { in: ids }, period: { in: months } },
+              select: { employeeId: true, targetUnits: true },
+            })
+          : Promise.resolve(null),
+      ]);
+      const result = computeProduction(rows, employees, targets);
       return {
         result,
         pdf: () => renderReport(<ProductionPdf r={result} meta={meta} />),
@@ -375,7 +385,7 @@ const EMPTY_MY_DATA: MyDataInput = {
     active: false,
     offboardedAt: null,
   },
-  attendance: [], leave: [], production: [], quality: [], appraisals: [],
+  attendance: [], leave: [], production: [], productionTarget: null, quality: [], appraisals: [],
   warnings: [], consents: [], expenses: [], payslips: [],
 };
 
@@ -387,8 +397,10 @@ const EMPTY_MY_DATA: MyDataInput = {
  */
 async function fetchMyData(employeeId: string, range: DateRange): Promise<MyDataInput> {
   const window = inRange(range);
+  const months = wholeMonthPeriods(range);
   const [
     employee, attendance, leave, production, quality, appraisals, warnings, consents, expenses, payslips,
+    targets,
   ] = await Promise.all([
     db.employee.findUnique({
       where: { id: employeeId },
@@ -416,7 +428,7 @@ async function fetchMyData(employeeId: string, range: DateRange): Promise<MyData
     db.production.findMany({
       where: { employeeId, date: window },
       orderBy: { date: "desc" },
-      select: { date: true, unitsProduced: true, targetUnits: true },
+      select: { date: true, unitsProduced: true },
     }),
     db.qualityReport.findMany({
       where: { employeeId, date: window },
@@ -456,6 +468,13 @@ async function fetchMyData(employeeId: string, range: DateRange): Promise<MyData
       orderBy: { month: "desc" },
       select: { month: true, status: true, net: true },
     }),
+    // Same whole-month rule as the Production vs Target report.
+    months
+      ? db.monthlyTarget.findMany({
+          where: { employeeId, period: { in: months } },
+          select: { targetUnits: true },
+        })
+      : Promise.resolve(null),
   ]);
 
   return {
@@ -475,6 +494,7 @@ async function fetchMyData(employeeId: string, range: DateRange): Promise<MyData
     attendance,
     leave,
     production,
+    productionTarget: targets ? targets.reduce((n, t) => n + t.targetUnits, 0) : null,
     quality,
     appraisals: appraisals.map((a) => ({
       cyclePeriod: a.cycle.period,

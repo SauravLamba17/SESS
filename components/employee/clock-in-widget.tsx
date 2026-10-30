@@ -1,5 +1,6 @@
 "use client";
 
+import { formatClock } from "@/lib/time-display";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Fingerprint, Loader2, MapPin, LogOut, MessageSquare } from "lucide-react";
@@ -63,7 +64,7 @@ function getPosition(): Promise<{
 
 function fmtTime(iso: string | null | undefined): string {
   if (!iso) return "—";
-  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return formatClock(iso);
 }
 
 export function ClockInWidget({

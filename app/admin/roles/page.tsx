@@ -88,7 +88,9 @@ export default async function RolesPermissions() {
               <tbody className="divide-y divide-border">
                 {users.map((u) => (
                   <tr key={u.id} className="align-top hover:bg-surface-raised/50">
-                    <td className="px-4 py-3 font-mono text-xs text-text-muted">{u.clerkId}</td>
+                    <td className="px-4 py-3 text-xs text-text-muted" title={u.clerkId}>
+                      {u.employee?.name ?? `${ROLE_LABEL[u.role as Role]} account`}
+                    </td>
                     <td className="px-4 py-3">
                       {u.employee ? (
                         <>

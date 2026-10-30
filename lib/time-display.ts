@@ -52,19 +52,34 @@
 export const ORG_TIME_ZONE = "Asia/Kolkata";
 
 /**
- * "05:58 PM" — 12-hour, matching what the client-side Web Attendance widget
- * already renders, so a card and the widget beside it agree to the minute.
+ * "05:58 PM" — 12-hour, in IST, used by server cards AND the client widgets.
  *
- * Locale is left to the environment exactly as before; ONLY the timezone is
- * pinned, so this changes the hour and nothing else about the formatting.
+ * Locale AND timezone are pinned. An unpinned locale formats differently on
+ * the server (Node) and in the browser, which is a React hydration error in a
+ * client component and a different format locally vs on Vercel elsewhere.
  */
 export function formatClock(d: Date | string | null | undefined): string {
   if (!d) return "—";
-  return new Date(d).toLocaleTimeString([], {
+  return new Date(d).toLocaleTimeString("en-US", {
     hour: "2-digit",
     minute: "2-digit",
     timeZone: ORG_TIME_ZONE,
   });
+}
+
+/**
+ * "18 Oct 2026" — every calendar date the app shows. Locale (en-GB, the
+ * British/Indian order the UI copy uses) AND timezone are pinned, for the same
+ * reason as formatClock: an unpinned toLocaleDateString printed "18 Oct 2026"
+ * on one machine and "Oct 18, 2026" on another, and threw a hydration error in
+ * the notification panel. Pass options to change the parts shown.
+ */
+export function formatDate(
+  d: Date | string | null | undefined,
+  opts: Intl.DateTimeFormatOptions = { day: "2-digit", month: "short", year: "numeric" },
+): string {
+  if (!d) return "—";
+  return new Intl.DateTimeFormat("en-GB", { ...opts, timeZone: ORG_TIME_ZONE }).format(new Date(d));
 }
 
 /**

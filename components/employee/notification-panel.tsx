@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDate } from "@/lib/time-display";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -86,11 +87,7 @@ export function NotificationPanel({ items }: { items: NotificationItem[] }) {
                     {n.message}
                   </p>
                   <p className="mt-0.5 font-mono text-[10px] text-text-muted">
-                    {new Date(n.createdAt).toLocaleDateString([], {
-                      day: "2-digit",
-                      month: "short",
-                      year: "numeric",
-                    })}
+                    {formatDate(n.createdAt)}
                     {href && " · view"}
                   </p>
                 </div>

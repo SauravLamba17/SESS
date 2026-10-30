@@ -97,11 +97,11 @@ export function EmployeeRetentionActions({
           </p>
           <p className="mt-1.5 text-[11px] text-text-muted">
             <span className="text-text">Will be erased</span> on {name}’s
-            record: <span className="font-mono">{redactedFields.join(", ")}</span>.
+            record: <span>{redactedFields.join(", ")}</span>.
           </p>
           <p className="mt-1 text-[11px] text-text-muted">
             <span className="text-text">Kept</span>:{" "}
-            <span className="font-mono">{preservedFields.join(", ")}</span>, plus
+            <span>{preservedFields.join(", ")}</span>, plus
             all payroll, attendance, appraisal, warning and expense records. The
             employee record is never deleted.
           </p>

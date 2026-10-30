@@ -46,7 +46,7 @@ export default async function EmployeeMaster() {
     <>
       <PageHeader
         title="Employee Master"
-        description="Onboard and offboard employees. Offboarding is a soft-delete — historical records stay intact."
+        description="Add and offboard employees. Offboarding keeps all their past records."
         action={
           <Link
             href="/hr/employees/retention-review"

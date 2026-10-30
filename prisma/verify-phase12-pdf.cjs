@@ -195,6 +195,7 @@ const FIXTURES = [
     "production",
     "ProductionPdf",
     {
+      targetsApply: true,
       totalActual: 190, totalTarget: 210, achievementPct: 90.5, variance: -20,
       metTargetCount: 1, belowTargetCount: 1,
       byEmployee: [
@@ -203,6 +204,22 @@ const FIXTURES = [
       ],
       byDepartment: [
         { department: "Assembly", employees: 2, actual: 190, target: 210, achievementPct: 90.5, variance: -20 },
+      ],
+    },
+  ],
+  // Partial-month range: every target is N/A (null), never 0.
+  [
+    "production",
+    "ProductionPdf",
+    {
+      targetsApply: false,
+      totalActual: 190, totalTarget: null, achievementPct: null, variance: null,
+      metTargetCount: 0, belowTargetCount: 0,
+      byEmployee: [
+        { employeeId: "e1", name: "Alpha", employeeCode: "EMP-0001", department: "Assembly", days: 2, actual: 160, target: null, achievementPct: null, variance: null },
+      ],
+      byDepartment: [
+        { department: "Assembly", employees: 1, actual: 160, target: null, achievementPct: null, variance: null },
       ],
     },
   ],
@@ -250,8 +267,8 @@ const FIXTURES = [
       ],
       attendanceSummary: { days: 1, late: 0, flagged: 0 },
       leave: [{ startDate: new Date("2026-06-10"), endDate: new Date("2026-06-11"), reason: "Personal", status: "APPROVED", createdAt: new Date("2026-06-01") }],
-      production: [{ date: new Date("2026-06-01"), unitsProduced: 100, targetUnits: 80 }],
-      productionSummary: { days: 1, actual: 100, target: 80 },
+      production: [{ date: new Date("2026-06-01"), unitsProduced: 100 }],
+      productionSummary: { days: 1, actual: 100, target: 80, achievementPct: 125 },
       quality: [{ date: new Date("2026-06-01"), defectCount: 1, qualityScore: 95 }],
       qualitySummary: { reviews: 1, averageScore: 95 },
       appraisals: [{ cyclePeriod: "2026-Q2", published: true, excluded: false, finalScore: 88, managerFeedback: "Solid" }],

@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/time-display";
 import { getEffectiveUserId } from "@/lib/auth";
 import { PageHeader } from "@/components/portal/portal-shell";
 import { Panel, PanelHeader } from "@/components/ui/panel";
@@ -13,11 +14,7 @@ export const metadata = { title: "My Profile" };
 export const dynamic = "force-dynamic";
 
 function fmtDate(d: Date): string {
-  return d.toLocaleDateString([], {
-    year: "numeric",
-    month: "short",
-    day: "2-digit",
-  });
+  return formatDate(d);
 }
 
 async function loadEmployee() {

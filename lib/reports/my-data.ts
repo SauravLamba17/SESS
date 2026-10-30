@@ -37,6 +37,7 @@
 // Pure. No DB access.
 
 import type { DateRange } from "./range.ts";
+import { pct } from "./types.ts";
 
 export interface MyProfile {
   name: string;
@@ -73,7 +74,6 @@ export interface MyLeaveRow {
 export interface MyProductionRow {
   date: Date;
   unitsProduced: number;
-  targetUnits: number;
 }
 
 export interface MyQualityRow {
@@ -123,6 +123,11 @@ export interface MyDataInput {
   attendance: MyAttendanceRow[];
   leave: MyLeaveRow[];
   production: MyProductionRow[];
+  /**
+   * Sum of this employee's MonthlyTarget over the range's months, or null when
+   * the range is not whole calendar months (the appraisal whole-month rule).
+   */
+  productionTarget: number | null;
   quality: MyQualityRow[];
   appraisals: MyAppraisalRow[];
   warnings: MyWarningRow[];
@@ -141,7 +146,8 @@ export interface MyDataResult {
   };
   leave: MyLeaveRow[];
   production: MyProductionRow[];
-  productionSummary: { days: number; actual: number; target: number };
+  /** target null = N/A (partial-month range); 0 = no target set. */
+  productionSummary: { days: number; actual: number; target: number | null; achievementPct: number | null };
   quality: MyQualityRow[];
   qualitySummary: { reviews: number; averageScore: number | null };
   /** PUBLISHED, non-excluded cycles only. */
@@ -163,7 +169,7 @@ export function computeMyData(input: MyDataInput, range: DateRange): MyDataResul
   const warnings = input.warnings.filter((w) => w.status === "RELEASED");
 
   const productionActual = input.production.reduce((n, p) => n + p.unitsProduced, 0);
-  const productionTarget = input.production.reduce((n, p) => n + p.targetUnits, 0);
+  const productionTarget = input.productionTarget;
 
   const qualityScores = input.quality.map((q) => q.qualityScore);
   const averageScore =
@@ -185,6 +191,7 @@ export function computeMyData(input: MyDataInput, range: DateRange): MyDataResul
       days: input.production.length,
       actual: productionActual,
       target: productionTarget,
+      achievementPct: productionTarget === null ? null : pct(productionActual, productionTarget),
     },
     quality: input.quality,
     qualitySummary: { reviews: input.quality.length, averageScore },

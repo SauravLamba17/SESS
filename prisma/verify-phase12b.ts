@@ -308,7 +308,7 @@ async function main() {
         },
       })
     ),
-    leave: [], production: [], quality: [],
+    leave: [], production: [], productionTarget: null, quality: [],
     appraisals: (
       await db.appraisalScore.findMany({
         where: { employeeId: A.id },

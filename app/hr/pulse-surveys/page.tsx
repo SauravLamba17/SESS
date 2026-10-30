@@ -49,6 +49,7 @@ async function load() {
 
 export default async function PulseSurveysPage() {
   const { surveys, aggregates, error } = await load();
+  const now = new Date();
 
   return (
     <>
@@ -91,13 +92,17 @@ export default async function PulseSurveysPage() {
             </Panel>
           ) : (
             surveys.map((s) => {
+              // Open = switched on AND not past its close date — the same test
+              // the employee /pulse page uses to list it.
+              const expired = s.closesAt !== null && s.closesAt <= now;
+              const open = s.active && !expired;
               const agg = aggregates.get(s.id);
               const total = agg?.responseCount ?? 0;
               const maxCount = Math.max(1, ...(agg?.distribution.map((d) => d.count) ?? [1]));
               return (
                 <Panel key={s.id}>
                   <PanelHeader
-                    title={s.active ? "Open" : "Closed"}
+                    title={open ? "Open" : "Closed"}
                     action={
                       <span className="inline-flex items-center gap-3">
                         <span className="font-mono text-[11px] text-text-muted">
@@ -106,7 +111,7 @@ export default async function PulseSurveysPage() {
                             ? ` · avg ${agg.average}`
                             : ""}
                         </span>
-                        <SurveyToggleButton id={s.id} active={s.active} />
+                        {!expired && <SurveyToggleButton id={s.id} active={s.active} />}
                       </span>
                     }
                   />
@@ -149,7 +154,8 @@ export default async function PulseSurveysPage() {
                     <p className="mt-3 font-mono text-[10px] text-text-muted">
                       scale {s.scaleMin}–{s.scaleMax} · created{" "}
                       {s.createdAt.toISOString().slice(0, 10)}
-                      {s.closesAt && ` · closes ${ymd(pulseLastOpenDay(s.closesAt))}`}
+                      {s.closesAt &&
+                        ` · ${expired ? "closed" : "closes"} ${ymd(pulseLastOpenDay(s.closesAt))}`}
                     </p>
                   </div>
                 </Panel>

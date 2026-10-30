@@ -1,5 +1,6 @@
 "use client";
 
+import { formatClock } from "@/lib/time-display";
 import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { StatusDot, type StatusState } from "@/components/ui/status-dot";
@@ -41,10 +42,7 @@ function ymd(y: number, m: number, d: number): string {
 
 function fmtTime(iso: string | null): string {
   if (!iso) return "";
-  return new Date(iso).toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatClock(iso);
 }
 
 export function AttendanceCalendar({

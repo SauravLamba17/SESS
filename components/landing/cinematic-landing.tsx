@@ -17,12 +17,13 @@
  * of logic that is already visually verified. It stays imperative, owned by
  * one effect, and is torn down completely on unmount.
  *
- * Sign-in reuses the app's existing mechanism verbatim: Clerk's
- * <SignInButton mode="modal">, exactly as the previous app/page.tsx did.
+ * Sign-in is Clerk's <SignInButton mode="modal"> for a signed-out visitor; a
+ * signed-in one goes straight to their portal (./sign-in-or-portal.tsx).
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { SignInButton } from "@clerk/nextjs";
+import { SignInOrPortal } from "./sign-in-or-portal";
+import { SignedInRedirect } from "./signed-in-redirect";
 // Type-only: erased at compile time, so this does NOT pull lenis into the
 // bundle. The runtime import lives in the effect below.
 import type LenisInstance from "lenis";
@@ -642,6 +643,7 @@ export default function CinematicLanding({
 
   return (
     <div className={s.root}>
+      <SignedInRedirect />
       <canvas ref={canvasRef} className={s.stage} aria-hidden="true" />
       <div className={s.vignette} aria-hidden="true" />
       <div className={s.grain} aria-hidden="true" />
@@ -667,9 +669,9 @@ export default function CinematicLanding({
               </a>
             ))}
           </nav>
-          <SignInButton mode="modal">
+          <SignInOrPortal signedInLabel="Open my portal">
             <button className={s.signin}>Sign in</button>
-          </SignInButton>
+          </SignInOrPortal>
         </div>
       </header>
 
@@ -940,7 +942,7 @@ export default function CinematicLanding({
             </p>
             <div className={`${s.portals} ${s.rv}`}>
               {PORTALS.map((p) => (
-                <SignInButton key={p.href} mode="modal" forceRedirectUrl={p.href}>
+                <SignInOrPortal key={p.href} redirectUrl={p.href}>
                   <button
                     className={`${s.portal} ${s.glass}`}
                     style={{ "--rc": p.rc } as React.CSSProperties}
@@ -956,7 +958,7 @@ export default function CinematicLanding({
                       <span className={s.arrow}>→</span>
                     </div>
                   </button>
-                </SignInButton>
+                </SignInOrPortal>
               ))}
             </div>
           </div>
@@ -1033,9 +1035,9 @@ export default function CinematicLanding({
                 people.
               </p>
               <div className={`${s.acts} ${s.rv}`}>
-                <SignInButton mode="modal">
+                <SignInOrPortal signedInLabel="Open my portal">
                   <button className={`${s.act} ${s.filled}`}>Sign in</button>
-                </SignInButton>
+                </SignInOrPortal>
                 <button className={s.act} onClick={() => goTo(0)}>
                   Back to top
                 </button>

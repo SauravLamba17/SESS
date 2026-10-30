@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Calculator, Send } from "lucide-react";
 import { StatusDot } from "@/components/ui/status-dot";
 import { formatComponentOutOf5 } from "@/lib/appraisal/display";
+import { canPublishCycle, type CycleScoreState } from "@/lib/appraisal/publish-rule";
 
 interface Incomplete {
   employeeId: string;
@@ -34,9 +35,37 @@ export function CycleActions({ cycleId }: { cycleId: string }) {
     total: number;
     complete: number;
     incomplete: Incomplete[];
+    excluded: { employeeId: string; name: string }[];
+    people: CycleScoreState[];
     scored: Scored[];
   } | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  function show(data: {
+    total: number; complete: number; incomplete: Incomplete[];
+    excluded?: { employeeId: string; name: string }[]; people?: CycleScoreState[]; scored?: Scored[];
+  }) {
+    setSummary({
+      total: data.total,
+      complete: data.complete,
+      incomplete: data.incomplete,
+      excluded: data.excluded ?? [],
+      people: data.people ?? [],
+      scored: data.scored ?? [],
+    });
+  }
+
+  /** The saved status (no recalculation), so the lists survive a reload. */
+  async function loadStatus() {
+    const res = await fetch(`/api/hr/appraisal/compute?cycleId=${encodeURIComponent(cycleId)}`);
+    const data = res.ok ? await res.json() : null;
+    if (data?.computed) show(data);
+  }
+
+  useEffect(() => {
+    loadStatus().catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per cycle
+  }, [cycleId]);
 
   async function compute() {
     setMsg(null);
@@ -50,28 +79,27 @@ export function CycleActions({ cycleId }: { cycleId: string }) {
       setMsg({ ok: false, text: data.error ?? "Compute failed" });
       return;
     }
-    setSummary({
-      total: data.total,
-      complete: data.complete,
-      incomplete: data.incomplete,
-      scored: data.scored ?? [],
-    });
+    show(data);
+    router.refresh(); // the cycle card's score-row count
   }
 
   function onCompute() {
     start(compute);
   }
 
-  function onExclude(employeeId: string) {
+  function setExcluded(employeeId: string, excluded: boolean) {
     start(async () => {
       const res = await fetch("/api/hr/appraisal/exclude", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cycleId, employeeId, excluded: true }),
+        body: JSON.stringify({ cycleId, employeeId, excluded }),
       });
       const data = await res.json();
-      if (!res.ok) return setMsg({ ok: false, text: data.error ?? "Exclude failed" });
-      await compute(); // refresh completeness after exclusion
+      if (!res.ok)
+        return setMsg({ ok: false, text: data.error ?? (excluded ? "Exclude failed" : "Include failed") });
+      // Re-read, don't recalculate: a recompute here would use whatever the
+      // "Allow missing feedback" box says NOW and could rewrite scores.
+      await loadStatus();
     });
   }
 
@@ -94,7 +122,9 @@ export function CycleActions({ cycleId }: { cycleId: string }) {
     });
   }
 
-  const canPublish = summary !== null && summary.incomplete.length === 0 && summary.total > 0;
+  // The publish API's own rule (lib/appraisal/publish-rule), run on the same data.
+  const canPublish =
+    summary !== null && canPublishCycle(summary.people.map((p) => p.employeeId), summary.people);
 
   return (
     <div className="mt-3 space-y-3 border-t border-border pt-3">
@@ -135,6 +165,7 @@ export function CycleActions({ cycleId }: { cycleId: string }) {
             <StatusDot state={summary.incomplete.length === 0 ? "good" : "warn"} />
             <span className="text-text">
               {summary.complete} / {summary.total} complete
+              {summary.excluded.length > 0 && ` · ${summary.excluded.length} excluded`}
             </span>
           </div>
           {summary.incomplete.length > 0 && (
@@ -149,11 +180,32 @@ export function CycleActions({ cycleId }: { cycleId: string }) {
                   </span>
                   <button
                     type="button"
-                    onClick={() => onExclude(e.employeeId)}
+                    onClick={() => setExcluded(e.employeeId, true)}
                     disabled={pending}
                     className="rounded border border-border px-2 py-0.5 text-[11px] text-text-muted hover:text-text focus:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
                   >
                     Exclude
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {summary.excluded.length > 0 && (
+            <ul className="mt-2 space-y-1">
+              {summary.excluded.map((e) => (
+                <li key={e.employeeId} className="flex items-center justify-between gap-3">
+                  <span className="text-text-muted">
+                    {e.name}
+                    <span className="ml-2 text-text-muted">Excluded</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setExcluded(e.employeeId, false)}
+                    disabled={pending}
+                    className="rounded border border-border px-2 py-0.5 text-[11px] text-text-muted hover:text-text focus:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
+                  >
+                    Include
                   </button>
                 </li>
               ))}

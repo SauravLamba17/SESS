@@ -87,8 +87,8 @@ export async function POST(req: NextRequest) {
       return fail(
         "NO_CONSENT",
         consent.reason === "NEVER_GIVEN"
-          ? `No IDLE_TRACKING consent is recorded for ${employee.name}. Record their consent on the Compliance & Consent page before issuing an agent token.`
-          : `${employee.name}'s IDLE_TRACKING consent expired on ${consent.expiredOn ? ymd(consent.expiredOn) : "an unknown date"}. Record fresh consent on the Compliance & Consent page before issuing an agent token.`,
+          ? `No idle-tracking consent is recorded for ${employee.name}. Record their consent on the Compliance & Consent page before issuing an agent token.`
+          : `${employee.name}'s idle-tracking consent expired on ${consent.expiredOn ? ymd(consent.expiredOn) : "an unknown date"}. Record fresh consent on the Compliance & Consent page before issuing an agent token.`,
         409,
       );
 

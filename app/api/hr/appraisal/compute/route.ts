@@ -13,9 +13,85 @@ import {
 import { fail } from "@/lib/api/response";
 import { lockCycleForWrite } from "@/lib/appraisal/cycle-lock";
 import { onAppraisalChanged } from "@/lib/invalidation/employee";
+import { canPublishCycle } from "@/lib/appraisal/publish-rule";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+/** One in-scope employee's state in a cycle, as the HR page shows it. */
+interface CyclePerson {
+  employeeId: string;
+  name: string;
+  finalScore: number | null;
+  excluded: boolean;
+  /** Missing components when not scored; empty when complete or never computed. */
+  missing: string[];
+  computed: boolean;
+}
+
+/**
+ * The page's view of a cycle, split so excluded people never count as
+ * incomplete, plus `canPublish` from the SAME rule the publish API uses.
+ */
+function cycleStatus(
+  employees: { id: string; name: string }[],
+  rows: { employeeId: string; finalScore: number | null; excluded: boolean; componentDataJson: Prisma.JsonValue }[],
+) {
+  const byEmp = new Map(rows.map((r) => [r.employeeId, r]));
+  const people: CyclePerson[] = employees.map((e) => {
+    const r = byEmp.get(e.id);
+    const meta = (r?.componentDataJson ?? {}) as { missingComponents?: unknown };
+    return {
+      employeeId: e.id,
+      name: e.name,
+      finalScore: r?.finalScore ?? null,
+      excluded: r?.excluded ?? false,
+      missing: Array.isArray(meta.missingComponents) ? meta.missingComponents.map(String) : [],
+      computed: Boolean(r),
+    };
+  });
+  return {
+    total: employees.length,
+    complete: people.filter((p) => p.finalScore !== null && !p.excluded).length,
+    incomplete: people
+      .filter((p) => p.finalScore === null && !p.excluded)
+      .map((p) => ({ employeeId: p.employeeId, name: p.name, missing: p.computed ? p.missing : ["not computed yet"] })),
+    excluded: people.filter((p) => p.excluded).map((p) => ({ employeeId: p.employeeId, name: p.name })),
+    canPublish: canPublishCycle(employees.map((e) => e.id), people),
+    /** Raw states so the page can run the shared rule itself. */
+    people: people.map(({ employeeId, finalScore, excluded }) => ({ employeeId, finalScore, excluded })),
+  };
+}
+
+/**
+ * The cycle's current state from the stored score rows, so the incomplete and
+ * excluded lists survive a page reload (they used to exist only in the POST
+ * response). Reads nothing it would not show HR anyway.
+ */
+export async function GET(req: NextRequest) {
+  const userId = await getEffectiveUserId();
+  if (!userId) return fail("UNAUTHENTICATED", "Not authenticated", 401);
+  const role = await getCurrentRole();
+  if (role !== "HR" && role !== "SUPER_ADMIN")
+    return fail("FORBIDDEN", "Only HR or Super Admin may view cycle status", 403);
+  const cycleId = new URL(req.url).searchParams.get("cycleId") ?? "";
+  if (!cycleId) return fail("BAD_INPUT", "cycleId is required", 400);
+  try {
+    const cycle = await db.appraisalCycle.findUnique({ where: { id: cycleId }, select: { department: true } });
+    if (!cycle) return fail("NOT_FOUND", "Cycle not found", 404);
+    const [employees, rows] = await Promise.all([
+      getActiveEmployees(cycle.department),
+      db.appraisalScore.findMany({
+        where: { cycleId },
+        select: { employeeId: true, finalScore: true, excluded: true, componentDataJson: true },
+      }),
+    ]);
+    return NextResponse.json({ ok: true, cycleId, computed: rows.length > 0, ...cycleStatus(employees, rows), scored: [] });
+  } catch (err) {
+    console.error("[hr/appraisal/compute GET] failed:", err);
+    return fail("SERVER_ERROR", "Could not load the cycle status", 503);
+  }
+}
 // The $transaction below is capped at 60s and upserts one row PER EMPLOYEE in a
 // loop, so its duration scales with headcount. 90 leaves Prisma's own 60s
 // timeout room to fire first and return a real error, instead of Vercel killing
@@ -76,7 +152,9 @@ export async function POST(req: NextRequest) {
     const inRange = { gte: range.start, lt: range.end };
 
     if (ids.length === 0)
-      return NextResponse.json({ ok: true, cycleId, total: 0, complete: 0, incomplete: [] });
+      return NextResponse.json({
+        ok: true, cycleId, computed: true, total: 0, complete: 0, incomplete: [], excluded: [], canPublish: false, people: [], scored: [],
+      });
 
     // ── Batch fetch: a fixed handful of queries, independent of headcount ──
     const [attTotal, attLate, prodSum, targets, qualAvg, warnings, existing] =
@@ -117,7 +195,7 @@ export async function POST(req: NextRequest) {
         }),
         db.appraisalScore.findMany({
           where: { cycleId },
-          select: { employeeId: true, managerFeedbackScore: true },
+          select: { employeeId: true, managerFeedbackScore: true, excluded: true },
         }),
       ]);
 
@@ -133,7 +211,6 @@ export async function POST(req: NextRequest) {
     for (const t of targets)
       targetBy.set(t.employeeId, (targetBy.get(t.employeeId) ?? 0) + t.targetUnits);
 
-    const incomplete: { employeeId: string; name: string; missing: string[] }[] = [];
     const scored: {
       employeeId: string;
       name: string;
@@ -147,7 +224,6 @@ export async function POST(req: NextRequest) {
         avgLateMinutesAmongLateDays: number;
       };
     }[] = [];
-    let complete = 0;
 
     // Computed first, written second. The scoring below is pure; collecting the
     // payloads lets every write happen together inside ONE locked transaction,
@@ -185,7 +261,6 @@ export async function POST(req: NextRequest) {
         const finalScore = result.status === "COMPLETE" ? result.finalScore : null;
 
         if (result.status === "COMPLETE") {
-          complete += 1;
           const pd = result.componentData.punctuality;
           if (pd.breakdown) {
             scored.push({
@@ -202,8 +277,6 @@ export async function POST(req: NextRequest) {
               },
             });
           }
-        } else {
-          incomplete.push({ employeeId: emp.id, name: emp.name, missing: result.missingComponents });
         }
 
         pending.push({
@@ -266,13 +339,25 @@ export async function POST(req: NextRequest) {
     // §2: scoring wrote the score rows the cached summary counts.
     onAppraisalChanged();
 
+    // Excluded people are reported separately and never as incomplete — the
+    // bug that kept Publish disabled after an Exclude.
+    const excludedBy = new Map(existing.map((s) => [s.employeeId, s.excluded]));
+    const status = cycleStatus(
+      employees,
+      pending.map((p) => ({
+        employeeId: p.employeeId,
+        finalScore: p.finalScore,
+        excluded: excludedBy.get(p.employeeId) ?? false,
+        componentDataJson: p.componentMeta as Prisma.JsonValue,
+      })),
+    );
+
     return NextResponse.json({
       ok: true,
       cycleId,
-      total: employees.length,
-      complete,
-      incomplete,
-      scored,
+      computed: true,
+      ...status,
+      scored: scored.filter((x) => !excludedBy.get(x.employeeId)),
     });
   } catch (err) {
     console.error("[hr/appraisal/compute] failed:", err);
